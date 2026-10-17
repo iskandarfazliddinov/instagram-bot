@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  instagram-bot:
+    build: .
+    container_name: instagram_automation_bot
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Ma'lumotlar bazasi konteyner o'chirilganda ham o'chib ketmasligi uchun
+      - ./data:/app/data

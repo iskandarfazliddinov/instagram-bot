@@ -1,0 +1,123 @@
+import logging
+import requests
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+GRAPH_API_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}/me/messages"
+GRAPH_BASE_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}"
+
+def send_message(recipient_id: str, text: str) -> dict:
+    """
+    Instagram Direct orqali mijozga xabar yuborish
+    """
+    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+        logger.warning("PAGE_ACCESS_TOKEN kiritilmagan. Xabar yuborilmadi.")
+        return {"error": "PAGE_ACCESS_TOKEN is not configured"}
+
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": text}
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        data = response.json()
+        if response.status_code != 200:
+            logger.error(f"Meta API xatoligi: {data}")
+        return data
+    except Exception as e:
+        logger.error(f"Instagram xabar yuborishda xatolik: {e}")
+        return {"error": str(e)}
+
+def send_link_button(recipient_id: str, text: str, button_title: str, url: str) -> dict:
+    """
+    Tugmali havola (Web URL button) yuborish
+    """
+    if not settings.PAGE_ACCESS_TOKEN:
+        return {"error": "No token"}
+
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "button",
+                    "text": text,
+                    "buttons": [
+                        {
+                            "type": "web_url",
+                            "url": url,
+                            "title": button_title
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        return response.json()
+    except Exception as e:
+        logger.error(f"Tugmali havola yuborishda xatolik: {e}")
+        # Fallback: oddiy matn sifatida jo'natamiz
+        return send_message(recipient_id, f"{text}\n\n👉 {url}")
+
+def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
+    """
+    Videodagi izoh qoldirgan mijozning Directiga avtomatik shaxsiy xabar yuborish
+    (Meta Instagram Private Reply to Comment API)
+    """
+    if not settings.PAGE_ACCESS_TOKEN:
+        return {"error": "No token"}
+
+    payload = {
+        "recipient": {"comment_id": comment_id},
+        "message": {"text": text}
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        data = response.json()
+        if response.status_code != 200:
+            logger.error(f"Izohga Direct javob yuborishda xatolik: {data}")
+        return data
+    except Exception as e:
+        logger.error(f"Izohga Direct yuborishda xatolik: {e}")
+        return {"error": str(e)}
+
+def reply_public_comment(comment_id: str, text: str) -> dict:
+    """
+    Videodagi izoh ostiga ommaviy javob yozish (Public reply)
+    """
+    if not settings.PAGE_ACCESS_TOKEN:
+        return {"error": "No token"}
+
+    url = f"{GRAPH_BASE_URL}/{comment_id}/replies"
+    payload = {"message": text}
+    headers = {
+        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        return response.json()
+    except Exception as e:
+        logger.error(f"Izoh ostiga ommaviy javob yozishda xatolik: {e}")
+        return {"error": str(e)}
+
