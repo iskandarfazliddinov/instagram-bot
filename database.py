@@ -23,19 +23,62 @@ def init_db():
             full_name TEXT,
             phone_number TEXT,
             source TEXT DEFAULT 'Direct',
+            campaign TEXT DEFAULT 'Umumiy',
             step TEXT DEFAULT 'new',
             last_message TEXT,
             created_at TIMESTAMP,
             updated_at TIMESTAMP
         )
     """)
-    # Agar jadval oldin yaratilgan bo'lsa, source ustunini qo'shib qo'yish
+    # Eski jadval bo'lsa yangi ustunlarni xatosiz qo'shish
     try:
         cursor.execute("ALTER TABLE clients ADD COLUMN source TEXT DEFAULT 'Direct'")
     except sqlite3.OperationalError:
-        pass  # Ustun allaqachon mavjud bo'lsa xatolik bermaydi
+        pass
+    try:
+        cursor.execute("ALTER TABLE clients ADD COLUMN campaign TEXT DEFAULT 'Umumiy'")
+    except sqlite3.OperationalError:
+        pass
+
+    # 1. Tizim sozlamalari jadvali (Direct matnlari)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+
+    # 2. Har bir video/mavzu uchun maxsus qoidalar jadvali
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            trigger_keyword TEXT,
+            media_id TEXT,
+            public_reply TEXT,
+            dm_welcome TEXT,
+            promo_link TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP
+        )
+    """)
+
+    # Standart matnlarni tekshirib kiritish
+    default_settings = {
+        "direct_welcome": "Assalomu alaykum! Xush kelibsiz. 😊\n\nSiz so'ragan maxsus havola va batafsil ma'lumotlarni yuborishimiz uchun, iltimos, ismingizni yozib qoldiring:",
+        "ask_phone": "Rahmat, {name}! 🙌\n\nMa'lumotlarni taqdim etishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",
+        "final_message": "Katta rahmat! Ma'lumotlaringiz muvaffaqiyatli saqlandi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:",
+        "default_promo_link": "https://sizning-saytingiz.uz/katalog",
+        "admin_password": "admin"
+    }
+    for k, v in default_settings.items():
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
     conn.commit()
     conn.close()
+
+# Modul yuklanganda bazani avtomatik tayyorlab qo'yish
+init_db()
 
 def get_or_create_client(instagram_id: str) -> dict:
     """Mijozni bazadan olish yoki yangi bo'lsa yaratish"""
@@ -81,3 +124,83 @@ def get_all_clients():
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+# ----------------- SOZLAMALAR (SETTINGS) -----------------
+
+def get_setting(key: str, default: str = "") -> str:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+def set_setting(key: str, value: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+def get_all_settings() -> dict:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM settings")
+    rows = cursor.fetchall()
+    conn.close()
+    return {r["key"]: r["value"] for r in rows}
+
+# ----------------- VIDEO AKSIYALARI (CAMPAIGNS) -----------------
+
+def get_all_campaigns():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM campaigns ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def create_campaign(name: str, trigger_keyword: str, media_id: str, public_reply: str, dm_welcome: str, promo_link: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now().isoformat()
+    cursor.execute("""
+        INSERT INTO campaigns (name, trigger_keyword, media_id, public_reply, dm_welcome, promo_link, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    """, (name, trigger_keyword.strip().lower(), media_id.strip(), public_reply, dm_welcome, promo_link, now))
+    conn.commit()
+    conn.close()
+
+def delete_campaign(campaign_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+    conn.commit()
+    conn.close()
+
+def match_campaign(media_id: str = "", text: str = "") -> dict:
+    """
+    Video ID yoki izohdagi kalit so'zga qarab mos keluvchi aksiyani topish
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM campaigns WHERE is_active = 1")
+    campaigns = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    text_lower = text.lower().strip()
+
+    # 1. Avval media_id bo'yicha aniq mos kelishini qidiramiz
+    if media_id:
+        for c in campaigns:
+            if c.get("media_id") and c["media_id"] == media_id:
+                return c
+
+    # 2. Kalit so'z bo'yicha qidiramiz
+    for c in campaigns:
+        kw = c.get("trigger_keyword", "")
+        if kw and kw in text_lower:
+            return c
+
+    return None
+

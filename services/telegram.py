@@ -15,12 +15,14 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
     phone = client.get('phone_number', 'Noma\'lum')
     ig_id = client.get('instagram_id', '')
     last_msg = client.get('last_message', '')
+    campaign = client.get('campaign', 'Umumiy')
 
     text = (
         "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Mijoz:</b> {full_name}\n"
         f"📞 <b>Telefon:</b> <code>{phone}</code>\n"
+        f"🎯 <b>Yo'nalish / Aksiya:</b> <b>{campaign}</b>\n"
         f"📍 <b>Manba:</b> {source}\n"
         f"🆔 <b>Instagram ID:</b> <code>{ig_id}</code>\n"
         f"💬 <b>So'rovi:</b> <i>{last_msg}</i>\n"

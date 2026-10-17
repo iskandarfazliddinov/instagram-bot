@@ -1,11 +1,20 @@
 import io
 import csv
 import logging
-from fastapi import FastAPI, Request, Response, status
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request, Response, Form, status
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from config import settings
-from database import init_db, get_all_clients
+from database import (
+    init_db,
+    get_all_clients,
+    get_all_settings,
+    set_setting,
+    get_all_campaigns,
+    create_campaign,
+    delete_campaign
+)
 from services.dialog_manager import process_incoming_message, process_incoming_comment
+from services.admin_view import get_admin_dashboard_html
 
 # Loglarni sozlash
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -175,6 +184,69 @@ async def receive_instagram_events(request: Request):
     return {"status": "ok"}
 
 # ----------------- ADMIN VA BAZANI KO'RISH -----------------
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_dashboard(request: Request, notice: str = ""):
+    """Veb admin boshqaruv paneli"""
+    settings_data = get_all_settings()
+    campaigns_data = get_all_campaigns()
+    clients_data = get_all_clients()
+    html_content = get_admin_dashboard_html(settings_data, campaigns_data, clients_data, notice=notice)
+    return HTMLResponse(content=html_content)
+
+@app.post("/admin/settings/save")
+async def save_settings(
+    direct_welcome: str = Form(""),
+    ask_phone: str = Form(""),
+    final_message: str = Form(""),
+    default_promo_link: str = Form("")
+):
+    """Direct xabar shablonlarini yangilash"""
+    if direct_welcome.strip():
+        set_setting("direct_welcome", direct_welcome.strip())
+    if ask_phone.strip():
+        set_setting("ask_phone", ask_phone.strip())
+    if final_message.strip():
+        set_setting("final_message", final_message.strip())
+    if default_promo_link.strip():
+        set_setting("default_promo_link", default_promo_link.strip())
+
+    return RedirectResponse(
+        url="/admin?notice=Direct+shablonlari+muvaffaqiyatli+saqlandi",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/campaign/create")
+async def add_campaign(
+    name: str = Form(...),
+    trigger_keyword: str = Form(...),
+    public_reply: str = Form(...),
+    promo_link: str = Form(...),
+    dm_welcome: str = Form(""),
+    media_id: str = Form("")
+):
+    """Yangi video qoidasi (aksiyasi) qo'shish"""
+    create_campaign(
+        name=name,
+        trigger_keyword=trigger_keyword,
+        media_id=media_id,
+        public_reply=public_reply,
+        dm_welcome=dm_welcome,
+        promo_link=promo_link
+    )
+    return RedirectResponse(
+        url="/admin?notice=Yangi+video+qoidasi+qo%27shildi",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/campaign/delete")
+async def remove_campaign(campaign_id: int = Form(...)):
+    """Video qoidasini o'chirish"""
+    delete_campaign(campaign_id)
+    return RedirectResponse(
+        url="/admin?notice=Video+qoidasi+o%27chirildi",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
 
 @app.get("/api/clients")
 def list_clients():
