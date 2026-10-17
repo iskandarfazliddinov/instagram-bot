@@ -1,4 +1,4 @@
-def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, notice: str = "") -> str:
+def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "") -> str:
     # Aksiya ro'yxati HTML
     campaigns_html = ""
     if not campaigns:
@@ -10,10 +10,25 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, not
         </tr>
         """
     for c in campaigns:
+        # Video linki yoki barcha videolar
+        if c.get('media_url'):
+            media_display = f"""<a href="{c['media_url']}" target="_blank" class="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1">🎬 Videoni ochish ↗</a>"""
+        elif c.get('media_id'):
+            media_display = f"""<span class="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">ID: {c['media_id'][:10]}...</span>"""
+        else:
+            media_display = """<span class="text-xs text-slate-400 italic">Barcha videolar</span>"""
+
+        # Kalit so'z yoki barcha izohlar
+        if c.get('trigger_keyword'):
+            kw_display = f"""<span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium">#{c['trigger_keyword']}</span>"""
+        else:
+            kw_display = """<span class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-medium">✨ Barcha izohlar</span>"""
+
         campaigns_html += f"""
         <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
             <td class="px-6 py-4 font-semibold text-gray-800">{c['name']}</td>
-            <td class="px-6 py-4"><span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">#{c.get('trigger_keyword', '—')}</span></td>
+            <td class="px-6 py-4">{media_display}</td>
+            <td class="px-6 py-4">{kw_display}</td>
             <td class="px-6 py-4 text-xs text-gray-500 truncate max-w-xs">{c.get('public_reply', '—')}</td>
             <td class="px-6 py-4 text-xs text-blue-600 truncate max-w-xs"><a href="{c.get('promo_link', '#')}" target="_blank" class="hover:underline">{c.get('promo_link', '—')}</a></td>
             <td class="px-6 py-4">
@@ -51,6 +66,16 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, not
             <td class="px-6 py-4 text-xs text-gray-400">{created_at}</td>
         </tr>
         """
+
+    media_options_html = '<option value="">-- Akkauntdagi videoni tanlang (ixtiyoriy) --</option>\n'
+    if recent_media:
+        for m in recent_media:
+            caption = (m.get('caption') or 'Sarlavhasiz video').replace('\n', ' ').replace('"', "'")
+            if len(caption) > 55:
+                caption = caption[:52] + '...'
+            m_type = m.get('media_type', 'POST')
+            permalink = m.get('permalink', '')
+            media_options_html += f'<option value="{permalink}">[{m_type}] {caption}</option>\n'
 
     notice_banner = f"""
     <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium flex items-center justify-between">
@@ -170,6 +195,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, not
                             <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-500 border-b border-slate-100">
                                 <tr>
                                     <th class="px-6 py-3.5">Aksiya / Video Nomi</th>
+                                    <th class="px-6 py-3.5">Bog'langan Video</th>
                                     <th class="px-6 py-3.5">Kalit so'z</th>
                                     <th class="px-6 py-3.5">Izohga javob</th>
                                     <th class="px-6 py-3.5">Beriladigan Havola</th>
@@ -192,8 +218,28 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, not
                                     <input type="text" name="name" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" placeholder="Masalan: Umra Safari 2026">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Trigger Kalit so'z (izohda yoziladigan so'z):</label>
-                                    <input type="text" name="trigger_keyword" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" placeholder="Masalan: umra (yoki narx, dubay)">
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                        Trigger Kalit so'z <span class="text-slate-400 font-normal">(Bo'sh qoldirilsa, har qanday izohga ishlaydi)</span>:
+                                    </label>
+                                    <input type="text" name="trigger_keyword" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" placeholder="Masalan: umra (yoki bo'sh qoldiring)">
+                                </div>
+                            </div>
+
+                            <!-- Video havolasi va tanlash (Variant B) -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50/60 p-4 rounded-xl border border-purple-100">
+                                <div>
+                                    <label class="block text-xs font-semibold text-purple-900 mb-1">
+                                        🎬 Videolaringiz ro'yxatidan tanlang:
+                                    </label>
+                                    <select id="video_selector" onchange="if(this.value) document.getElementById('video_url').value = this.value;" class="w-full px-4 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-800">
+                                        {media_options_html}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-purple-900 mb-1">
+                                        🔗 Yoki Instagram video linkini qo'ying:
+                                    </label>
+                                    <input type="text" id="video_url" name="video_url" class="w-full px-4 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-mono" placeholder="https://www.instagram.com/reel/...">
                                 </div>
                             </div>
 
@@ -214,8 +260,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, not
                             </div>
 
                             <div class="flex justify-end pt-2">
-                                <button type="submit" class="bg-slate-900 hover:bg-black text-white font-medium px-5 py-2.5 rounded-xl text-sm transition">
-                                    ➕ Qoidani Saqlash
+                                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-6 py-2.5 rounded-xl text-sm shadow-sm transition">
+                                    ➕ Video Qoidasini Saqlash
                                 </button>
                             </div>
                         </form>

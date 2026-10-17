@@ -55,6 +55,7 @@ def init_db():
             name TEXT NOT NULL,
             trigger_keyword TEXT,
             media_id TEXT,
+            media_url TEXT,
             public_reply TEXT,
             dm_welcome TEXT,
             promo_link TEXT,
@@ -62,6 +63,10 @@ def init_db():
             created_at TIMESTAMP
         )
     """)
+    try:
+        cursor.execute("ALTER TABLE campaigns ADD COLUMN media_url TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     # Standart matnlarni tekshirib kiritish
     default_settings = {
@@ -160,14 +165,14 @@ def get_all_campaigns():
     conn.close()
     return [dict(r) for r in rows]
 
-def create_campaign(name: str, trigger_keyword: str, media_id: str, public_reply: str, dm_welcome: str, promo_link: str):
+def create_campaign(name: str, trigger_keyword: str, media_id: str, media_url: str, public_reply: str, dm_welcome: str, promo_link: str):
     conn = get_connection()
     cursor = conn.cursor()
     now = datetime.now().isoformat()
     cursor.execute("""
-        INSERT INTO campaigns (name, trigger_keyword, media_id, public_reply, dm_welcome, promo_link, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-    """, (name, trigger_keyword.strip().lower(), media_id.strip(), public_reply, dm_welcome, promo_link, now))
+        INSERT INTO campaigns (name, trigger_keyword, media_id, media_url, public_reply, dm_welcome, promo_link, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+    """, (name, trigger_keyword.strip().lower(), media_id.strip(), media_url.strip(), public_reply, dm_welcome, promo_link, now))
     conn.commit()
     conn.close()
 
@@ -194,12 +199,19 @@ def match_campaign(media_id: str = "", text: str = "") -> dict:
     if media_id:
         for c in campaigns:
             if c.get("media_id") and c["media_id"] == media_id:
-                return c
+                kw = (c.get("trigger_keyword") or "").strip().lower()
+                # Agar ushbu videoda ma'lum bir kalit so'z ham ko'rsatilgan bo'lsa
+                if kw and kw != "*":
+                    if kw in text_lower:
+                        return c
+                else:
+                    # Kalit so'z ko'rsatilmagan bo'lsa, ushbu videodagi BARCHA izohlarga javob qaytaradi!
+                    return c
 
-    # 2. Kalit so'z bo'yicha qidiramiz
+    # 2. Kalit so'z bo'yicha qidiramiz (agar videoga bog'lanmagan umumiy aksiya bo'lsa)
     for c in campaigns:
-        kw = c.get("trigger_keyword", "")
-        if kw and kw in text_lower:
+        kw = (c.get("trigger_keyword") or "").strip().lower()
+        if kw and kw != "*" and kw in text_lower:
             return c
 
     return None

@@ -1,6 +1,7 @@
 import io
 import csv
 import logging
+import urllib.parse
 from fastapi import FastAPI, Request, Response, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from config import settings
@@ -14,6 +15,7 @@ from database import (
     delete_campaign
 )
 from services.dialog_manager import process_incoming_message, process_incoming_comment
+from services.instagram import get_recent_media, resolve_media_id_from_url
 from services.admin_view import get_admin_dashboard_html
 
 # Loglarni sozlash
@@ -191,7 +193,11 @@ def admin_dashboard(request: Request, notice: str = ""):
     settings_data = get_all_settings()
     campaigns_data = get_all_campaigns()
     clients_data = get_all_clients()
-    html_content = get_admin_dashboard_html(settings_data, campaigns_data, clients_data, notice=notice)
+    recent_media = get_recent_media(limit=25)
+    html_content = get_admin_dashboard_html(
+        settings_data, campaigns_data, clients_data,
+        recent_media=recent_media, notice=notice
+    )
     return HTMLResponse(content=html_content)
 
 @app.post("/admin/settings/save")
@@ -219,23 +225,28 @@ async def save_settings(
 @app.post("/admin/campaign/create")
 async def add_campaign(
     name: str = Form(...),
-    trigger_keyword: str = Form(...),
+    video_url: str = Form(""),
+    trigger_keyword: str = Form(""),
     public_reply: str = Form(...),
     promo_link: str = Form(...),
-    dm_welcome: str = Form(""),
-    media_id: str = Form("")
+    dm_welcome: str = Form("")
 ):
-    """Yangi video qoidasi (aksiyasi) qo'shish"""
+    """Yangi video qoidasi (aksiyasi) qo'shish (Variant B: Video linki orqali)"""
+    media_id, resolved_url = resolve_media_id_from_url(video_url)
     create_campaign(
         name=name,
         trigger_keyword=trigger_keyword,
         media_id=media_id,
+        media_url=resolved_url or video_url,
         public_reply=public_reply,
         dm_welcome=dm_welcome,
         promo_link=promo_link
     )
+    msg = "Yangi video qoidasi muvaffaqiyatli saqlandi!"
+    if media_id:
+        msg += f" (Video ID bog'landi)"
     return RedirectResponse(
-        url="/admin?notice=Yangi+video+qoidasi+qo%27shildi",
+        url=f"/admin?notice={urllib.parse.quote(msg)}",
         status_code=status.HTTP_303_SEE_OTHER
     )
 

@@ -121,3 +121,54 @@ def reply_public_comment(comment_id: str, text: str) -> dict:
         logger.error(f"Izoh ostiga ommaviy javob yozishda xatolik: {e}")
         return {"error": str(e)}
 
+def get_recent_media(limit: int = 25) -> list:
+    """
+    Instagram akkauntdagi so'nggi video va postlarni olish
+    """
+    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+        return []
+
+    url = f"{GRAPH_BASE_URL}/me/media"
+    params = {
+        "fields": "id,caption,permalink,media_type,thumbnail_url,timestamp",
+        "access_token": settings.PAGE_ACCESS_TOKEN,
+        "limit": limit
+    }
+    try:
+        res = requests.get(url, params=params, timeout=5)
+        if res.status_code == 200:
+            return res.json().get("data", [])
+        logger.warning(f"me/media so'rovi xatolik berdi: {res.text}")
+    except Exception as e:
+        logger.error(f"Instagram media olishda xatolik: {e}")
+    return []
+
+def resolve_media_id_from_url(url_or_id: str) -> tuple[str, str]:
+    """
+    Instagram havolasi (linki) yoki ID sidan media_id va permalinkni aniqlash
+    Qaytaradi: (media_id, permalink)
+    """
+    if not url_or_id:
+        return ("", "")
+
+    cleaned = url_or_id.strip()
+    # 1. Agar to'g'ridan-to'g'ri raqamli ID kiritilgan bo'lsa
+    if cleaned.isdigit():
+        return (cleaned, f"https://www.instagram.com/p/{cleaned}/")
+
+    # 2. Havoladan shortcode ajratib olish (/reel/SHORTCODE/ yoki /p/SHORTCODE/)
+    import re
+    match = re.search(r"/(?:reel|p)/([A-Za-z0-9_-]+)", cleaned)
+    shortcode = match.group(1) if match else cleaned
+
+    # Instagram API orqali media ro'yxatidan qidirish
+    media_list = get_recent_media(limit=50)
+    for item in media_list:
+        permalink = item.get("permalink", "")
+        if shortcode in permalink or item.get("id") == cleaned:
+            return (item["id"], permalink)
+
+    # Agar topilmasa ham shortcode/linkni qaytaramiz
+    return ("", cleaned)
+
+
