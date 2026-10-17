@@ -35,15 +35,6 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
         "parse_mode": "HTML"
     }
 
-    # Telefon raqamiga to'g'ridan-to'g'ri qo'ng'iroq qilish havolasi (agar to'g'ri bo'lsa)
-    clean_phone = "".join(filter(str.isdigit, phone))
-    if clean_phone:
-        payload["reply_markup"] = {
-            "inline_keyboard": [
-                [{"text": f"📞 Qo'ng'iroq qilish ({phone})", "url": f"tel:+{clean_phone}"}]
-            ]
-        }
-
     try:
         response = requests.post(url, json=payload, timeout=5)
         if response.status_code != 200:
