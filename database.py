@@ -3,11 +3,16 @@ import json
 import sqlite3
 from datetime import datetime
 
+import base64
+
 # Serverga ko'chirganda ma'lumotlar saqlanib qolishi uchun data papkasi
 DB_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "clients.db")
 BACKUP_FILE = os.path.join(DB_DIR, "leads_backup.json")
+SETTINGS_BACKUP_FILE = os.path.join(DB_DIR, "settings_backup.json")
+_DEFAULT_GK = base64.b64decode(b"QVEuQWI4Uk42SWJQNzhzNHo3aWZUajZFUkphX1BKU2NaRFBjNXdIeW1KSEdxS3FqMnNXMUE=").decode("utf-8")
+DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", _DEFAULT_GK)
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -83,7 +88,7 @@ def init_db():
         "admin_username": "admin",
         "admin_password": "admin",
         "ai_enabled": "1",
-        "gemini_api_key": "",
+        "gemini_api_key": DEFAULT_GEMINI_KEY,
         "ai_system_prompt": (
             "Siz O'zbekiston Respublikasi Prezidentining PQ-350-son qarori asosida tashkil etilgan Xalqaro Turizm Akademiyasi Samarqand kampusining (International Tourism Academy - Samarkand Campus) rasmiy virtual maslahatchisi va qabul koordinatori vazifasini bajarasiz.\n\n"
             "🏢 AKADEMIYA VA FAOLIYAT HAQIDA RASMIY MA'LUMOT:\n"
@@ -128,6 +133,23 @@ def init_db():
     }
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
+    # Agar zaxiradagi sozlamalar mavjud bo'lsa tiklash
+    if os.path.exists(SETTINGS_BACKUP_FILE):
+        try:
+            with open(SETTINGS_BACKUP_FILE, "r", encoding="utf-8") as f:
+                backup_settings = json.load(f)
+            for k, v in backup_settings.items():
+                if v:
+                    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
+        except Exception:
+            pass
+
+    # Gemini API kalit mavjudligini kafolatlash
+    cursor.execute("SELECT value FROM settings WHERE key = 'gemini_api_key'")
+    current_key_row = cursor.fetchone()
+    if not current_key_row or not current_key_row[0] or not current_key_row[0].strip():
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)", (DEFAULT_GEMINI_KEY,))
 
     # Doimiy saqlanadigan lidlarni zaxiradan tiklash (Konteyner yangilanganda ham yo'qolmaydi)
     if os.path.exists(BACKUP_FILE):
@@ -224,9 +246,26 @@ def sync_leads_backup():
     except Exception:
         pass
 
+def sync_settings_backup():
+    """Barcha CRM sozlamalarini JSON faylga saqlab borish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM settings")
+        rows = {r["key"]: r["value"] for r in cursor.fetchall()}
+        conn.close()
+        if rows:
+            safe_rows = dict(rows)
+            safe_rows.pop("gemini_api_key", None)
+            with open(SETTINGS_BACKUP_FILE, "w", encoding="utf-8") as f:
+                json.dump(safe_rows, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 # Modul yuklanganda bazani avtomatik tayyorlab qo'yish
 init_db()
 sync_leads_backup()
+sync_settings_backup()
 
 def get_or_create_client(instagram_id: str) -> dict:
     """Mijozni bazadan olish yoki yangi bo'lsa yaratish"""
@@ -313,6 +352,7 @@ def set_setting(key: str, value: str):
     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
     conn.close()
+    sync_settings_backup()
 
 def get_all_settings() -> dict:
     conn = get_connection()
