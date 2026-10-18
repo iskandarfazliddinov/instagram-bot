@@ -343,7 +343,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             </h2>
                             <p class="text-sm text-slate-500">Instagram orqali kelgan barcha mijozlar tarixi.</p>
                         </div>
-                        <a href="/api/clients/csv" class="text-sm text-emerald-600 hover:underline font-medium">Excel yuklab olish →</a>
+                        <div class="flex items-center gap-4">
+                            <a href="/api/clients/csv" class="text-sm text-emerald-600 hover:underline font-medium">Excel yuklab olish →</a>
+                            <form method="POST" action="/admin/clients/clear" onsubmit="return confirm('Barcha mijozlar tarixi va test yozishmalarini tozalashni tasdiqlaysizmi? (AI yangidan toza boshlanadi)');" class="inline">
+                                <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer">
+                                    🗑️ Tarixni tozalash
+                                </button>
+                            </form>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto rounded-xl border border-slate-100">

@@ -80,12 +80,12 @@ def init_db():
         "ai_system_prompt": (
             "Siz O'zbekiston Respublikasi Prezidentining PQ-350-son qarori asosida tashkil etilgan Xalqaro Turizm Akademiyasi Samarqand kampusining (International Tourism Academy - Samarkand Campus) rasmiy virtual maslahatchisi va qabul koordinatori vazifasini bajarasiz.\n\n"
             "🏢 AKADEMIYA VA FAOLIYAT HAQIDA RASMIY MA'LUMOT:\n"
-            "- Tashkilot: Xalqaro Turizm Akademiyasi — Samarqand kampusi (davlat ta'lim muassasasi).\n"
+            "- Tashkilot: Xalqaro Turizm Akademiyasi — Samarqand kampusi (davlat muassasasi shaklidagi yuridik shaxs).\n"
             "- Huquqiy asosi: O'zbekiston Respublikasi Prezidentining 'Butunjahon turizm tashkiloti shafeligida Xalqaro turizm akademiyasi Samarqand kampusi faoliyatini tashkil etish to'g'risida'gi PQ–350-son qarori.\n"
             "- Muassisi: O'zbekiston Respublikasi Turizm qo'mitasi huzuridagi 'Ipak yo'li' turizm va madaniy meros xalqaro universiteti.\n"
             "- Missiyasi: Turizm va mehmondo'stlik industriyasini rivojlantirishga xizmat qiladigan, xalqaro standartlarga mos, amaliy bilim va ko'nikmalarga ega malakali mutaxassislar avlodini shakllantirishdir.\n"
-            "- Xalqaro hamkorlik: Ta'lim jarayonida UN Tourism (sobiq UNWTO) tavsiyalari va ilg'or xalqaro tajriba joriy etilgan.\n"
-            "- Asosiy faoliyat: Turizm sohasida ishlayotgan va yangi kasb egallamoqchi bo'lgan mutaxassislar uchun qayta tayyorlash va malaka oshirishning zamonaviy modeli.\n\n"
+            "- Xalqaro hamkorlik: Ta'lim jarayonida UN Tourism (sobiq UNWTO) tavsiyalari, ilg'or xalqaro tajriba hamda real biznes amaliyotini uyg'unlashtirgan holda, turizm sohasida ishlayotgan va faoliyatini yangi bosqichga olib chiqmoqchi bo'lgan mutaxassislar uchun qayta tayyorlash va malaka oshirishning zamonaviy modelini joriy etadi.\n"
+            "- Asosiy faoliyat: Turizm sohasida tinglovchilarni qayta tayyorlash va malakasini oshirish.\n\n"
             "👥 AKADEMIYA RAHBARIYATI:\n"
             "- Narzikulov Dilshod Rustamovich — Akademiya direktori\n"
             "- Safarov Bahodirxon Shahriyorovich — Akademik masalalar bo'yicha direktor o'rinbosari\n"
@@ -96,12 +96,14 @@ def init_db():
             "3. Turoperatorlik va turagentlik xizmatlari;\n"
             "4. Restoran ishi, servis va mehmondo'stlik (F&B Service);\n"
             "5. Turizm menejmenti va zamonaviy raqamli marketing.\n\n"
-            "💎 BIZNING QADRIYATLARIMIZ VA AFZALLIKLAR:\n"
+            "💎 BIZNING QADRIYATLARIMIZ:\n"
             "- Amaliy natija — har bir kurs real ish ko'nikmasini beradi;\n"
             "- Sifat va standartlar — davlat va xalqaro talablar asosida ta'lim;\n"
+            "- Mas'uliyat — ish beruvchi va tinglovchi oldidagi javobgarlik;\n"
+            "- Hamkorlik — ta'lim va real sektor integratsiyasi;\n"
+            "- Rivojlanish — doimiy yangilanish va zamonaviy yondashuv;\n"
             "- Bitiruvchilarga rasmiy davlat va xalqaro sertifikat beriladi;\n"
-            "- Samarqanddagi nufuzli turizm va mehmonxona obyektlarida bevosita amaliyot;\n"
-            "- Ta'lim va real sektor integratsiyasi.\n\n"
+            "- Samarqanddagi nufuzli turizm va mehmonxona obyektlarida bevosita amaliyot.\n\n"
             "📍 MANZIL VA ALOQA MA'LUMOTLARI:\n"
             "- Manzil: Samarqand shahar, Bobur Mirzo ko'chasi, 3A\n"
             "- Telefon: +998 (90) 103 30 00\n"
@@ -119,7 +121,6 @@ def init_db():
     }
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
-
     conn.commit()
     conn.close()
 
@@ -256,4 +257,18 @@ def match_campaign(media_id: str = "", text: str = "") -> dict:
             return c
 
     return None
+
+def delete_all_clients():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM clients")
+    conn.commit()
+    conn.close()
+
+def reset_client(instagram_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM clients WHERE instagram_id = ?", (instagram_id,))
+    conn.commit()
+    conn.close()
 

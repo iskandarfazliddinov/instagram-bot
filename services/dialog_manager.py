@@ -25,18 +25,11 @@ def process_incoming_message(sender_id: str, user_text: str):
     # Oxirgi yozilgan xabarni saqlash
     update_client(sender_id, last_message=text_clean)
 
-    # 1. Xabarda telefon raqam borligini aniqlash (har qanday bosqichda)
+    # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
     digits = re.sub(r"\D", "", text_clean)
     has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
 
-    if has_phone or step == "awaiting_phone":
-        if len(digits) < 7:
-            send_message(
-                sender_id, 
-                "Iltimos, telefon raqamingizni to'g'ri formatda kiriting (masalan: +998901234567):"
-            )
-            return
-
+    if has_phone:
         update_client(sender_id, phone_number=text_clean, step="completed")
         client["phone_number"] = text_clean
         client["step"] = "completed"
@@ -48,7 +41,7 @@ def process_incoming_message(sender_id: str, user_text: str):
         # Mijoz qaysi aksiyadan kelgan bo'lsa, uning maxsus havolasi beriladi
         final_caption = get_setting(
             "final_message",
-            "Katta rahmat! Ma'lumotlaringiz muvaffaqiyatli saqlandi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:"
+            "Katta rahmat! Ma'lumotlaringiz qabul qilindi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:"
         )
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
 
@@ -65,27 +58,48 @@ def process_incoming_message(sender_id: str, user_text: str):
         send_link_button(
             recipient_id=sender_id,
             text=final_caption,
-            button_title="Havolani ochish 🚀",
+            button_title="Rasmiy saytni ochish 🚀",
             url=send_link
         )
         return
 
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
-    from services.ai_assistant import generate_ai_reply
-    is_first = (step == "start")
-    ai_reply = generate_ai_reply(user_message=text_clean, client_context=client, is_first_message=is_first)
-    if ai_reply:
-        send_message(sender_id, ai_reply)
-        if step == "start":
-            update_client(sender_id, step="in_dialog")
-        return
+    # AI yoqilgan bo'lsa, u barcha savollarga bevosita javob beradi
+    ai_enabled = (get_setting("ai_enabled", "1") == "1")
 
-    # 3. AI o'chiq yoki sozlanmagan bo'lsa — Standart shablon bo'yicha ketadi:
+    if ai_enabled:
+        from services.ai_assistant import generate_ai_reply
+        is_first = (step == "start")
+        ai_reply = generate_ai_reply(user_message=text_clean, client_context=client, is_first_message=is_first)
+        if ai_reply:
+            send_message(sender_id, ai_reply)
+            if step == "start":
+                update_client(sender_id, step="in_dialog")
+            return
+        else:
+            # AI kutilmaganda javob bermay qolsa (masalan, tarmoq xatoligi bo'lsa):
+            # Savolni "ism" deb tushunib olmaslik uchun professional xabar qaytariladi
+            fallback_msg = (
+                "Xabaringiz uchun tashakkur! Xalqaro Turizm Akademiyasi Samarqand kampusi maslahatchisi tez orada sizga javob beradi. 😊\n\n"
+                "Qo'shimcha ma'lumot yoki qabul bo'yicha: +998 (90) 103 30 00 yoki https://tourism-academy.uz"
+            )
+            send_message(sender_id, fallback_msg)
+            return
+
+    # 3. Faqat AI o'chiq bo'lsa (ai_enabled == 0) — Standart shablon bo'yicha ketadi:
+    if step == "awaiting_phone":
+        if len(digits) < 7:
+            send_message(
+                sender_id, 
+                "Iltimos, telefon raqamingizni to'g'ri formatda kiriting (masalan: +998901234567):"
+            )
+            return
+
     # 3.1. Boshlang'ich holat yoki kalit so'zlarni tutish
     if any(k in text_lower for k in TRIGGER_KEYWORDS) or step == "start":
         welcome_msg = get_setting(
             "direct_welcome",
-            "Assalomu alaykum! Xush kelibsiz. 😊\n\nSiz so'ragan maxsus havola va batafsil ma'lumotlarni yuborishimiz uchun, iltimos, ismingizni yozib qoldiring:"
+            "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan yo'nalishlar bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:"
         )
         send_message(sender_id, welcome_msg)
         update_client(sender_id, step="awaiting_name")
@@ -96,7 +110,7 @@ def process_incoming_message(sender_id: str, user_text: str):
         update_client(sender_id, full_name=text_clean, step="awaiting_phone")
         ask_phone_template = get_setting(
             "ask_phone",
-            "Rahmat, {name}! 🙌\n\nMa'lumotlarni taqdim etishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
+            "Rahmat, {name}! 🙌\n\nBatafsil ma'lumotlarni yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
         )
         response_msg = ask_phone_template.replace("{name}", text_clean)
         send_message(sender_id, response_msg)
@@ -107,8 +121,8 @@ def process_incoming_message(sender_id: str, user_text: str):
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
         send_message(
             sender_id,
-            f"Sizning so'rovingiz qabul qilingan. Havolani yana ochish: {default_link}\n\n"
-            "Agar qo'shimcha savollaringiz bo'lsa, tez orada menejerimiz sizga javob beradi."
+            f"Sizning so'rovingiz qabul qilingan. Rasmiy saytimiz: {default_link}\n\n"
+            "Menejerimiz tez orada siz bilan bog'lanadi."
         )
         return
 

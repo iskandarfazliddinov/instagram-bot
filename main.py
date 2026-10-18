@@ -12,7 +12,9 @@ from database import (
     set_setting,
     get_all_campaigns,
     create_campaign,
-    delete_campaign
+    delete_campaign,
+    delete_all_clients,
+    reset_client
 )
 from services.dialog_manager import process_incoming_message, process_incoming_comment
 from services.instagram import get_recent_media, resolve_media_id_from_url
@@ -277,6 +279,15 @@ async def save_ai_settings(
     msg = "Sun'iy Intellekt sozlamalari muvaffaqiyatli saqlandi!"
     return RedirectResponse(
         url=f"/admin?notice={urllib.parse.quote(msg)}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/clients/clear")
+def clear_clients():
+    """Barcha test mijozlar tarixini tozalash (AIni qaytadan toza boshlash uchun)"""
+    delete_all_clients()
+    return RedirectResponse(
+        url="/admin?notice=Mijozlar+tarixi+tozalandi+(AI+toza+boshlanadi)",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
