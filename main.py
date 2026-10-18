@@ -443,14 +443,21 @@ def export_clients_csv():
     
     # Sarlavhalar
     writer.writerow([
-        "ID", "Instagram ID", "Ismi", "Telefon raqami", "Yo'nalish", 
-        "Manba", "Holati", "Mas'ul xodim", "Oxirgi xabar", "Yaratilgan vaqti"
+        "ID", "Instagram ID", "Instagram Username", "Instagram Profil Havolasi", "Obuna Holati",
+        "Mijoz Ismi", "Telefon raqami", "Yo'nalish", 
+        "Manba", "Holati", "Mas'ul xodim", "Oxirgi xabar / So'rov", "Yaratilgan vaqti"
     ])
     
     for c in clients:
+        uname = c.get("username") or ""
+        ig_url = f"https://instagram.com/{uname}" if uname else ""
+        is_fol_str = "Obunachi" if c.get("is_follower") else "Obuna emas"
         writer.writerow([
             c.get("id"),
             c.get("instagram_id"),
+            f"@{uname}" if uname else "",
+            ig_url,
+            is_fol_str,
             c.get("full_name"),
             c.get("phone_number"),
             c.get("campaign", "Umumiy"),

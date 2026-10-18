@@ -44,7 +44,10 @@ def init_db():
         ("lead_status", "TEXT DEFAULT 'yangi'"),
         ("manager_name", "TEXT DEFAULT ''"),
         ("manager_time", "TEXT DEFAULT ''"),
-        ("tg_message_id", "INTEGER")
+        ("tg_message_id", "INTEGER"),
+        ("username", "TEXT DEFAULT ''"),
+        ("profile_pic", "TEXT DEFAULT ''"),
+        ("is_follower", "INTEGER DEFAULT 0")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -210,20 +213,22 @@ def init_db():
         if not row:
             cursor.execute("""
                 INSERT INTO clients (
-                    instagram_id, full_name, phone_number, source,
-                    campaign, step, last_message, lead_status, created_at, updated_at
+                    instagram_id, username, full_name, phone_number, source,
+                    campaign, step, last_message, lead_status, is_follower, created_at, updated_at
                 ) VALUES (
-                    '2215649625966523', 'Iskandar', '+998902857276', 'Direct',
-                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', ?, ?
+                    '2215649625966523', 'isak.dev', 'Iskandar Fazliddinov', '+998902857276', 'Direct',
+                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', 0, ?, ?
                 )
             """, (now_iso, now_iso))
         else:
             cursor.execute("""
                 UPDATE clients SET
-                    full_name = 'Iskandar',
+                    username = 'isak.dev',
+                    full_name = 'Iskandar Fazliddinov',
                     phone_number = '+998902857276',
                     campaign = 'Front Office (Mehmonxona)',
-                    last_message = 'Frontoffice qancha'
+                    last_message = 'Frontoffice qancha',
+                    is_follower = 0
                 WHERE instagram_id = '2215649625966523'
             """)
     except Exception:

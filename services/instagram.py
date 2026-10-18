@@ -171,4 +171,26 @@ def resolve_media_id_from_url(url_or_id: str) -> tuple[str, str]:
     # Agar topilmasa ham shortcode/linkni qaytaramiz
     return ("", cleaned)
 
+def get_user_profile(instagram_id: str) -> dict:
+    """
+    Instagram Graph API orqali foydalanuvchining profil ma'lumotlarini (ism, @username, obuna holati) olish
+    """
+    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+        return {}
+
+    url = f"{GRAPH_BASE_URL}/{instagram_id}"
+    params = {
+        "fields": "name,username,profile_pic,is_user_follow_business",
+        "access_token": settings.PAGE_ACCESS_TOKEN
+    }
+    try:
+        res = requests.get(url, params=params, timeout=6)
+        if res.status_code == 200:
+            return res.json()
+        logger.warning(f"get_user_profile API javobi [{res.status_code}]: {res.text}")
+    except Exception as e:
+        logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
+    return {}
+
+
 

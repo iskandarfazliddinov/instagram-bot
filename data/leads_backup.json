@@ -2,7 +2,7 @@
   {
     "id": 2,
     "instagram_id": "2215649625966523",
-    "full_name": "Iskandar",
+    "full_name": "Iskandar Fazliddinov",
     "phone_number": "+998902857276",
     "source": "Direct",
     "step": "completed",
@@ -13,7 +13,10 @@
     "lead_status": "yangi",
     "manager_name": "",
     "manager_time": "",
-    "tg_message_id": null
+    "tg_message_id": null,
+    "username": "isak.dev",
+    "profile_pic": "",
+    "is_follower": 0
   },
   {
     "id": 3,
@@ -29,7 +32,10 @@
     "lead_status": "yangi",
     "manager_name": "",
     "manager_time": "",
-    "tg_message_id": null
+    "tg_message_id": null,
+    "username": "",
+    "profile_pic": "",
+    "is_follower": 0
   },
   {
     "id": 1,
@@ -45,6 +51,9 @@
     "lead_status": "yangi",
     "manager_name": "",
     "manager_time": "",
-    "tg_message_id": null
+    "tg_message_id": null,
+    "username": "",
+    "profile_pic": "",
+    "is_follower": 0
   }
 ]

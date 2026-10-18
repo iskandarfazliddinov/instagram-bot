@@ -90,7 +90,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     if not clients:
         clients_html = """
         <tr id="empty_row">
-            <td colspan="8" class="px-6 py-12 text-center text-slate-400">
+            <td colspan="9" class="px-6 py-12 text-center text-slate-400">
                 <div class="text-4xl mb-2">📭</div>
                 <div class="font-medium text-slate-600">Hozircha lidlar yo'q</div>
                 <div class="text-xs text-slate-400 mt-1">Instagram Direct yoki izohlardan mijozlar yozishi bilan bu yerda paydo bo'ladi.</div>
@@ -100,15 +100,39 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     for client in clients:
         client_id = client.get('id', 0)
         full_name = client.get('full_name') or "Kiritilmagan"
+        username = client.get('username') or ""
+        ig_id = client.get('instagram_id') or ""
         phone = client.get('phone_number') or "—"
         source = client.get('source') or "Direct"
         campaign = client.get('campaign') or "Umumiy"
+        last_msg = client.get('last_message') or "—"
         created_at = client.get('created_at', '')[:16].replace("T", " ")
         lead_status = client.get('lead_status', 'yangi')
         manager_name = client.get('manager_name') or "—"
+        is_fol = client.get('is_follower')
 
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
+
+        # Instagram profil nishoni
+        if username:
+            ig_badge = f'<a href="https://instagram.com/{username}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-semibold text-pink-600 hover:text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 px-2 py-0.5 rounded-md transition mt-1" title="Instagram profilini ochish">📸 @{username} ↗</a>'
+        else:
+            ig_badge = f'<span class="text-[11px] text-slate-400 font-mono mt-0.5 block">ID: {ig_id}</span>'
+
+        # Obuna holati
+        if is_fol == 1 or is_fol is True:
+            fol_badge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">⭐ Obunachi</span>'
+        elif is_fol == 0 or is_fol is False:
+            fol_badge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">Obuna emas</span>'
+        else:
+            fol_badge = '<span class="text-xs text-slate-400">—</span>'
+
+        # So'rov xabari
+        if last_msg and last_msg != "—":
+            last_msg_html = f'<div class="text-xs text-slate-700 font-medium max-w-[200px] truncate" title="{last_msg}">"{last_msg}"</div>'
+        else:
+            last_msg_html = '<span class="text-xs text-slate-400">—</span>'
 
         if lead_status == "jarayonda":
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">🟡 Jarayonda</span>'
@@ -121,21 +145,41 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">⚪ Yangi</span>'
 
-        tg_btn = f'<a href="{tg_link}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded font-medium ml-1.5 transition" title="Telegramda ochish">✈️ Yozish</a>' if tg_link else ""
+        tg_btn = f'<a href="{tg_link}" target="_blank" class="inline-flex items-center gap-1 text-[11px] text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded font-medium transition" title="Telegramda ochish">✈️ Telegram</a>' if tg_link else ""
+        call_btn = f'<a href="tel:{phone}" class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded font-medium transition" title="Qo\'ng\'iroq qilish">📞 Tel</a>' if len(digits) >= 9 else ""
+
+        initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
         clients_html += f"""
         <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
-            data-search="{full_name.lower()} {phone.lower()} {campaign.lower()}"
+            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {last_msg.lower()}"
             data-status="{lead_status}">
-            <td class="px-5 py-3.5 font-bold text-slate-900">{full_name}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <a href="tel:{phone}" class="font-mono text-xs font-semibold text-slate-800 hover:text-purple-600">{phone}</a>
-                {tg_btn}
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
+                        {initials}
+                    </div>
+                    <div>
+                        <div class="font-bold text-slate-900 leading-snug">{full_name}</div>
+                        {ig_badge}
+                    </div>
+                </div>
+            </td>
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="font-mono text-xs font-bold text-slate-800">{phone}</div>
+                <div class="flex items-center gap-1.5 mt-1">
+                    {tg_btn}
+                    {call_btn}
+                </div>
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <span class="bg-purple-50 text-purple-700 border border-purple-100 px-2.5 py-0.5 rounded-md text-xs font-semibold">{campaign}</span>
+                <div class="text-[11px] text-slate-400 mt-0.5">{source}</div>
             </td>
-            <td class="px-5 py-3.5 text-xs text-slate-500 whitespace-nowrap">{source}</td>
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                {last_msg_html}
+            </td>
+            <td class="px-5 py-3.5 whitespace-nowrap">{fol_badge}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">{badge_html}</td>
             <td class="px-5 py-3.5 text-xs font-medium text-slate-700 whitespace-nowrap">{manager_name}</td>
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
@@ -347,14 +391,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <table class="w-full text-left text-sm" id="leads_table">
                         <thead class="bg-slate-50 text-xs font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
                             <tr>
-                                <th class="px-5 py-3.5">Mijoz Ismi</th>
-                                <th class="px-5 py-3.5">Telefon</th>
-                                <th class="px-5 py-3.5">Yo'nalish</th>
-                                <th class="px-5 py-3.5">Manba</th>
+                                <th class="px-5 py-3.5">Mijoz / Instagram Profil</th>
+                                <th class="px-5 py-3.5">Telefon & Aloqa</th>
+                                <th class="px-5 py-3.5">Qiziqqan Yo'nalishi</th>
+                                <th class="px-5 py-3.5">So'rovi / Xabar</th>
+                                <th class="px-5 py-3.5">Obuna</th>
                                 <th class="px-5 py-3.5">Holati</th>
                                 <th class="px-5 py-3.5">Mas'ul xodim</th>
                                 <th class="px-5 py-3.5">Vaqti</th>
-                                <th class="px-5 py-3.5 text-right">Holatni yangilash</th>
+                                <th class="px-5 py-3.5 text-right">Boshqarish</th>
                             </tr>
                         </thead>
                         <tbody>

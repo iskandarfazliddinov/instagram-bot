@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     full_name = client.get('full_name') or 'Noma\'lum'
+    username = client.get('username') or ''
     phone = client.get('phone_number') or 'Noma\'lum'
     ig_id = client.get('instagram_id', '')
     last_msg = client.get('last_message', '')
@@ -16,6 +17,7 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     status = client.get('lead_status', 'yangi')
     manager_name = client.get('manager_name', '')
     manager_time = client.get('manager_time', '')
+    is_fol = client.get('is_follower')
 
     status_icon = "⚪"
     status_label = "Yangi (Bog'lanish kutilmoqda ⏳)"
@@ -32,10 +34,19 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
         status_icon = "🔴"
         status_label = f"Bog'lana olmadi (Ko'tarmadi / Rad etdi) ❌\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
 
+    ig_line = f"📸 <b>Instagram:</b> <a href='https://instagram.com/{username}'>@{username}</a>\n" if username else ""
+    if is_fol is not None:
+        fol_str = "✅ Sahifa obunachisi ⭐" if (is_fol == 1 or is_fol is True) else "❌ Sahifaga obuna bo'lmagan"
+        fol_line = f"📌 <b>Obuna holati:</b> {fol_str}\n"
+    else:
+        fol_line = ""
+
     text = (
         "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Mijoz:</b> {full_name}\n"
+        f"{ig_line}"
+        f"{fol_line}"
         f"📞 <b>Telefon:</b> <code>{phone}</code>\n"
         f"🎯 <b>Yo'nalish / Kurs:</b> <b>{campaign}</b>\n"
         f"📍 <b>Manba:</b> {source}\n"
@@ -46,7 +57,7 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     )
     return text
 
-def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi") -> list:
+def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", username: str = "") -> list:
     digits = re.sub(r"\D", "", phone or "")
     if len(digits) == 9:
         clean_phone = f"998{digits}"
@@ -72,10 +83,13 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi") -> 
             {"text": "🔄 Holatni o'zgartirish", "callback_data": f"claim_{client_id}"}
         ])
 
+    quick_links = []
+    if username:
+        quick_links.append({"text": f"📸 @{username}", "url": f"https://instagram.com/{username}"})
     if clean_phone and len(clean_phone) >= 9:
-        keyboard.append([
-            {"text": "📲 Telegramda yozish", "url": f"https://t.me/+{clean_phone}"}
-        ])
+        quick_links.append({"text": "📲 Telegram", "url": f"https://t.me/+{clean_phone}"})
+    if quick_links:
+        keyboard.append(quick_links)
 
     return keyboard
 
@@ -101,7 +115,7 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
 
     client["source"] = source
     text = build_lead_message_text(client, source=source)
-    keyboard = build_inline_keyboard(client_id or 0, client.get("phone_number", ""), status=client.get("lead_status", "yangi"))
+    keyboard = build_inline_keyboard(client_id or 0, client.get("phone_number", ""), status=client.get("lead_status", "yangi"), username=client.get("username", ""))
 
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -189,7 +203,7 @@ def handle_telegram_callback(update: dict):
 
     # Telegram xabarini tahrirlash (In-place update)
     new_text = build_lead_message_text(client, source=client.get("source", "Direct"))
-    new_keyboard = build_inline_keyboard(client_id, client.get("phone_number", ""), status=new_status)
+    new_keyboard = build_inline_keyboard(client_id, client.get("phone_number", ""), status=new_status, username=client.get("username", ""))
 
     edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
     edit_payload = {

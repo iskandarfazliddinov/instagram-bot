@@ -2,7 +2,7 @@ import re
 import logging
 from config import settings
 from database import get_or_create_client, update_client, get_setting, match_campaign
-from services.instagram import send_message, send_link_button
+from services.instagram import send_message, send_link_button, get_user_profile
 from services.telegram import notify_admin_new_lead
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,27 @@ def process_incoming_message(sender_id: str, user_text: str):
     step = client.get("step", "start")
     text_clean = user_text.strip()
     text_lower = text_clean.lower()
+
+    # Instagram profilidan ma'lumotlarni (@username, ism, obunachi ekanligi) avtomatik olish
+    if not client.get("username") or not client.get("full_name") or client.get("is_follower") is None:
+        try:
+            profile = get_user_profile(sender_id)
+            if profile:
+                prof_updates = {}
+                if profile.get("username"):
+                    prof_updates["username"] = profile["username"]
+                    client["username"] = profile["username"]
+                if profile.get("name") and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+                    prof_updates["full_name"] = profile["name"]
+                    client["full_name"] = profile["name"]
+                if "is_user_follow_business" in profile:
+                    is_fol = 1 if profile["is_user_follow_business"] else 0
+                    prof_updates["is_follower"] = is_fol
+                    client["is_follower"] = is_fol
+                if prof_updates:
+                    update_client(sender_id, **prof_updates)
+        except Exception as e:
+            logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
 
     # Oxirgi yozilgan xabarni saqlash
     update_client(sender_id, last_message=text_clean)
@@ -195,13 +216,28 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
 
     # 3. Bazada mijozni ro'yxatga olish (manba va qaysi aksiya ekanligi bilan)
     client = get_or_create_client(user_id)
-    update_client(
-        user_id,
-        source=f"Video izohi ({username})",
-        campaign=campaign_name,
-        last_message=f"Izoh: {comment_text}",
-        step="awaiting_name"
-    )
+    c_updates = {
+        "source": f"Video izohi (@{username})" if username else "Video izohi",
+        "campaign": campaign_name,
+        "last_message": f"Izoh: {comment_text}",
+        "step": "awaiting_name"
+    }
+    if username:
+        c_updates["username"] = username
+
+    try:
+        profile = get_user_profile(user_id)
+        if profile:
+            if profile.get("username") and not username:
+                c_updates["username"] = profile["username"]
+            if profile.get("name") and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+                c_updates["full_name"] = profile["name"]
+            if "is_user_follow_business" in profile:
+                c_updates["is_follower"] = 1 if profile["is_user_follow_business"] else 0
+    except Exception as e:
+        logger.error(f"Izoh qoldirgan foydalanuvchi profilini olishda xato: {e}")
+
+    update_client(user_id, **c_updates)
 
     # 4. Mijozning Directiga o'sha videoga mos maxsus xabar (Private reply) yuborish
     send_private_reply_to_comment(comment_id, dm_welcome_text)
