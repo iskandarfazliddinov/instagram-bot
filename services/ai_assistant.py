@@ -262,12 +262,13 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
 
     dialog_str = "\n".join(history_lines[-6:]) if history_lines else f"Qiziqqan kursi: {campaign}"
 
+    safe_name = client_name or "Noma'lum"
     if api_key and get_setting("ai_enabled", "1") == "1":
         prompt = (
             "Siz Xalqaro Turizm Akademiyasi Samarqand kampusining g'amxo'r va xushmuomala virtual yordamchisisiz.\n"
             "Tinglovchi Directda muloqot boshlagan, ammo telefon raqamini qoldirmasdan suhbat to'xtab qolgan.\n\n"
             f"--- SUHBAT MAZMUNI ---\n"
-            f"Ismi: {client_name or 'Noma\'lum'}\n"
+            f"Ismi: {safe_name}\n"
             f"Qiziqqan yo'nalishi: {campaign}\n"
             f"{dialog_str}\n\n"
             "VAZIFA: Ushbu tinglovchiga suhbatni davom ettirish va telefon raqamini so'rash uchun 1-2 jumlali o'ta samimiy, "
