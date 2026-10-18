@@ -12,7 +12,7 @@ class Settings:
     GRAPH_API_VERSION: str = os.getenv("GRAPH_API_VERSION", "v21.0")
     PORT: int = int(os.getenv("PORT", 8000))
     HOST: str = os.getenv("HOST", "0.0.0.0")
-    PROMO_LINK: str = os.getenv("PROMO_LINK", "https://sizning-saytingiz.uz")
+    PROMO_LINK: str = os.getenv("PROMO_LINK", "https://tourism-edu.uz")
     
     # Izohlarga (Comments) javob berish sozlamalari
     TARGET_MEDIA_IDS: list = [m.strip() for m in os.getenv("TARGET_MEDIA_IDS", "").split(",") if m.strip()]

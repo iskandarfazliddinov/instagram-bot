@@ -17,12 +17,18 @@ from database import (
     delete_campaign,
     delete_all_clients,
     reset_client,
-    update_client_by_id
+    update_client_by_id,
+    update_client_manager_comment
 )
 from services.dialog_manager import process_incoming_message, process_incoming_comment
 from services.instagram import get_recent_media, resolve_media_id_from_url
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
-from services.telegram import handle_telegram_callback, setup_telegram_webhook
+from services.telegram import (
+    handle_telegram_callback,
+    handle_telegram_reply_comment,
+    update_telegram_lead_message,
+    setup_telegram_webhook
+)
 
 # Loglarni sozlash
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -411,19 +417,51 @@ def update_status_from_admin(
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
     update_client_by_id(client_id, lead_status=status_val, manager_name=manager_name, manager_time=now_str)
+    
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception as e:
+        logger.error(f"Telegram lead update error from CRM: {e}")
+
     return RedirectResponse(
         url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi#leads",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/clients/{client_id}/comment")
+def update_comment_from_admin(
+    client_id: int,
+    request: Request,
+    comment: str = Form(...)
+):
+    """CRM dan mutaxassis izohini saqlash va Telegram guruhidagi xabarni yangilash"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    update_client_manager_comment(client_id, comment, manager_name="Admin")
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception as e:
+        logger.error(f"Telegram lead update error from CRM comment: {e}")
+
+    return RedirectResponse(
+        url="/admin?notice=Mutaxassis+izohi+muvaffaqiyatli+saqlandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
     """
-    Telegram bot webhooki (Guruhdagi 'Men bog'lanaman', 'Bog'lanildi' tugmalari bosilganda)
+    Telegram bot webhooki:
+    1. Guruhdagi tugmalar bosilganda (callback_query)
+    2. Lid xabariga 'Reply' (javob) qilib izoh yozilganda (message with reply_to_message)
     """
     try:
         data = await request.json()
-        handle_telegram_callback(data)
+        if "callback_query" in data:
+            handle_telegram_callback(data)
+        elif "message" in data:
+            handle_telegram_reply_comment(data)
     except Exception as e:
         logger.error(f"Telegram webhook callback xatoligi: {e}")
     return {"ok": True}
@@ -445,7 +483,8 @@ def export_clients_csv():
     writer.writerow([
         "ID", "Instagram ID", "Instagram Username", "Instagram Profil Havolasi", "Obuna Holati",
         "Mijoz Ismi", "Telefon raqami", "Yo'nalish", 
-        "Manba", "Holati", "Mas'ul xodim", "Oxirgi xabar / So'rov", "Yaratilgan vaqti"
+        "Manba", "Holati", "Mas'ul xodim", "Mutaxassis Izohi", "💡 AI Ehtiyoj Tahlili",
+        "Oxirgi xabar / So'rov", "Yaratilgan vaqti"
     ])
     
     for c in clients:
@@ -464,6 +503,8 @@ def export_clients_csv():
             c.get("source", "Direct"),
             c.get("lead_status", "yangi"),
             c.get("manager_name", ""),
+            c.get("manager_comment", ""),
+            c.get("ai_summary", ""),
             c.get("last_message"),
             c.get("created_at")
         ])

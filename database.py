@@ -47,7 +47,10 @@ def init_db():
         ("tg_message_id", "INTEGER"),
         ("username", "TEXT DEFAULT ''"),
         ("profile_pic", "TEXT DEFAULT ''"),
-        ("is_follower", "INTEGER DEFAULT 0")
+        ("is_follower", "INTEGER DEFAULT 0"),
+        ("ai_summary", "TEXT DEFAULT ''"),
+        ("manager_comment", "TEXT DEFAULT ''"),
+        ("chat_history", "TEXT DEFAULT '[]'")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -86,8 +89,8 @@ def init_db():
     default_settings = {
         "direct_welcome": "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan qayta tayyorlash va malaka oshirish kurslari bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:",
         "ask_phone": "Rahmat, {name}! 🙌\n\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",
-        "final_message": "Katta rahmat! Ma'lumotlaringiz qabul qilindi. ✅\n\nQuyidagi havola orqali akademiyamiz dasturlari bilan batafsil tanishishingiz mumkin:",
-        "default_promo_link": "https://tourism-academy.uz",
+        "final_message": "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:",
+        "default_promo_link": "https://tourism-edu.uz",
         "admin_username": "admin",
         "admin_password": "admin",
         "ai_enabled": "1",
@@ -122,20 +125,24 @@ def init_db():
             "📍 MANZIL VA ALOQA MA'LUMOTLARI:\n"
             "- Manzil: Samarqand shahar, Bobur Mirzo ko'chasi, 3A\n"
             "- Telefon: +998 (90) 103 30 00\n"
-            "- Email: info@tourism-academy.uz\n"
-            "- Rasmiy veb-sayt: https://tourism-academy.uz\n"
-            "- Onlayn ta'lim platformasi: https://tourism-edu.uz\n\n"
+            "- Email: info@tourism-edu.uz\n"
+            "- Rasmiy veb-sayt va onlayn ta'lim platformasi: https://tourism-edu.uz\n\n"
             "🎯 SIZNING ASOSIY MULOQOT QOIDALARINGIZ:\n"
             "1. Tinglovchilarning savollariga aniq, madaniyatli, samimiy va qisqa (2-3 jumla) qilib javob bering.\n"
             "2. Tinglovchi qaysi tilda yozsa (o'zbek yoki rus), shu tilda professional darajada javob bering.\n"
             "3. SALOMLASHISH QOIDASI: Faqat birinchi xabarda salomlashing. Keyingi har bir xabarda qayta-qayta «Assalomu alaykum» yoki «Salom» demang. Darhol to'g'ridan-to'g'ri savolga javob bering.\n"
             "4. Agar kurs narxlari, dars jadvali yoki hujjat topshirish so'ralsa:\n"
             "   'Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊' deb muloyimlik bilan raqam so'rang.\n"
-            "5. Rasmiy saytimiz (tourism-academy.uz) yoki onlayn platformamiz (tourism-edu.uz) haqida so'ralsa, havolasini bering."
+            "5. Rasmiy veb-saytimiz yoki onlayn ta'lim platformamiz haqida so'ralsa, FAQAT https://tourism-edu.uz havolasini bering."
         )
     }
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
+    # Eski havola va eski final_message larni yangilash (foydalanuvchi talabiga ko'ra)
+    cursor.execute("UPDATE settings SET value = 'https://tourism-edu.uz' WHERE key = 'default_promo_link'")
+    cursor.execute("UPDATE settings SET value = ? WHERE key = 'final_message'", (default_settings["final_message"],))
+    cursor.execute("UPDATE settings SET value = ? WHERE key = 'ai_system_prompt'", (default_settings["ai_system_prompt"],))
 
     # Agar zaxiradagi sozlamalar mavjud bo'lsa tiklash
     if os.path.exists(SETTINGS_BACKUP_FILE):
@@ -144,6 +151,10 @@ def init_db():
                 backup_settings = json.load(f)
             for k, v in backup_settings.items():
                 if v:
+                    if k == "default_promo_link" and "tourism-academy.uz" in v:
+                        v = "https://tourism-edu.uz"
+                    if k == "ai_system_prompt" and "tourism-academy.uz" in v:
+                        v = v.replace("https://tourism-academy.uz", "https://tourism-edu.uz").replace("info@tourism-academy.uz", "info@tourism-edu.uz")
                     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
         except Exception:
             pass
@@ -167,12 +178,14 @@ def init_db():
                     if not row:
                         cursor.execute("""
                             INSERT INTO clients (
-                                instagram_id, full_name, phone_number, source,
-                                campaign, step, last_message, lead_status,
+                                instagram_id, username, full_name, phone_number, source,
+                                campaign, step, last_message, lead_status, is_follower,
+                                ai_summary, manager_comment, chat_history,
                                 manager_name, manager_time, created_at, updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             ig_id,
+                            b.get("username", ""),
                             b.get("full_name"),
                             b.get("phone_number"),
                             b.get("source", "Direct"),
@@ -180,6 +193,10 @@ def init_db():
                             b.get("step", "completed"),
                             b.get("last_message", ""),
                             b.get("lead_status", "yangi"),
+                            b.get("is_follower", 0),
+                            b.get("ai_summary", ""),
+                            b.get("manager_comment", ""),
+                            b.get("chat_history", "[]"),
                             b.get("manager_name", ""),
                             b.get("manager_time", ""),
                             b.get("created_at", datetime.now().isoformat()),
@@ -190,16 +207,22 @@ def init_db():
                         if b.get("phone_number") or b.get("full_name"):
                             cursor.execute("""
                                 UPDATE clients SET 
+                                    username = COALESCE(NULLIF(username, ''), ?),
                                     full_name = COALESCE(full_name, ?),
                                     phone_number = COALESCE(phone_number, ?),
                                     campaign = CASE WHEN campaign = 'Umumiy' OR campaign IS NULL THEN ? ELSE campaign END,
-                                    last_message = CASE WHEN last_message IS NULL OR last_message = '' OR last_message = 'Salom' THEN ? ELSE last_message END
+                                    last_message = CASE WHEN last_message IS NULL OR last_message = '' OR last_message = 'Salom' THEN ? ELSE last_message END,
+                                    ai_summary = COALESCE(NULLIF(ai_summary, ''), ?),
+                                    manager_comment = COALESCE(NULLIF(manager_comment, ''), ?)
                                 WHERE instagram_id = ?
                             """, (
+                                b.get("username", ""),
                                 b.get("full_name"),
                                 b.get("phone_number"),
                                 b.get("campaign", "Front Office (Mehmonxona)"),
                                 b.get("last_message", "Frontoffice qancha"),
+                                b.get("ai_summary", ""),
+                                b.get("manager_comment", ""),
                                 ig_id
                             ))
         except Exception:
@@ -214,10 +237,13 @@ def init_db():
             cursor.execute("""
                 INSERT INTO clients (
                     instagram_id, username, full_name, phone_number, source,
-                    campaign, step, last_message, lead_status, is_follower, created_at, updated_at
+                    campaign, step, last_message, lead_status, is_follower, 
+                    ai_summary, manager_comment, created_at, updated_at
                 ) VALUES (
                     '2215649625966523', 'isak.dev', 'Iskandar Fazliddinov', '+998902857276', 'Direct',
-                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', 0, ?, ?
+                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', 0,
+                    'Front Office (Mehmonxona boshqaruvi) kursi narxi, o''qish davomiyligi va sertifikat berilishi haqida so''ragan.',
+                    '', ?, ?
                 )
             """, (now_iso, now_iso))
         else:
@@ -228,7 +254,8 @@ def init_db():
                     phone_number = '+998902857276',
                     campaign = 'Front Office (Mehmonxona)',
                     last_message = 'Frontoffice qancha',
-                    is_follower = 0
+                    is_follower = 0,
+                    ai_summary = COALESCE(NULLIF(ai_summary, ''), 'Front Office (Mehmonxona boshqaruvi) kursi narxi, o''qish davomiyligi va sertifikat berilishi haqida so''ragan.')
                 WHERE instagram_id = '2215649625966523'
             """)
     except Exception:
@@ -331,6 +358,92 @@ def update_client_by_id(client_id: int, **kwargs):
     conn.commit()
     conn.close()
     sync_leads_backup()
+
+def get_client_by_tg_message_id(message_id: int) -> dict | None:
+    """Telegram xabar ID si bo'yicha lidni topish (Reply orqali izoh yozilganda)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM clients WHERE tg_message_id = ?", (message_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def append_client_chat_history(instagram_id: str, role: str, text: str):
+    """Mijoz bilan Direct suhbat tarixini saqlab borish (AI tahlili va kontekst uchun)"""
+    if not instagram_id or not text:
+        return
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT chat_history FROM clients WHERE instagram_id = ?", (instagram_id,))
+        row = cursor.fetchone()
+        history = []
+        if row and row["chat_history"]:
+            try:
+                history = json.loads(row["chat_history"])
+            except Exception:
+                history = []
+        
+        now_time = datetime.now().strftime("%H:%M")
+        history.append({"role": role, "text": text.strip(), "time": now_time})
+        # Oxirgi 20 ta xabarni saqlash
+        if len(history) > 20:
+            history = history[-20:]
+            
+        cursor.execute("UPDATE clients SET chat_history = ?, updated_at = ? WHERE instagram_id = ?", (
+            json.dumps(history, ensure_ascii=False),
+            datetime.now().isoformat(),
+            instagram_id
+        ))
+        conn.commit()
+        conn.close()
+        sync_leads_backup()
+    except Exception as e:
+        logger.error(f"Suhbat tarixini saqlashda xatolik: {e}")
+
+def get_client_chat_history(instagram_id: str) -> list:
+    """Mijoz suhbat tarixini ro'yxat ko'rinishida olish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT chat_history FROM clients WHERE instagram_id = ?", (instagram_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row["chat_history"]:
+            return json.loads(row["chat_history"])
+    except Exception:
+        pass
+    return []
+
+def update_client_manager_comment(client_id: int, comment: str, manager_name: str = "") -> dict | None:
+    """Xodim yoki mutaxassis izohini CRM yoki Telegramdan saqlash"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_iso = datetime.now().isoformat()
+    if manager_name:
+        cursor.execute("""
+            UPDATE clients SET 
+                manager_comment = ?, 
+                manager_name = ?, 
+                manager_time = ?, 
+                updated_at = ? 
+            WHERE id = ?
+        """, (comment.strip(), manager_name, now_str, now_iso, client_id))
+    else:
+        cursor.execute("""
+            UPDATE clients SET 
+                manager_comment = ?, 
+                manager_time = ?, 
+                updated_at = ? 
+            WHERE id = ?
+        """, (comment.strip(), now_str, now_iso, client_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
+    row = cursor.fetchone()
+    conn.close()
+    sync_leads_backup()
+    return dict(row) if row else None
 
 def get_all_clients():
     """Barcha yig'ilgan mijozlar ro'yxatini olish"""

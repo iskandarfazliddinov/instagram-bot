@@ -1,9 +1,17 @@
 import re
 import logging
 from config import settings
-from database import get_or_create_client, update_client, get_setting, match_campaign
+from database import (
+    get_or_create_client,
+    update_client,
+    get_setting,
+    match_campaign,
+    append_client_chat_history,
+    get_client_chat_history
+)
 from services.instagram import send_message, send_link_button, get_user_profile
 from services.telegram import notify_admin_new_lead
+from services.ai_assistant import analyze_lead_need
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +51,9 @@ def process_incoming_message(sender_id: str, user_text: str):
         except Exception as e:
             logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
 
-    # Oxirgi yozilgan xabarni saqlash
+    # Oxirgi yozilgan xabarni saqlash va suhbat tarixiga qo'shish
     update_client(sender_id, last_message=text_clean)
+    append_client_chat_history(sender_id, "user", text_clean)
 
     # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
     digits = re.sub(r"\D", "", text_clean)
@@ -82,11 +91,17 @@ def process_incoming_message(sender_id: str, user_text: str):
                 client["campaign"] = "Turoperatorlik va agentlik"
             update_client(sender_id, campaign=client["campaign"])
 
+        # AI tahlili orqali mijozning nimalarga qiziqqani va unga nima kerakligini aniqlash
+        chat_history = get_client_chat_history(sender_id)
+        lead_summary = analyze_lead_need(chat_history, client)
+        client["ai_summary"] = lead_summary
+
         update_client(
             sender_id, 
             phone_number=clean_phone, 
             step="completed",
-            lead_status="yangi"
+            lead_status="yangi",
+            ai_summary=lead_summary
         )
         client["phone_number"] = clean_phone
         client["step"] = "completed"
@@ -99,7 +114,7 @@ def process_incoming_message(sender_id: str, user_text: str):
         # Mijoz qaysi aksiyadan kelgan bo'lsa, uning maxsus havolasi beriladi
         final_caption = get_setting(
             "final_message",
-            "Katta rahmat! Ma'lumotlaringiz qabul qilindi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:"
+            "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:"
         )
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
 
@@ -116,9 +131,10 @@ def process_incoming_message(sender_id: str, user_text: str):
         send_link_button(
             recipient_id=sender_id,
             text=final_caption,
-            button_title="Rasmiy saytni ochish 🚀",
+            button_title="Ta'lim platformasini ochish 🚀",
             url=send_link
         )
+        append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {send_link}")
         return
 
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
@@ -131,6 +147,7 @@ def process_incoming_message(sender_id: str, user_text: str):
         ai_reply = generate_ai_reply(user_message=text_clean, client_context=client, is_first_message=is_first)
         if ai_reply:
             send_message(sender_id, ai_reply)
+            append_client_chat_history(sender_id, "assistant", ai_reply)
             if step == "start":
                 update_client(sender_id, step="in_dialog")
             return
@@ -139,9 +156,10 @@ def process_incoming_message(sender_id: str, user_text: str):
             # Savolni "ism" deb tushunib olmaslik uchun professional xabar qaytariladi
             fallback_msg = (
                 "Xabaringiz uchun tashakkur! Xalqaro Turizm Akademiyasi Samarqand kampusi maslahatchisi tez orada sizga javob beradi. 😊\n\n"
-                "Qo'shimcha ma'lumot yoki qabul bo'yicha: +998 (90) 103 30 00 yoki https://tourism-academy.uz"
+                "Qo'shimcha ma'lumot yoki qabul bo'yicha: +998 (90) 103 30 00 yoki https://tourism-edu.uz"
             )
             send_message(sender_id, fallback_msg)
+            append_client_chat_history(sender_id, "assistant", fallback_msg)
             return
 
     # 3. Faqat AI o'chiq bo'lsa (ai_enabled == 0) — Standart shablon bo'yicha ketadi:

@@ -8,15 +8,18 @@
     "step": "completed",
     "last_message": "Frontoffice qancha",
     "created_at": "2026-10-18T20:20:00",
-    "updated_at": "2026-10-18T20:20:00",
+    "updated_at": "2026-10-18T22:05:42.069926",
     "campaign": "Front Office (Mehmonxona)",
     "lead_status": "yangi",
-    "manager_name": "",
-    "manager_time": "",
+    "manager_name": "@dilshod_manager",
+    "manager_time": "18.10.2026 22:05",
     "tg_message_id": null,
     "username": "isak.dev",
     "profile_pic": "",
-    "is_follower": 0
+    "is_follower": 0,
+    "ai_summary": "Front Office (Mehmonxona boshqaruvi) kursi narxi, o'qish muddati va sertifikat berilishi haqida so'ragan. Kursga yozilish niyatida.",
+    "manager_comment": "",
+    "chat_history": "[]"
   },
   {
     "id": 3,
@@ -35,7 +38,10 @@
     "tg_message_id": null,
     "username": "",
     "profile_pic": "",
-    "is_follower": 0
+    "is_follower": 0,
+    "ai_summary": "",
+    "manager_comment": "",
+    "chat_history": "[]"
   },
   {
     "id": 1,
@@ -54,6 +60,9 @@
     "tg_message_id": null,
     "username": "",
     "profile_pic": "",
-    "is_follower": 0
+    "is_follower": 0,
+    "ai_summary": "",
+    "manager_comment": "",
+    "chat_history": "[]"
   }
 ]

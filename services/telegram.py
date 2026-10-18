@@ -18,6 +18,8 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     manager_name = client.get('manager_name', '')
     manager_time = client.get('manager_time', '')
     is_fol = client.get('is_follower')
+    ai_summary = client.get('ai_summary') or ''
+    manager_comment = client.get('manager_comment') or ''
 
     status_icon = "⚪"
     status_label = "Yangi (Bog'lanish kutilmoqda ⏳)"
@@ -41,6 +43,9 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     else:
         fol_line = ""
 
+    ai_line = f"💡 <b>Mijoz ehtiyoji (AI tahlili):</b>\n<i>{ai_summary}</i>\n" if ai_summary else ""
+    comment_line = f"📝 <b>Mutaxassis izohi:</b>\n<i>«{manager_comment}»</i>\n" if manager_comment else ""
+
     text = (
         "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
@@ -53,7 +58,11 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
         f"🆔 <b>Instagram ID:</b> <code>{ig_id}</code>\n"
         f"💬 <b>So'rovi:</b> <i>{last_msg}</i>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        f"{status_icon} <b>Holat:</b> {status_label}"
+        f"{ai_line}"
+        f"{comment_line}"
+        f"{status_icon} <b>Holat:</b> {status_label}\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "💬 <i>Izoh qoldirish uchun ushbu xabarga 'Reply' qilib yozing (avtomatik CRM ga saqlanadi).</i>"
     )
     return text
 
@@ -88,6 +97,7 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
         quick_links.append({"text": f"📸 @{username}", "url": f"https://instagram.com/{username}"})
     if clean_phone and len(clean_phone) >= 9:
         quick_links.append({"text": "📲 Telegram", "url": f"https://t.me/+{clean_phone}"})
+    quick_links.append({"text": "💬 Izoh yozish", "callback_data": f"commentinfo_{client_id}"})
     if quick_links:
         keyboard.append(quick_links)
 
@@ -169,6 +179,15 @@ def handle_telegram_callback(update: dict):
     except ValueError:
         return
 
+    if action == "commentinfo":
+        ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+        requests.post(ans_url, json={
+            "callback_query_id": cq_id, 
+            "text": "Ushbu xabarga 'Reply' (Javob) qilib izoh yozing. U avtomatik CRM ga va xabarga saqlanadi!", 
+            "show_alert": True
+        }, timeout=5)
+        return
+
     client = get_client_by_id(client_id)
     if not client:
         return
@@ -218,6 +237,92 @@ def handle_telegram_callback(update: dict):
     # Tugma bosilganda bildirishnoma chiqarish
     ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
     requests.post(ans_url, json={"callback_query_id": cq_id, "text": alert_text, "show_alert": False}, timeout=5)
+
+def handle_telegram_reply_comment(update: dict):
+    """
+    Xodim Telegram guruhdagi lid xabariga 'Reply' (javob) qilib izoh yozganda:
+    izohni CRM ga saqlash va original Telegram xabarini yangilash
+    """
+    message = update.get("message")
+    if not message:
+        return
+
+    reply_to = message.get("reply_to_message")
+    comment_text = message.get("text", "").strip()
+    if not reply_to or not comment_text:
+        return
+
+    reply_msg_id = reply_to.get("message_id")
+    chat_id = message.get("chat", {}).get("id")
+    from_user = message.get("from", {})
+    uname = from_user.get("username")
+    fname = from_user.get("first_name", "")
+    lname = from_user.get("last_name", "")
+    manager_name = f"@{uname}" if uname else f"{fname} {lname}".strip() or "Xodim"
+
+    from database import get_client_by_tg_message_id, update_client_manager_comment
+    client = get_client_by_tg_message_id(reply_msg_id)
+    if not client:
+        return
+
+    # Izohni bazada yangilash
+    updated_client = update_client_manager_comment(client["id"], comment_text, manager_name)
+    if not updated_client:
+        return
+
+    # Original xabarni tahrirlab yangi izohni ko'rsatish
+    new_text = build_lead_message_text(updated_client, source=updated_client.get("source", "Direct"))
+    new_keyboard = build_inline_keyboard(
+        updated_client["id"], 
+        updated_client.get("phone_number", ""), 
+        status=updated_client.get("lead_status", "yangi"), 
+        username=updated_client.get("username", "")
+    )
+    edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
+    requests.post(edit_url, json={
+        "chat_id": chat_id,
+        "message_id": reply_msg_id,
+        "text": new_text,
+        "parse_mode": "HTML",
+        "reply_markup": {"inline_keyboard": new_keyboard}
+    }, timeout=5)
+
+    # Guruhda izoh saqlangani haqida tasdiq xabari
+    ack_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    requests.post(ack_url, json={
+        "chat_id": chat_id,
+        "reply_to_message_id": message.get("message_id"),
+        "text": f"✅ <b>Izoh CRM ga saqlandi!</b>\n👤 <b>Mas'ul:</b> {manager_name}\n📝 <i>«{comment_text}»</i>",
+        "parse_mode": "HTML"
+    }, timeout=5)
+
+def update_telegram_lead_message(client_id: int):
+    """
+    CRM dan izoh yoki holat yangilanganda Telegramdagi xabarni ham sinxronlashtirish
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
+        return
+    client = get_client_by_id(client_id)
+    if not client or not client.get("tg_message_id"):
+        return
+    try:
+        new_text = build_lead_message_text(client, source=client.get("source", "Direct"))
+        new_keyboard = build_inline_keyboard(
+            client_id, 
+            client.get("phone_number", ""), 
+            status=client.get("lead_status", "yangi"), 
+            username=client.get("username", "")
+        )
+        edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
+        requests.post(edit_url, json={
+            "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
+            "message_id": client["tg_message_id"],
+            "text": new_text,
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": new_keyboard}
+        }, timeout=5)
+    except Exception as e:
+        logger.error(f"Telegram xabarni CRM dan yangilashda xato: {e}")
 
 def setup_telegram_webhook(host_url: str):
     """Render domenini Telegram Webhook sifatida ro'yxatdan o'tkazish"""

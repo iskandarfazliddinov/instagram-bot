@@ -109,7 +109,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         created_at = client.get('created_at', '')[:16].replace("T", " ")
         lead_status = client.get('lead_status', 'yangi')
         manager_name = client.get('manager_name') or "—"
+        manager_time = client.get('manager_time') or ""
         is_fol = client.get('is_follower')
+        ai_summary = client.get('ai_summary') or ""
+        manager_comment = client.get('manager_comment') or ""
 
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
@@ -128,9 +131,22 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             fol_badge = '<span class="text-xs text-slate-400">—</span>'
 
+        # AI Ehtiyoj Tahlili kartasi
+        if ai_summary:
+            ai_card = f'''
+            <div class="mb-1.5 p-2 rounded-xl bg-indigo-50/90 border border-indigo-200/80 text-indigo-950 text-xs font-medium max-w-[280px] shadow-sm">
+                <div class="flex items-center gap-1 text-[11px] font-bold text-indigo-700 mb-0.5">
+                    <span>💡</span> <span>AI Tahlili (Ehtiyoji):</span>
+                </div>
+                <div class="leading-relaxed">{ai_summary}</div>
+            </div>
+            '''
+        else:
+            ai_card = ""
+
         # So'rov xabari
         if last_msg and last_msg != "—":
-            last_msg_html = f'<div class="text-xs text-slate-700 font-medium max-w-[200px] truncate" title="{last_msg}">"{last_msg}"</div>'
+            last_msg_html = f'<div class="text-xs text-slate-500 italic max-w-[280px] truncate" title="{last_msg}">"{last_msg}"</div>'
         else:
             last_msg_html = '<span class="text-xs text-slate-400">—</span>'
 
@@ -148,11 +164,24 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         tg_btn = f'<a href="{tg_link}" target="_blank" class="inline-flex items-center gap-1 text-[11px] text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded font-medium transition" title="Telegramda ochish">✈️ Telegram</a>' if tg_link else ""
         call_btn = f'<a href="tel:{phone}" class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded font-medium transition" title="Qo\'ng\'iroq qilish">📞 Tel</a>' if len(digits) >= 9 else ""
 
+        # Mutaxassis izohi kartasi va tugmasi
+        escaped_comment = manager_comment.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace('\n', ' ')
+        escaped_name = full_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
+
+        comment_block = ""
+        if manager_comment:
+            comment_block = f'''
+            <div class="mt-1 p-1.5 rounded-lg bg-amber-50/90 border border-amber-200 text-amber-950 text-[11px] max-w-[220px] shadow-sm">
+                <span class="font-bold text-amber-800">📝 Izoh:</span> {manager_comment}
+                {f'<span class="block text-[10px] text-slate-400 mt-0.5 font-normal">{manager_time}</span>' if manager_time else ''}
+            </div>
+            '''
+
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
         clients_html += f"""
         <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
-            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {last_msg.lower()}"
+            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()}"
             data-status="{lead_status}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
@@ -176,12 +205,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <span class="bg-purple-50 text-purple-700 border border-purple-100 px-2.5 py-0.5 rounded-md text-xs font-semibold">{campaign}</span>
                 <div class="text-[11px] text-slate-400 mt-0.5">{source}</div>
             </td>
-            <td class="px-5 py-3.5 whitespace-nowrap">
+            <td class="px-5 py-3.5">
+                {ai_card}
                 {last_msg_html}
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">{fol_badge}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">{badge_html}</td>
-            <td class="px-5 py-3.5 text-xs font-medium text-slate-700 whitespace-nowrap">{manager_name}</td>
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="text-xs font-bold text-slate-800">{manager_name}</div>
+                {comment_block}
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1">
+                    💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
+                </button>
+            </td>
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
             <td class="px-5 py-3.5 text-right whitespace-nowrap">
                 <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
@@ -394,10 +430,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-5 py-3.5">Mijoz / Instagram Profil</th>
                                 <th class="px-5 py-3.5">Telefon & Aloqa</th>
                                 <th class="px-5 py-3.5">Qiziqqan Yo'nalishi</th>
-                                <th class="px-5 py-3.5">So'rovi / Xabar</th>
+                                <th class="px-5 py-3.5">💡 AI Tahlili & So'rovi</th>
                                 <th class="px-5 py-3.5">Obuna</th>
                                 <th class="px-5 py-3.5">Holati</th>
-                                <th class="px-5 py-3.5">Mas'ul xodim</th>
+                                <th class="px-5 py-3.5">Mas'ul & Mutaxassis Izohi</th>
                                 <th class="px-5 py-3.5">Vaqti</th>
                                 <th class="px-5 py-3.5 text-right">Boshqarish</th>
                             </tr>
@@ -522,7 +558,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 mb-1">Mijozga beriladigan maxsus havola:</label>
-                                <input type="url" name="promo_link" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono" placeholder="https://tourism-academy.uz">
+                                <input type="url" name="promo_link" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono" placeholder="https://tourism-edu.uz">
                             </div>
                         </div>
 
@@ -571,7 +607,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">4. Asosiy havola (Sayt / Platforma):</label>
-                        <input type="url" name="default_promo_link" value="{settings.get('default_promo_link', '')}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm font-mono" placeholder="https://tourism-academy.uz">
+                        <input type="url" name="default_promo_link" value="{settings.get('default_promo_link', '')}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm font-mono" placeholder="https://tourism-edu.uz">
                     </div>
 
                     <div class="flex justify-end pt-2">
@@ -619,6 +655,26 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </div>
     </main>
 
+    <!-- Mutaxassis Izohi Qoldirish Modali -->
+    <div id="commentModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>📝</span> <span>Mutaxassis Izohi Qoldirish</span>
+                </h3>
+                <button type="button" onclick="closeCommentModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none p-1">&times;</button>
+            </div>
+            <p class="text-xs text-slate-500 mb-3" id="modalClientInfo">Mijoz uchun mutaxassis izohini kiriting:</p>
+            <form method="POST" id="modalCommentForm" action="">
+                <textarea name="comment" id="modalCommentInput" rows="4" required class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none placeholder-slate-400 leading-relaxed" placeholder="Mijoz bilan nima gaplashildi, qaysi guruhga yozildi yoki qachon qayta qo'ng'iroq qilish kerak..."></textarea>
+                <div class="flex items-center justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeCommentModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition">Bekor qilish</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 transition">Saqlash & Telegramga yuborish 💾</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Qidiruv va Tab almashtirish skriptlari -->
     <script>
         function switchTab(tabId) {{
@@ -665,6 +721,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     row.style.display = 'none';
                 }}
             }});
+        }}
+
+        function openCommentModal(clientId, currentComment, clientName) {{
+            document.getElementById('modalCommentForm').action = '/admin/clients/' + clientId + '/comment';
+            document.getElementById('modalCommentInput').value = currentComment || '';
+            document.getElementById('modalClientInfo').textContent = (clientName || 'Mijoz') + ' uchun mutaxassis izohini kiriting:';
+            document.getElementById('commentModal').classList.remove('hidden');
+            document.getElementById('modalCommentInput').focus();
+        }}
+
+        function closeCommentModal() {{
+            document.getElementById('commentModal').classList.add('hidden');
         }}
     </script>
 </body>
