@@ -98,7 +98,8 @@ def init_db():
             "2. Tinglovchi qaysi tilda yozsa (o'zbek yoki rus), shu tilda professional darajada javob bering.\n"
             "3. Agar aniq narxlar, dars jadvallari yoki hujjat topshirish so'ralsa:\n"
             "   'Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊' deb muloyimlik bilan raqam so'rang.\n"
-            "4. O'zingizdan mavjud bo'lmagan qoidalarni to'qimang. Bilmagan savolingiz bo'lsa, mutaxassisimiz tezda bog'lanishi uchun raqam so'rang."
+            "4. O'zingizdan mavjud bo'lmagan qoidalarni to'qimang. Bilmagan savolingiz bo'lsa, mutaxassisimiz tezda bog'lanishi uchun raqam so'rang.\n"
+            "5. Qat'iy qoida: Tinglovchi bilan faqat birinchi xabarda salomlashing. Keyingi har bir xabaringizda qayta-qayta «Assalomu alaykum» yoki «Salom» deb salomlashmang! Darhol to'g'ridan-to'g'ri savolga javob bering."
         )
     }
     for k, v in default_settings.items():

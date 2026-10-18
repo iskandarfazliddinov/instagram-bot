@@ -72,9 +72,12 @@ def process_incoming_message(sender_id: str, user_text: str):
 
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
     from services.ai_assistant import generate_ai_reply
-    ai_reply = generate_ai_reply(user_message=text_clean, client_context=client)
+    is_first = (step == "start")
+    ai_reply = generate_ai_reply(user_message=text_clean, client_context=client, is_first_message=is_first)
     if ai_reply:
         send_message(sender_id, ai_reply)
+        if step == "start":
+            update_client(sender_id, step="in_dialog")
         return
 
     # 3. AI o'chiq yoki sozlanmagan bo'lsa — Standart shablon bo'yicha ketadi:
