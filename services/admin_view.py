@@ -286,6 +286,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     ai_enabled = settings.get("ai_enabled", "1") == "1"
     ai_checked = "checked" if ai_enabled else ""
+    ai_followup_enabled = settings.get("ai_followup_enabled", "1") == "1"
+    ai_followup_checked = "checked" if ai_followup_enabled else ""
+    ai_followup_delay = str(settings.get("ai_followup_delay_minutes", "30"))
     gemini_key = settings.get("gemini_api_key", "").strip()
     if ai_enabled and gemini_key:
         ai_status_badge = "bg-emerald-50 text-emerald-700 border border-emerald-200"
@@ -457,11 +460,36 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
 
                 <form method="POST" action="/admin/ai/save" class="space-y-6">
-                    <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                        <input type="checkbox" id="ai_enabled" name="ai_enabled" value="1" {ai_checked} class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer">
-                        <label for="ai_enabled" class="text-sm font-semibold text-slate-800 cursor-pointer select-none">
-                            AI Maslahatchini faollashtirish (Instagram Directga kelgan erkin savollarga sun'iy intellekt javob beradi)
-                        </label>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <input type="checkbox" id="ai_enabled" name="ai_enabled" value="1" {ai_checked} class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer">
+                            <label for="ai_enabled" class="text-sm font-semibold text-slate-800 cursor-pointer select-none">
+                                AI Maslahatchini faollashtirish (Direct xabarlar va video izohlariga suhbat tarixini hisobga olgan holda sun'iy intellekt javob beradi)
+                            </label>
+                        </div>
+
+                        <div class="p-4 bg-purple-50/70 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div class="flex items-start gap-3">
+                                <input type="checkbox" id="ai_followup_enabled" name="ai_followup_enabled" value="1" {ai_followup_checked} class="w-5 h-5 mt-0.5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer">
+                                <div>
+                                    <label for="ai_followup_enabled" class="text-sm font-bold text-slate-900 cursor-pointer select-none flex items-center gap-1.5">
+                                        <span>🔄</span> <span>Suhbat yakunlanmagan mijozlarga avto-eslatma (AI Follow-up)</span>
+                                    </label>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        Agar mijoz yozishib, telefon raqamini qoldirmasdan to'xtab qolsa, AI belgilangan vaqtdan so'ng unga qiziqishiga mos samimiy eslatma yozib suhbatni oxiriga yetkazadi.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 self-end sm:self-center">
+                                <label class="text-xs font-semibold text-slate-700 whitespace-nowrap">Kutish vaqti:</label>
+                                <select name="ai_followup_delay_minutes" class="text-xs px-2.5 py-1.5 rounded-lg border border-purple-200 bg-white font-medium text-slate-800 outline-none">
+                                    <option value="15" {'selected' if ai_followup_delay=='15' else ''}>15 daqiqa</option>
+                                    <option value="30" {'selected' if ai_followup_delay=='30' else ''}>30 daqiqa</option>
+                                    <option value="60" {'selected' if ai_followup_delay=='60' else ''}>1 soat</option>
+                                    <option value="120" {'selected' if ai_followup_delay=='120' else ''}>2 soat</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 gap-6">

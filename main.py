@@ -1,3 +1,4 @@
+import asyncio
 import io
 import csv
 import logging
@@ -34,6 +35,49 @@ from services.telegram import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+async def follow_up_background_worker():
+    """
+    Suhbati yakunlanmagan (telefon raqamini qoldirmagan) mijozlarga
+    AI orqali avtomatik aqlli eslatma (Follow-up) yuboruvchi xizmat
+    """
+    await asyncio.sleep(60)  # Server ishga tushgandan so'ng 1 daqiqa kutish
+    while True:
+        try:
+            if get_setting("ai_followup_enabled", "1") == "1":
+                try:
+                    delay_mins = int(get_setting("ai_followup_delay_minutes", "30"))
+                except ValueError:
+                    delay_mins = 30
+
+                from database import (
+                    get_abandoned_clients,
+                    mark_client_followup_sent,
+                    get_client_chat_history,
+                    append_client_chat_history
+                )
+                from services.ai_assistant import generate_ai_followup
+                from services.instagram import send_message
+
+                abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
+                for client in abandoned_clients:
+                    ig_id = client.get("instagram_id")
+                    if not ig_id:
+                        continue
+
+                    history = get_client_chat_history(ig_id)
+                    followup_msg = generate_ai_followup(history, client)
+                    if followup_msg:
+                        logger.info(f"AI Follow-up yuborilmoqda [{ig_id}]: {followup_msg[:45]}...")
+                        send_message(ig_id, followup_msg)
+                        append_client_chat_history(ig_id, "assistant", followup_msg)
+                        mark_client_followup_sent(client["id"])
+                        await asyncio.sleep(2)
+        except Exception as e:
+            logger.error(f"Follow-up fon xizmati xatoligi: {e}")
+
+        # Har 5 daqiqada tekshirish
+        await asyncio.sleep(300)
+
 app = FastAPI(
     title="Instagram Automation & Lead Capture API",
     description="Instagram Direct va Video izohlari orqali avtomatik javob berish, havola ulashish va Telegramga lidlarni uzatish tizimi",
@@ -41,13 +85,14 @@ app = FastAPI(
 )
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
     try:
         setup_telegram_webhook("https://instagram-bot-zohg.onrender.com")
     except Exception as e:
         logger.error(f"Telegram webhook ulashda xatolik: {e}")
-    logger.info("Ma'lumotlar bazasi ishga tushirildi.")
+    asyncio.create_task(follow_up_background_worker())
+    logger.info("Ma'lumotlar bazasi va AI Follow-up xizmati ishga tushirildi.")
 
 @app.get("/")
 def home():
@@ -335,6 +380,8 @@ async def remove_campaign(request: Request, campaign_id: int = Form(...)):
 async def save_ai_settings(
     request: Request,
     ai_enabled: str = Form(None),
+    ai_followup_enabled: str = Form(None),
+    ai_followup_delay_minutes: str = Form("30"),
     gemini_api_key: str = Form(""),
     ai_system_prompt: str = Form("")
 ):
@@ -344,6 +391,11 @@ async def save_ai_settings(
 
     is_on = "1" if ai_enabled else "0"
     set_setting("ai_enabled", is_on)
+
+    is_followup_on = "1" if ai_followup_enabled else "0"
+    set_setting("ai_followup_enabled", is_followup_on)
+    if ai_followup_delay_minutes.strip():
+        set_setting("ai_followup_delay_minutes", ai_followup_delay_minutes.strip())
 
     if gemini_api_key.strip():
         set_setting("gemini_api_key", gemini_api_key.strip())

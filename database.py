@@ -50,7 +50,9 @@ def init_db():
         ("is_follower", "INTEGER DEFAULT 0"),
         ("ai_summary", "TEXT DEFAULT ''"),
         ("manager_comment", "TEXT DEFAULT ''"),
-        ("chat_history", "TEXT DEFAULT '[]'")
+        ("chat_history", "TEXT DEFAULT '[]'"),
+        ("followup_count", "INTEGER DEFAULT 0"),
+        ("last_followup_at", "TEXT DEFAULT ''")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -94,6 +96,8 @@ def init_db():
         "admin_username": "admin",
         "admin_password": "admin",
         "ai_enabled": "1",
+        "ai_followup_enabled": "1",
+        "ai_followup_delay_minutes": "30",
         "gemini_api_key": DEFAULT_GEMINI_KEY,
         "ai_system_prompt": (
             "Siz O'zbekiston Respublikasi Prezidentining PQ-350-son qarori asosida tashkil etilgan Xalqaro Turizm Akademiyasi Samarqand kampusining (International Tourism Academy - Samarkand Campus) rasmiy virtual maslahatchisi va qabul koordinatori vazifasini bajarasiz.\n\n"
@@ -453,6 +457,57 @@ def get_all_clients():
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_abandoned_clients(min_minutes: int = 30, max_hours: int = 23) -> list:
+    """
+    Telefon raqamini qoldirmagan, suhbat to'xtab qolgan va belgilangan vaqt o'tgan mijozlarni topish.
+    (Meta Instagram 24 soatlik oynasi doirasida qayta eslatma yuborish uchun)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM clients 
+        WHERE (step != 'completed' OR phone_number IS NULL OR phone_number = '')
+          AND instagram_id IS NOT NULL 
+          AND instagram_id != ''
+          AND (followup_count IS NULL OR followup_count = 0)
+        ORDER BY updated_at ASC
+    """)
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    eligible = []
+    now = datetime.now()
+    for c in rows:
+        up_str = c.get("updated_at")
+        if not up_str:
+            continue
+        try:
+            up_time = datetime.fromisoformat(up_str)
+            diff_seconds = (now - up_time).total_seconds()
+            diff_minutes = diff_seconds / 60
+            diff_hours = diff_seconds / 3600
+            if diff_minutes >= min_minutes and diff_hours <= max_hours:
+                eligible.append(c)
+        except Exception:
+            continue
+    return eligible
+
+def mark_client_followup_sent(client_id: int):
+    """Mijozga avtomatik eslatma (Follow-up) yuborilganligini belgilash"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_iso = datetime.now().isoformat()
+    cursor.execute("""
+        UPDATE clients SET 
+            followup_count = COALESCE(followup_count, 0) + 1,
+            last_followup_at = ?,
+            updated_at = ?
+        WHERE id = ?
+    """, (now_iso, now_iso, client_id))
+    conn.commit()
+    conn.close()
+    sync_leads_backup()
 
 # ----------------- SOZLAMALAR (SETTINGS) -----------------
 

@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 PRIMARY_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODEL = "gemini-3.5-flash-lite"
 
-def generate_ai_reply(user_message: str, client_context: dict, is_first_message: bool = False) -> str | None:
+def generate_ai_reply(user_message: str, client_context: dict, is_first_message: bool = False, chat_history: list = None) -> str | None:
     """
-    Google Gemini AI orqali mijoz xabariga professional va samimiy javob yaratish
+    Google Gemini AI orqali mijoz xabariga professional, do'stona va suhbat tarixini hisobga olgan holda javob yaratish
     """
     # 1. AI yoqilganligini tekshirish
     if get_setting("ai_enabled", "1") != "1":
@@ -41,12 +41,30 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
             "Salomlashmasdan darhol to'g'ridan-to'g'ri savolga javob bering."
         )
 
+    # Suhbat tarixini kontekstga kiritish (Mijoz bilan oldingi gaplashilgan mavzularni eslab qolish)
+    history_section = ""
+    if chat_history and len(chat_history) > 1:
+        history_lines = []
+        for h in chat_history[:-1]:
+            r = "Tinglovchi" if h.get("role") == "user" else "Siz (Virtual maslahatchi)"
+            t = (h.get("text") or "").strip()
+            if t:
+                history_lines.append(f"{r}: {t}")
+        if history_lines:
+            history_section = (
+                f"\n--- AVVALGI SUHBAT TARIXI (Mijozning o'tmishdagi savollari va sizning javoblaringiz) ---\n"
+                + "\n".join(history_lines[-10:])
+                + "\nESLATMA: Tinglovchining oldingi so'ragan narsalarini eslab qoling. "
+                "Agar u avval biror kursni so'ragan bo'lsa, o'sha kontekstni davom ettiring.\n"
+            )
+
     context_prompt = (
         f"{system_prompt}\n\n"
         f"--- HOZIRGI TINGLOVCHI/MIJOZ HAQIDA MA'LUMOT ---\n"
         f"Mijoz ismi: {client_name}\n"
         f"Telefon raqami holati: {phone_status}\n"
         f"Qiziqqan yo'nalishi/aksiyasi: {campaign}\n"
+        f"{history_section}\n"
         f"{greeting_instruction}\n"
         f"Eslatma: Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida "
         f"unga batafsil ma'lumot va dars jadvalini yuborish uchun muloyimlik bilan telefon raqamini so'rang. "
@@ -176,4 +194,116 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
     if not summary_parts:
         return f"{campaign} bo'yicha batafsil o'quv dasturi va qabul tafsilotlari kerak."
     return " ".join(summary_parts)
+
+def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name: str = "") -> str:
+    """
+    Video/Reels ostida izoh qoldirgan foydalanuvchiga uning izohiga mos aqlli shaxsiy Direct xabar yaratish
+    """
+    api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
+    system_prompt = get_setting("ai_system_prompt", "")
+    user_label = f"@{username}" if username else "tinglovchi"
+
+    if api_key and get_setting("ai_enabled", "1") == "1":
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"--- VAZIFA (VIDEO IZOHIGA SHAXSIY DIRECT XABAR) ---\n"
+            f"Foydalanuvchi ({user_label}) Instagram videomiz ostida quyidagi izohni qoldirdi:\n"
+            f"«{comment_text}»\n"
+            f"Video aksiyasi/mavzusi: {campaign_name or 'Umumiy ta''lim'}\n\n"
+            f"Ushbu tinglovchining Directiga yuboriladigan samimiy, do'stona va professional shaxsiy xabar yozing (2-3 jumla).\n"
+            f"Uning izohidagi savoli yoki qiziqishiga e'tibor qaratib, batafsil o'quv dasturi, dars jadvali va narxlarni Directda to'liq taqdim etishimiz uchun ismini yozib qoldirishini so'rang.\n"
+            f"Faqat to'g'ridan-to'g'ri yuboriladigan xabar matnini qaytaring."
+        )
+
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 300}
+        }
+        headers = {"Content-Type": "application/json"}
+
+        for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                if response.status_code == 200:
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            res_text = parts[0].get("text", "").strip()
+                            if res_text:
+                                logger.info(f"AI Comment DM yaratdi: {res_text[:50]}...")
+                                return res_text
+            except Exception as e:
+                logger.error(f"AI Comment DM xatosi ({model_name}): {e}")
+
+    # Fallback
+    return (
+        f"Salom {user_label}! Videomiz ostida qoldirgan izohingizni ko'rdik. 😊\n\n"
+        f"Siz so'ragan batafsil ma'lumot va maxsus dasturni yuborishimiz uchun ismingizni yozib qoldiring:"
+    )
+
+def generate_ai_followup(chat_history: list, client_context: dict) -> str:
+    """
+    Suhbati to'xtab qolgan (telefonini bermagan) mijozga samimiy qayta eslatma (Follow-up) yaratish
+    """
+    api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
+    client_name = client_context.get("full_name") or ""
+    campaign = client_context.get("campaign") or "Turizm kurslari"
+
+    history_lines = []
+    if chat_history and isinstance(chat_history, list):
+        for msg in chat_history:
+            role = "Tinglovchi" if msg.get("role") == "user" else "Siz"
+            text = (msg.get("text") or "").strip()
+            if text:
+                history_lines.append(f"{role}: {text}")
+
+    dialog_str = "\n".join(history_lines[-6:]) if history_lines else f"Qiziqqan kursi: {campaign}"
+
+    if api_key and get_setting("ai_enabled", "1") == "1":
+        prompt = (
+            "Siz Xalqaro Turizm Akademiyasi Samarqand kampusining g'amxo'r va xushmuomala virtual yordamchisisiz.\n"
+            "Tinglovchi Directda muloqot boshlagan, ammo telefon raqamini qoldirmasdan suhbat to'xtab qolgan.\n\n"
+            f"--- SUHBAT MAZMUNI ---\n"
+            f"Ismi: {client_name or 'Noma\'lum'}\n"
+            f"Qiziqqan yo'nalishi: {campaign}\n"
+            f"{dialog_str}\n\n"
+            "VAZIFA: Ushbu tinglovchiga suhbatni davom ettirish va telefon raqamini so'rash uchun 1-2 jumlali o'ta samimiy, "
+            "do'stona va muloyim eslatma (Follow-up) xabari yozing.\n"
+            "Masalan: 'Boya {campaign} haqida so'ragan edingiz, dars jadvali va joylarni band qilish bo'yicha ma'lumotlarni yuborishimiz uchun raqamingizni qoldirishga ulgurmadingizmi? 😊'\n"
+            "Bosim o'tkazmang, faqat yordam berishga tayyorligingizni bildiring. Faqat xabar matnini qaytaring."
+        )
+
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 250}
+        }
+        headers = {"Content-Type": "application/json"}
+
+        for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                if response.status_code == 200:
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            res_text = parts[0].get("text", "").strip()
+                            if res_text:
+                                logger.info(f"AI Follow-up yaratdi: {res_text[:50]}...")
+                                return res_text
+            except Exception as e:
+                logger.error(f"AI Follow-up xatosi ({model_name}): {e}")
+
+    # Fallback
+    name_str = f", {client_name}" if client_name else ""
+    return (
+        f"Salom{name_str}! 😊 Boya {campaign} bo'yicha ma'lumot so'ragan edingiz. "
+        f"Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? "
+        f"Sizga yordam berishdan mamnun bo'lamiz!"
+    )
 

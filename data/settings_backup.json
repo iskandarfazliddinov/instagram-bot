@@ -1,4 +1,6 @@
 {
+  "ai_followup_enabled": "1",
+  "ai_followup_delay_minutes": "30",
   "ask_phone": "Rahmat, {name}! 🙌\n\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",
   "final_message": "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:",
   "admin_password": "admin",

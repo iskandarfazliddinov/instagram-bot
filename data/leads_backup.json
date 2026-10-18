@@ -19,7 +19,9 @@
     "is_follower": 0,
     "ai_summary": "Front Office (Mehmonxona boshqaruvi) kursi narxi, o'qish muddati va sertifikat berilishi haqida so'ragan. Kursga yozilish niyatida.",
     "manager_comment": "",
-    "chat_history": "[]"
+    "chat_history": "[]",
+    "followup_count": 0,
+    "last_followup_at": ""
   },
   {
     "id": 3,
@@ -41,7 +43,9 @@
     "is_follower": 0,
     "ai_summary": "",
     "manager_comment": "",
-    "chat_history": "[]"
+    "chat_history": "[]",
+    "followup_count": 0,
+    "last_followup_at": ""
   },
   {
     "id": 1,
@@ -63,6 +67,8 @@
     "is_follower": 0,
     "ai_summary": "",
     "manager_comment": "",
-    "chat_history": "[]"
+    "chat_history": "[]",
+    "followup_count": 0,
+    "last_followup_at": ""
   }
 ]

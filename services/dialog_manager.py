@@ -144,7 +144,13 @@ def process_incoming_message(sender_id: str, user_text: str):
     if ai_enabled:
         from services.ai_assistant import generate_ai_reply
         is_first = (step == "start")
-        ai_reply = generate_ai_reply(user_message=text_clean, client_context=client, is_first_message=is_first)
+        chat_history = get_client_chat_history(sender_id)
+        ai_reply = generate_ai_reply(
+            user_message=text_clean, 
+            client_context=client, 
+            is_first_message=is_first,
+            chat_history=chat_history
+        )
         if ai_reply:
             send_message(sender_id, ai_reply)
             append_client_chat_history(sender_id, "assistant", ai_reply)
@@ -232,6 +238,16 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     # 2. Izoh ostiga ommaviy javob yozish
     reply_public_comment(comment_id, public_reply_text)
 
+    # Agar AI yoqilgan bo'lsa, izohga mos aqlli va shaxsiy Direct xabar yaratamiz
+    if get_setting("ai_enabled", "1") == "1":
+        from services.ai_assistant import generate_ai_comment_dm
+        try:
+            ai_dm = generate_ai_comment_dm(comment_text=comment_text, username=username, campaign_name=campaign_name)
+            if ai_dm:
+                dm_welcome_text = ai_dm
+        except Exception as e:
+            logger.error(f"AI Comment DM yaratishda xato: {e}")
+
     # 3. Bazada mijozni ro'yxatga olish (manba va qaysi aksiya ekanligi bilan)
     client = get_or_create_client(user_id)
     c_updates = {
@@ -259,5 +275,7 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
 
     # 4. Mijozning Directiga o'sha videoga mos maxsus xabar (Private reply) yuborish
     send_private_reply_to_comment(comment_id, dm_welcome_text)
+    append_client_chat_history(user_id, "user", f"[Video izohi]: {comment_text}")
+    append_client_chat_history(user_id, "assistant", dm_welcome_text)
 
 
