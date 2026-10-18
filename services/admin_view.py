@@ -623,3 +623,4 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 </body>
 </html>
 """
+    return html
