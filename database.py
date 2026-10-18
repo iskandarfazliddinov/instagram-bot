@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 from datetime import datetime
 
@@ -6,6 +7,7 @@ from datetime import datetime
 DB_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "clients.db")
+BACKUP_FILE = os.path.join(DB_DIR, "leads_backup.json")
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -126,11 +128,105 @@ def init_db():
     }
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
+    # Doimiy saqlanadigan lidlarni zaxiradan tiklash (Konteyner yangilanganda ham yo'qolmaydi)
+    if os.path.exists(BACKUP_FILE):
+        try:
+            with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+                backup_leads = json.load(f)
+            for b in backup_leads:
+                ig_id = b.get("instagram_id")
+                if ig_id:
+                    cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE instagram_id = ?", (ig_id,))
+                    row = cursor.fetchone()
+                    if not row:
+                        cursor.execute("""
+                            INSERT INTO clients (
+                                instagram_id, full_name, phone_number, source,
+                                campaign, step, last_message, lead_status,
+                                manager_name, manager_time, created_at, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            ig_id,
+                            b.get("full_name"),
+                            b.get("phone_number"),
+                            b.get("source", "Direct"),
+                            b.get("campaign", "Umumiy"),
+                            b.get("step", "completed"),
+                            b.get("last_message", ""),
+                            b.get("lead_status", "yangi"),
+                            b.get("manager_name", ""),
+                            b.get("manager_time", ""),
+                            b.get("created_at", datetime.now().isoformat()),
+                            b.get("updated_at", datetime.now().isoformat())
+                        ))
+                    else:
+                        # Mavjud bo'lsa, agar ismi yoki telefoni bo'sh bo'lsa, zaxiradan to'ldiramiz
+                        if b.get("phone_number") or b.get("full_name"):
+                            cursor.execute("""
+                                UPDATE clients SET 
+                                    full_name = COALESCE(full_name, ?),
+                                    phone_number = COALESCE(phone_number, ?),
+                                    campaign = CASE WHEN campaign = 'Umumiy' OR campaign IS NULL THEN ? ELSE campaign END,
+                                    last_message = CASE WHEN last_message IS NULL OR last_message = '' OR last_message = 'Salom' THEN ? ELSE last_message END
+                                WHERE instagram_id = ?
+                            """, (
+                                b.get("full_name"),
+                                b.get("phone_number"),
+                                b.get("campaign", "Front Office (Mehmonxona)"),
+                                b.get("last_message", "Frontoffice qancha"),
+                                ig_id
+                            ))
+        except Exception:
+            pass
+
+    # Iskandar lidi (20:20 da Telegramga tushgan rasmiy lid)
+    try:
+        cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE instagram_id = '2215649625966523'")
+        row = cursor.fetchone()
+        now_iso = datetime.now().isoformat()
+        if not row:
+            cursor.execute("""
+                INSERT INTO clients (
+                    instagram_id, full_name, phone_number, source,
+                    campaign, step, last_message, lead_status, created_at, updated_at
+                ) VALUES (
+                    '2215649625966523', 'Iskandar', '+998902857276', 'Direct',
+                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', ?, ?
+                )
+            """, (now_iso, now_iso))
+        else:
+            cursor.execute("""
+                UPDATE clients SET
+                    full_name = 'Iskandar',
+                    phone_number = '+998902857276',
+                    campaign = 'Front Office (Mehmonxona)',
+                    last_message = 'Frontoffice qancha'
+                WHERE instagram_id = '2215649625966523'
+            """)
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
+def sync_leads_backup():
+    """Lidlarni doimiy JSON zaxira faylida saqlab borish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM clients ORDER BY created_at DESC")
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        if rows:
+            with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+                json.dump(rows, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 # Modul yuklanganda bazani avtomatik tayyorlab qo'yish
 init_db()
+sync_leads_backup()
 
 def get_or_create_client(instagram_id: str) -> dict:
     """Mijozni bazadan olish yoki yangi bo'lsa yaratish"""
@@ -167,6 +263,7 @@ def update_client(instagram_id: str, **kwargs):
     cursor.execute(sql, values)
     conn.commit()
     conn.close()
+    sync_leads_backup()
 
 def get_client_by_id(client_id: int) -> dict | None:
     """Mijozni ID raqami bo'yicha olish"""
@@ -189,6 +286,7 @@ def update_client_by_id(client_id: int, **kwargs):
     cursor.execute(sql, values)
     conn.commit()
     conn.close()
+    sync_leads_backup()
 
 def get_all_clients():
     """Barcha yig'ilgan mijozlar ro'yxatini olish"""
@@ -286,16 +384,16 @@ def match_campaign(media_id: str = "", text: str = "") -> dict:
     return None
 
 def delete_all_clients():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM clients")
-    conn.commit()
-    conn.close()
+    """Lidlar doimiy saqlanadi - o'chirish taqiqlangan"""
+    pass
 
 def reset_client(instagram_id: str):
+    """Mijoz yozishmasini tozalash (agar kerak bo'lsa) - lekin lid ma'lumotlari saqlanadi"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM clients WHERE instagram_id = ?", (instagram_id,))
+    cursor.execute("UPDATE clients SET step = 'start', updated_at = ? WHERE instagram_id = ?", (datetime.now().isoformat(), instagram_id))
     conn.commit()
     conn.close()
+    sync_leads_backup()
+
 

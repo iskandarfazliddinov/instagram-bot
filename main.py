@@ -391,13 +391,9 @@ def save_security_settings(
 
 @app.post("/admin/clients/clear")
 def clear_clients(request: Request):
-    """Barcha test mijozlar tarixini tozalash (AIni qaytadan toza boshlash uchun)"""
-    if not is_authenticated(request):
-        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-
-    delete_all_clients()
+    """Lidlar doimiy saqlanadi - o'chirish taqiqlangan"""
     return RedirectResponse(
-        url="/admin?notice=Mijozlar+tarixi+tozalandi+(AI+toza+boshlanadi)#leads",
+        url="/admin?notice=Lidlar+doimiy+saqlanadi+va+ularni+o%27chirish+taqiqlangan!#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
 

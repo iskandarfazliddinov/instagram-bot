@@ -264,8 +264,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <a href="/api/clients/csv" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
                     📥 Excel (.CSV)
                 </a>
-                <a href="/logout" class="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Tizimdan chiqish">
-                    🚪 Chiqish
+                <a href="/logout" class="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Tizimdan chiqish">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path>
+                    </svg>
+                    <span>Chiqish</span>
                 </a>
             </div>
         </div>
@@ -332,11 +335,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="oylanyapti">💭 O'ylayapti</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
-                        <form method="POST" action="/admin/clients/clear" onsubmit="return confirm('Barcha mijozlar tarixi va test yozishmalarini tozalashni tasdiqlaysizmi? (AI yangidan toza boshlanadi)');">
-                            <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-2.5 rounded-xl transition font-semibold cursor-pointer whitespace-nowrap">
-                                🗑️ Tarixni tozalash
-                            </button>
-                        </form>
+                        <span class="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-xl font-medium" title="Barcha lidlar xavfsiz va doimiy saqlanadi">
+                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"></path></svg>
+                            <span>Doimiy saqlanadi</span>
+                        </span>
                     </div>
                 </div>
 
