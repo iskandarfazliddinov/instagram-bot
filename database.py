@@ -30,15 +30,19 @@ def init_db():
             updated_at TIMESTAMP
         )
     """)
-    # Eski jadval bo'lsa yangi ustunlarni xatosiz qo'shish
-    try:
-        cursor.execute("ALTER TABLE clients ADD COLUMN source TEXT DEFAULT 'Direct'")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE clients ADD COLUMN campaign TEXT DEFAULT 'Umumiy'")
-    except sqlite3.OperationalError:
-        pass
+    # Jadval ustunlarini xatosiz qo'shish (migratsiya)
+    for col, col_type in [
+        ("source", "TEXT DEFAULT 'Direct'"),
+        ("campaign", "TEXT DEFAULT 'Umumiy'"),
+        ("lead_status", "TEXT DEFAULT 'yangi'"),
+        ("manager_name", "TEXT DEFAULT ''"),
+        ("manager_time", "TEXT DEFAULT ''"),
+        ("tg_message_id", "INTEGER")
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
+        except sqlite3.OperationalError:
+            pass
 
     # 1. Tizim sozlamalari jadvali (Direct matnlari)
     cursor.execute("""
@@ -159,6 +163,28 @@ def update_client(instagram_id: str, **kwargs):
     values.append(instagram_id)
     
     sql = f"UPDATE clients SET {', '.join(fields)} WHERE instagram_id = ?"
+    cursor.execute(sql, values)
+    conn.commit()
+    conn.close()
+
+def get_client_by_id(client_id: int) -> dict | None:
+    """Mijozni ID raqami bo'yicha olish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def update_client_by_id(client_id: int, **kwargs):
+    """Mijozni ID raqami bo'yicha holati yoki mas'ul xodimini yangilash"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    kwargs["updated_at"] = datetime.now().isoformat()
+    fields = [f"{k} = ?" for k in kwargs.keys()]
+    values = list(kwargs.values())
+    values.append(client_id)
+    sql = f"UPDATE clients SET {', '.join(fields)} WHERE id = ?"
     cursor.execute(sql, values)
     conn.commit()
     conn.close()

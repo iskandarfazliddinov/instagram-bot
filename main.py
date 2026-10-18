@@ -14,11 +14,13 @@ from database import (
     create_campaign,
     delete_campaign,
     delete_all_clients,
-    reset_client
+    reset_client,
+    update_client_by_id
 )
 from services.dialog_manager import process_incoming_message, process_incoming_comment
 from services.instagram import get_recent_media, resolve_media_id_from_url
 from services.admin_view import get_admin_dashboard_html
+from services.telegram import handle_telegram_callback, setup_telegram_webhook
 
 # Loglarni sozlash
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -33,6 +35,10 @@ app = FastAPI(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    try:
+        setup_telegram_webhook("https://instagram-bot-zohg.onrender.com")
+    except Exception as e:
+        logger.error(f"Telegram webhook ulashda xatolik: {e}")
     logger.info("Ma'lumotlar bazasi ishga tushirildi.")
 
 @app.get("/")
@@ -291,6 +297,33 @@ def clear_clients():
         status_code=status.HTTP_303_SEE_OTHER
     )
 
+@app.post("/admin/clients/{client_id}/status")
+def update_status_from_admin(
+    client_id: int,
+    status_val: str = Form(..., alias="status"),
+    manager_name: str = Form("Admin", alias="manager_name")
+):
+    """Admin paneldan mijoz holati va mas'ul xodimni to'g'ridan-to'g'ri o'zgartirish"""
+    from datetime import datetime
+    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    update_client_by_id(client_id, lead_status=status_val, manager_name=manager_name, manager_time=now_str)
+    return RedirectResponse(
+        url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/telegram-webhook")
+async def telegram_webhook(request: Request):
+    """
+    Telegram bot webhooki (Guruhdagi 'Men bog'lanaman', 'Bog'lanildi' tugmalari bosilganda)
+    """
+    try:
+        data = await request.json()
+        handle_telegram_callback(data)
+    except Exception as e:
+        logger.error(f"Telegram webhook callback xatoligi: {e}")
+    return {"ok": True}
+
 @app.get("/api/clients")
 def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""
@@ -305,7 +338,10 @@ def export_clients_csv():
     writer = csv.writer(output)
     
     # Sarlavhalar
-    writer.writerow(["ID", "Instagram ID", "Ismi", "Telefon raqami", "Manba", "Bosqich", "Oxirgi xabar", "Yaratilgan vaqti"])
+    writer.writerow([
+        "ID", "Instagram ID", "Ismi", "Telefon raqami", "Yo'nalish", 
+        "Manba", "Holati", "Mas'ul xodim", "Oxirgi xabar", "Yaratilgan vaqti"
+    ])
     
     for c in clients:
         writer.writerow([
@@ -313,8 +349,10 @@ def export_clients_csv():
             c.get("instagram_id"),
             c.get("full_name"),
             c.get("phone_number"),
+            c.get("campaign", "Umumiy"),
             c.get("source", "Direct"),
-            c.get("step"),
+            c.get("lead_status", "yangi"),
+            c.get("manager_name", ""),
             c.get("last_message"),
             c.get("created_at")
         ])

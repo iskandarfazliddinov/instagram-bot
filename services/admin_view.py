@@ -51,19 +51,58 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </tr>
         """
     for client in clients:
+        client_id = client.get('id', 0)
         full_name = client.get('full_name') or "Kiritilmagan"
         phone = client.get('phone_number') or "—"
         source = client.get('source') or "Direct"
         campaign = client.get('campaign') or "Umumiy"
         created_at = client.get('created_at', '')[:16].replace("T", " ")
+        lead_status = client.get('lead_status', 'yangi')
+        manager_name = client.get('manager_name') or "—"
+
+        # Telefon raqam tozalash
+        digits = re.sub(r"\D", "", phone)
+        tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
+
+        # Status badge
+        if lead_status == "jarayonda":
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">🟡 Jarayonda</span>'
+        elif lead_status == "boglandi":
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span>'
+        elif lead_status == "oylanyapti":
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">💭 O\'ylayapti</span>'
+        elif lead_status == "rad":
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">🔴 Rad / Ko\'tarmadi</span>'
+        else:
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">⚪ Yangi</span>'
+
+        tg_btn = f'<a href="{tg_link}" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs ml-1" title="Telegramda ochish">✈️</a>' if tg_link else ""
 
         clients_html += f"""
         <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
-            <td class="px-6 py-4 font-medium text-gray-900">{full_name}</td>
-            <td class="px-6 py-4"><a href="tel:{phone}" class="font-mono text-blue-600 hover:underline">{phone}</a></td>
-            <td class="px-6 py-4"><span class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded text-xs font-medium">{campaign}</span></td>
-            <td class="px-6 py-4 text-xs text-gray-500">{source}</td>
-            <td class="px-6 py-4 text-xs text-gray-400">{created_at}</td>
+            <td class="px-5 py-3.5 font-medium text-gray-900">{full_name}</td>
+            <td class="px-5 py-3.5">
+                <a href="tel:{phone}" class="font-mono text-blue-600 hover:underline text-xs">{phone}</a>
+                {tg_btn}
+            </td>
+            <td class="px-5 py-3.5"><span class="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">{campaign}</span></td>
+            <td class="px-5 py-3.5 text-xs text-gray-500">{source}</td>
+            <td class="px-5 py-3.5">{badge_html}</td>
+            <td class="px-5 py-3.5 text-xs font-medium text-slate-700">{manager_name}</td>
+            <td class="px-5 py-3.5 text-xs text-gray-400">{created_at}</td>
+            <td class="px-5 py-3.5 text-right">
+                <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
+                    <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 outline-none">
+                        <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                        <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
+                        <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
+                        <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                        <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                    </select>
+                    <input type="hidden" name="manager_name" value="Admin">
+                    <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 transition" title="Saqlash">💾</button>
+                </form>
+            </td>
         </tr>
         """
 
@@ -357,11 +396,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <table class="w-full text-left text-sm">
                             <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-500 border-b border-slate-100">
                                 <tr>
-                                    <th class="px-6 py-3.5">Ism</th>
-                                    <th class="px-6 py-3.5">Telefon</th>
-                                    <th class="px-6 py-3.5">Yo'nalish / Aksiya</th>
-                                    <th class="px-6 py-3.5">Manba</th>
-                                    <th class="px-6 py-3.5">Vaqti</th>
+                                    <th class="px-5 py-3.5">Mijoz Ismi</th>
+                                    <th class="px-5 py-3.5">Telefon</th>
+                                    <th class="px-5 py-3.5">Yo'nalish</th>
+                                    <th class="px-5 py-3.5">Manba</th>
+                                    <th class="px-5 py-3.5">Holati</th>
+                                    <th class="px-5 py-3.5">Mas'ul xodim</th>
+                                    <th class="px-5 py-3.5">Vaqti</th>
+                                    <th class="px-5 py-3.5 text-right">Holatni yangilash</th>
                                 </tr>
                             </thead>
                             <tbody>

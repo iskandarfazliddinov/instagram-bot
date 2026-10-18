@@ -30,11 +30,48 @@ def process_incoming_message(sender_id: str, user_text: str):
     has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
 
     if has_phone:
-        update_client(sender_id, phone_number=text_clean, step="completed")
-        client["phone_number"] = text_clean
-        client["step"] = "completed"
+        # Telefon raqamni toza xalqaro formatga keltirish
+        if len(digits) == 9:
+            clean_phone = f"+998{digits}"
+        elif len(digits) == 12 and digits.startswith("998"):
+            clean_phone = f"+{digits}"
+        else:
+            clean_phone = f"+{digits}" if not text_clean.startswith("+") else text_clean
 
-        # Telegram adminga xabar yuborish (manba va yo'nalishi bilan)
+        # Agar mijoz ismini ham birga yozgan bo'lsa (masalan: "Iskandar 902857276")
+        potential_name = re.sub(r"[\d\+\(\)\-\.,]", " ", text_clean).strip()
+        potential_name = " ".join(potential_name.split())
+        current_name = client.get("full_name")
+        if (not current_name or current_name in ["None", "Noma'lum"]) and len(potential_name) >= 2:
+            client["full_name"] = potential_name
+            update_client(sender_id, full_name=potential_name)
+
+        # Qiziqqan kurs yo'nalishini aniqlash
+        history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
+        if client.get("campaign") in ["Umumiy", "", None]:
+            if "frontoffice" in history_text or "front office" in history_text:
+                client["campaign"] = "Front Office (Mehmonxona)"
+            elif "gid" in history_text or "ekskurs" in history_text:
+                client["campaign"] = "Gid-hamrohlik / Ekskursovod"
+            elif "hotel" in history_text or "mehmonxona" in history_text:
+                client["campaign"] = "Mehmonxona boshqaruvi"
+            elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
+                client["campaign"] = "Restoran ishi va servis"
+            elif "turoperator" in history_text or "turagent" in history_text:
+                client["campaign"] = "Turoperatorlik va agentlik"
+            update_client(sender_id, campaign=client["campaign"])
+
+        update_client(
+            sender_id, 
+            phone_number=clean_phone, 
+            step="completed",
+            lead_status="yangi"
+        )
+        client["phone_number"] = clean_phone
+        client["step"] = "completed"
+        client["lead_status"] = "yangi"
+
+        # Telegram guruhga interaktiv tugmalar bilan xabar yuborish
         source = client.get("source", "Direct")
         notify_admin_new_lead(client, source=source)
 
