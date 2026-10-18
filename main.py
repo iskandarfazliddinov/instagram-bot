@@ -1,6 +1,7 @@
 import io
 import csv
 import logging
+import hashlib
 import urllib.parse
 from fastapi import FastAPI, Request, Response, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -10,6 +11,7 @@ from database import (
     get_all_clients,
     get_all_settings,
     set_setting,
+    get_setting,
     get_all_campaigns,
     create_campaign,
     delete_campaign,
@@ -19,7 +21,7 @@ from database import (
 )
 from services.dialog_manager import process_incoming_message, process_incoming_comment
 from services.instagram import get_recent_media, resolve_media_id_from_url
-from services.admin_view import get_admin_dashboard_html
+from services.admin_view import get_admin_dashboard_html, get_login_page_html
 from services.telegram import handle_telegram_callback, setup_telegram_webhook
 
 # Loglarni sozlash
@@ -43,12 +45,7 @@ def on_startup():
 
 @app.get("/")
 def home():
-    return {
-        "status": "running",
-        "service": "Instagram Automation Bot",
-        "docs": "/docs",
-        "clients_count": len(get_all_clients())
-    }
+    return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.get("/privacy", response_class=Response)
 def privacy_policy():
@@ -193,11 +190,63 @@ async def receive_instagram_events(request: Request):
 
     return {"status": "ok"}
 
-# ----------------- ADMIN VA BAZANI KO'RISH -----------------
+# ----------------- CRM AVTORIZATSIYA VA XAVFSIZLIK -----------------
+
+def get_auth_token() -> str:
+    pwd = get_setting("admin_password", "admin")
+    return hashlib.sha256(f"{pwd}_crm_salt_2026".encode()).hexdigest()
+
+def is_authenticated(request: Request) -> bool:
+    token = request.cookies.get("crm_session")
+    return bool(token and token == get_auth_token())
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, error: str = ""):
+    """CRM tizimiga kirish sahifasi"""
+    if is_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+    return HTMLResponse(content=get_login_page_html(error=error))
+
+@app.post("/login")
+def login_action(
+    username: str = Form(...),
+    password: str = Form(...)
+):
+    """Login va parolni tekshirib sessiya o'rnatish"""
+    expected_user = get_setting("admin_username", "admin").strip()
+    expected_pwd = get_setting("admin_password", "admin").strip()
+
+    if username.strip() == expected_user and password.strip() == expected_pwd:
+        resp = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+        resp.set_cookie(
+            key="crm_session",
+            value=get_auth_token(),
+            httponly=True,
+            max_age=86400 * 30, # 30 kun saqlanadi
+            samesite="lax"
+        )
+        return resp
+    else:
+        return RedirectResponse(
+            url="/login?error=Login+yoki+parol+noto%27g%27ri",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+@app.get("/logout")
+def logout():
+    """Tizimdan chiqish (sessiyani tozalash)"""
+    resp = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    resp.delete_cookie("crm_session")
+    return resp
+
+# ----------------- ADMIN VA CRM BOSHQARUVI -----------------
 
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, notice: str = ""):
-    """Veb admin boshqaruv paneli"""
+    """Instagram CRM boshqaruv paneli"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     settings_data = get_all_settings()
     campaigns_data = get_all_campaigns()
     clients_data = get_all_clients()
@@ -210,12 +259,16 @@ def admin_dashboard(request: Request, notice: str = ""):
 
 @app.post("/admin/settings/save")
 async def save_settings(
+    request: Request,
     direct_welcome: str = Form(""),
     ask_phone: str = Form(""),
     final_message: str = Form(""),
     default_promo_link: str = Form("")
 ):
     """Direct xabar shablonlarini yangilash"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     if direct_welcome.strip():
         set_setting("direct_welcome", direct_welcome.strip())
     if ask_phone.strip():
@@ -226,12 +279,13 @@ async def save_settings(
         set_setting("default_promo_link", default_promo_link.strip())
 
     return RedirectResponse(
-        url="/admin?notice=Direct+shablonlari+muvaffaqiyatli+saqlandi",
+        url="/admin?notice=Direct+shablonlari+muvaffaqiyatli+saqlandi#templates",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
 @app.post("/admin/campaign/create")
 async def add_campaign(
+    request: Request,
     name: str = Form(...),
     video_url: str = Form(""),
     trigger_keyword: str = Form(""),
@@ -239,7 +293,10 @@ async def add_campaign(
     promo_link: str = Form(...),
     dm_welcome: str = Form("")
 ):
-    """Yangi video qoidasi (aksiyasi) qo'shish (Variant B: Video linki orqali)"""
+    """Yangi video qoidasi qo'shish"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     media_id, resolved_url = resolve_media_id_from_url(video_url)
     create_campaign(
         name=name,
@@ -251,29 +308,34 @@ async def add_campaign(
         promo_link=promo_link
     )
     msg = "Yangi video qoidasi muvaffaqiyatli saqlandi!"
-    if media_id:
-        msg += f" (Video ID bog'landi)"
     return RedirectResponse(
-        url=f"/admin?notice={urllib.parse.quote(msg)}",
+        url=f"/admin?notice={urllib.parse.quote(msg)}#campaigns",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
 @app.post("/admin/campaign/delete")
-async def remove_campaign(campaign_id: int = Form(...)):
+async def remove_campaign(request: Request, campaign_id: int = Form(...)):
     """Video qoidasini o'chirish"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     delete_campaign(campaign_id)
     return RedirectResponse(
-        url="/admin?notice=Video+qoidasi+o%27chirildi",
+        url="/admin?notice=Video+qoidasi+o%27chirildi#campaigns",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
 @app.post("/admin/ai/save")
 async def save_ai_settings(
+    request: Request,
     ai_enabled: str = Form(None),
     gemini_api_key: str = Form(""),
     ai_system_prompt: str = Form("")
 ):
     """Sun'iy intellekt (Gemini AI) sozlamalarini saqlash"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     is_on = "1" if ai_enabled else "0"
     set_setting("ai_enabled", is_on)
 
@@ -284,31 +346,77 @@ async def save_ai_settings(
 
     msg = "Sun'iy Intellekt sozlamalari muvaffaqiyatli saqlandi!"
     return RedirectResponse(
-        url=f"/admin?notice={urllib.parse.quote(msg)}",
+        url=f"/admin?notice={urllib.parse.quote(msg)}#ai",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
+@app.post("/admin/security/save")
+def save_security_settings(
+    request: Request,
+    username: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    """CRM login va parolini yangilash"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    if new_password.strip() != confirm_password.strip():
+        return RedirectResponse(
+            url="/admin?notice=Xatolik:+Yangi+parollar+mos+tushmadi#security",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    if len(new_password.strip()) < 3:
+        return RedirectResponse(
+            url="/admin?notice=Xatolik:+Parol+juda+qisqa#security",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    set_setting("admin_username", username.strip())
+    set_setting("admin_password", new_password.strip())
+
+    resp = RedirectResponse(
+        url="/admin?notice=Login+va+parol+muvaffaqiyatli+yangilandi#security",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+    resp.set_cookie(
+        key="crm_session",
+        value=get_auth_token(),
+        httponly=True,
+        max_age=86400 * 30,
+        samesite="lax"
+    )
+    return resp
+
 @app.post("/admin/clients/clear")
-def clear_clients():
+def clear_clients(request: Request):
     """Barcha test mijozlar tarixini tozalash (AIni qaytadan toza boshlash uchun)"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     delete_all_clients()
     return RedirectResponse(
-        url="/admin?notice=Mijozlar+tarixi+tozalandi+(AI+toza+boshlanadi)",
+        url="/admin?notice=Mijozlar+tarixi+tozalandi+(AI+toza+boshlanadi)#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
 @app.post("/admin/clients/{client_id}/status")
 def update_status_from_admin(
     client_id: int,
+    request: Request,
     status_val: str = Form(..., alias="status"),
     manager_name: str = Form("Admin", alias="manager_name")
 ):
     """Admin paneldan mijoz holati va mas'ul xodimni to'g'ridan-to'g'ri o'zgartirish"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
     update_client_by_id(client_id, lead_status=status_val, manager_name=manager_name, manager_time=now_str)
     return RedirectResponse(
-        url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi",
+        url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
 

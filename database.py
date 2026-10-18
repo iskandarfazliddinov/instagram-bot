@@ -78,6 +78,7 @@ def init_db():
         "ask_phone": "Rahmat, {name}! 🙌\n\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",
         "final_message": "Katta rahmat! Ma'lumotlaringiz qabul qilindi. ✅\n\nQuyidagi havola orqali akademiyamiz dasturlari bilan batafsil tanishishingiz mumkin:",
         "default_promo_link": "https://tourism-academy.uz",
+        "admin_username": "admin",
         "admin_password": "admin",
         "ai_enabled": "1",
         "gemini_api_key": "",
