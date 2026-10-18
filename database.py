@@ -74,7 +74,22 @@ def init_db():
         "ask_phone": "Rahmat, {name}! 🙌\n\nMa'lumotlarni taqdim etishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",
         "final_message": "Katta rahmat! Ma'lumotlaringiz muvaffaqiyatli saqlandi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:",
         "default_promo_link": "https://sizning-saytingiz.uz/katalog",
-        "admin_password": "admin"
+        "admin_password": "admin",
+        "ai_enabled": "1",
+        "gemini_api_key": "",
+        "ai_system_prompt": (
+            "Siz kompaniyaning Instagram Direct bo'yicha professional, samimiy va xushmuomala sotuv yordamchisisiz.\n\n"
+            "Vazifangiz:\n"
+            "1. Mijozlarning savollariga aniq, qisqa (2-3 jumla) va tushunarli javob berish.\n"
+            "2. Do'stona ohangda gapirish va o'rinli emojilardan foydalanish.\n"
+            "3. Mijoz qaysi tilda yozsa (o'zbek yoki rus), shu tilda javob berish.\n"
+            "4. Javobingiz oxirida mijozga to'liq ma'lumot va maxsus chegirma taklifini yuborish uchun telefon raqamini qoldirishni taklif qilish.\n\n"
+            "Kompaniyamiz va xizmatlarimiz:\n"
+            "- Biz mijozlarga ishonchli sayohat va Umra ziyorati xizmatlarini taqdim etamiz.\n"
+            "- Umra safari paketlari: To'g'ridan-to'g'ri reyslar, qulay mehmonxonalar, tajribali yo'lboshchilar va to'liq viza ko'magi.\n"
+            "- Dubay, Turkiya va boshqa mashhur sayohat yo'nalishlariga qulay turlar mavjud.\n"
+            "- Batafsil ma'lumot va chegirmali narxlar jadvalini yuborishimiz uchun mijozdan telefon raqamini qoldirishini so'rang."
+        )
     }
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))

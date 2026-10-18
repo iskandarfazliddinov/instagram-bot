@@ -259,6 +259,27 @@ async def remove_campaign(campaign_id: int = Form(...)):
         status_code=status.HTTP_303_SEE_OTHER
     )
 
+@app.post("/admin/ai/save")
+async def save_ai_settings(
+    ai_enabled: str = Form(None),
+    gemini_api_key: str = Form(""),
+    ai_system_prompt: str = Form("")
+):
+    """Sun'iy intellekt (Gemini AI) sozlamalarini saqlash"""
+    is_on = "1" if ai_enabled else "0"
+    set_setting("ai_enabled", is_on)
+
+    if gemini_api_key.strip():
+        set_setting("gemini_api_key", gemini_api_key.strip())
+    if ai_system_prompt.strip():
+        set_setting("ai_system_prompt", ai_system_prompt.strip())
+
+    msg = "Sun'iy Intellekt sozlamalari muvaffaqiyatli saqlandi!"
+    return RedirectResponse(
+        url=f"/admin?notice={urllib.parse.quote(msg)}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
 @app.get("/api/clients")
 def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""

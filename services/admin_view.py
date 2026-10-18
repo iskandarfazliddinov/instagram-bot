@@ -77,6 +77,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             permalink = m.get('permalink', '')
             media_options_html += f'<option value="{permalink}">[{m_type}] {caption}</option>\n'
 
+    ai_enabled = settings.get("ai_enabled", "1") == "1"
+    ai_checked = "checked" if ai_enabled else ""
+    gemini_key = settings.get("gemini_api_key", "").strip()
+    if ai_enabled and gemini_key:
+        ai_status_badge = "bg-emerald-50 text-emerald-700 border border-emerald-200"
+        ai_status_text = "● AI Faol va Ishlamoqda"
+    elif ai_enabled and not gemini_key:
+        ai_status_badge = "bg-amber-50 text-amber-700 border border-amber-200"
+        ai_status_text = "⚠️ API Kalit kiritilmagan"
+    else:
+        ai_status_badge = "bg-slate-100 text-slate-500 border border-slate-200"
+        ai_status_text = "○ AI O'chirilgan"
+
     notice_banner = f"""
     <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium flex items-center justify-between">
         <span>✅ {notice}</span>
@@ -268,12 +281,65 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
 
-                <!-- 3. YIG'ILGAN LIDLAR (MIJOZLAR) -->
+                <!-- 3. SUN'IY INTELLEKT (AI YORDAMCHI) -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+                    <div class="border-b border-slate-100 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                🤖 3. Sun'iy Intellekt (AI Yordamchi — Gemini)
+                            </h2>
+                            <p class="text-sm text-slate-500">Mijoz istalgan savol berganda (narx, ofis, shartlar) AI xuddi professional sotuvchi kabi javob beradi va telefonini so'raydi.</p>
+                        </div>
+                        <div>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {ai_status_badge}">
+                                {ai_status_text}
+                            </span>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="/admin/ai/save" class="space-y-6">
+                        <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <input type="checkbox" id="ai_enabled" name="ai_enabled" value="1" {ai_checked} class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer">
+                            <label for="ai_enabled" class="text-sm font-semibold text-slate-800 cursor-pointer select-none">
+                                AI Yordamchini yoqish (Mijozlarning erkin savollariga sun'iy intellekt javob beradi)
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-6">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-sm font-semibold text-slate-700">Google Gemini API Kaliti:</label>
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-600 hover:underline font-medium">
+                                        🔑 Bepul API kalit olish (aistudio.google.com) →
+                                    </a>
+                                </div>
+                                <input type="password" name="gemini_api_key" value="{settings.get('gemini_api_key', '')}" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm font-mono" placeholder="AIzaSy...">
+                                <p class="text-xs text-slate-400 mt-1">Google AI Studio dan 1 daqiqada mutlaqo bepul olinadi va hech qanday karta talab qilmaydi.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">
+                                    Kompaniyangiz haqida ma'lumot va AI yo'riqnomasi (Knowledge Base):
+                                </label>
+                                <textarea name="ai_system_prompt" rows="8" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm font-sans leading-relaxed">{settings.get('ai_system_prompt', '')}</textarea>
+                                <p class="text-xs text-slate-400 mt-1">Bu yerga o'z xizmatlaringiz, narxlar, shartlar va ofis manzilingizni yozing. AI aynan shu ma'lumotlar asosida mijozlarga javob beradi.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium px-6 py-2.5 rounded-xl text-sm shadow-sm transition">
+                                💾 AI Sozlamalarini Saqlash
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 4. YIG'ILGAN LIDLAR (MIJOZLAR) -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
                     <div class="border-b border-slate-100 pb-4 mb-6 flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                👥 3. Yig'ilgan Lidlar (Mijozlar Bazasi)
+                                👥 4. Yig'ilgan Lidlar (Mijozlar Bazasi)
                             </h2>
                             <p class="text-sm text-slate-500">Instagram orqali kelgan barcha mijozlar tarixi.</p>
                         </div>

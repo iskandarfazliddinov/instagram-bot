@@ -20,4 +20,7 @@ class Settings:
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_ADMIN_CHAT_ID: str = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
 
+    # Sun'iy intellekt (Gemini API)
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+
 settings = Settings()

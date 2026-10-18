@@ -15,7 +15,7 @@ TRIGGER_KEYWORDS = [
 
 def process_incoming_message(sender_id: str, user_text: str):
     """
-    Direct xabarni qabul qilib, unga mos dinamik javob va havola yuborish mantiqi
+    Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
     """
     client = get_or_create_client(sender_id)
     step = client.get("step", "start")
@@ -25,31 +25,11 @@ def process_incoming_message(sender_id: str, user_text: str):
     # Oxirgi yozilgan xabarni saqlash
     update_client(sender_id, last_message=text_clean)
 
-    # 1. Boshlang'ich holat yoki kalit so'zlarni tutish
-    if any(k in text_lower for k in TRIGGER_KEYWORDS) or step == "start":
-        # Dinamik sozlamalardan salomlashish matnini olamiz
-        welcome_msg = get_setting(
-            "direct_welcome",
-            "Assalomu alaykum! Xush kelibsiz. 😊\n\nSiz so'ragan maxsus havola va batafsil ma'lumotlarni yuborishimiz uchun, iltimos, ismingizni yozib qoldiring:"
-        )
-        send_message(sender_id, welcome_msg)
-        update_client(sender_id, step="awaiting_name")
-        return
+    # 1. Xabarda telefon raqam borligini aniqlash (har qanday bosqichda)
+    digits = re.sub(r"\D", "", text_clean)
+    has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
 
-    # 2. Ism qabul qilingan bosqich -> Telefon raqam so'rash
-    if step == "awaiting_name":
-        update_client(sender_id, full_name=text_clean, step="awaiting_phone")
-        ask_phone_template = get_setting(
-            "ask_phone",
-            "Rahmat, {name}! 🙌\n\nMa'lumotlarni taqdim etishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
-        )
-        response_msg = ask_phone_template.replace("{name}", text_clean)
-        send_message(sender_id, response_msg)
-        return
-
-    # 3. Telefon raqam qabul qilingan bosqich -> Bazaga yozish, Telegramga xabar va Havola berish
-    if step == "awaiting_phone":
-        digits = re.sub(r"\D", "", text_clean)
+    if has_phone or step == "awaiting_phone":
         if len(digits) < 7:
             send_message(
                 sender_id, 
@@ -70,7 +50,6 @@ def process_incoming_message(sender_id: str, user_text: str):
             "final_message",
             "Katta rahmat! Ma'lumotlaringiz muvaffaqiyatli saqlandi. ✅\n\nQuyidagi havola orqali batafsil tanishishingiz mumkin:"
         )
-        promo_url = client.get("last_message") # agar maxsus saqlangan bo'lsa
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
 
         # Havolani aniqlash (aksiya yoki standart)
@@ -91,7 +70,36 @@ def process_incoming_message(sender_id: str, user_text: str):
         )
         return
 
-    # 4. Mijoz allaqachon ro'yxatdan o'tgan bo'lsa
+    # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
+    from services.ai_assistant import generate_ai_reply
+    ai_reply = generate_ai_reply(user_message=text_clean, client_context=client)
+    if ai_reply:
+        send_message(sender_id, ai_reply)
+        return
+
+    # 3. AI o'chiq yoki sozlanmagan bo'lsa — Standart shablon bo'yicha ketadi:
+    # 3.1. Boshlang'ich holat yoki kalit so'zlarni tutish
+    if any(k in text_lower for k in TRIGGER_KEYWORDS) or step == "start":
+        welcome_msg = get_setting(
+            "direct_welcome",
+            "Assalomu alaykum! Xush kelibsiz. 😊\n\nSiz so'ragan maxsus havola va batafsil ma'lumotlarni yuborishimiz uchun, iltimos, ismingizni yozib qoldiring:"
+        )
+        send_message(sender_id, welcome_msg)
+        update_client(sender_id, step="awaiting_name")
+        return
+
+    # 3.2. Ism qabul qilingan bosqich -> Telefon raqam so'rash
+    if step == "awaiting_name":
+        update_client(sender_id, full_name=text_clean, step="awaiting_phone")
+        ask_phone_template = get_setting(
+            "ask_phone",
+            "Rahmat, {name}! 🙌\n\nMa'lumotlarni taqdim etishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
+        )
+        response_msg = ask_phone_template.replace("{name}", text_clean)
+        send_message(sender_id, response_msg)
+        return
+
+    # 3.3. Mijoz allaqachon ro'yxatdan o'tgan bo'lsa
     if step == "completed":
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
         send_message(
