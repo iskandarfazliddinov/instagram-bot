@@ -5,7 +5,7 @@ from database import get_setting
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
 
 def generate_ai_reply(user_message: str, client_context: dict) -> str | None:
     """
@@ -51,7 +51,8 @@ def generate_ai_reply(user_message: str, client_context: dict) -> str | None:
         },
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 300
+            "maxOutputTokens": 1000,
+            "thinkingConfig": {"thinkingBudget": 0}
         }
     }
 
