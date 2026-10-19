@@ -192,5 +192,28 @@ def get_user_profile(instagram_id: str) -> dict:
         logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
     return {}
 
+def get_media_details(media_id: str) -> dict:
+    """
+    Instagram Graph API orqali video/post tafsilotlarini (caption, permalink, media_type) olish
+    """
+    if not media_id or not settings.PAGE_ACCESS_TOKEN:
+        return {}
+
+    url = f"{GRAPH_BASE_URL}/{media_id}"
+    params = {
+        "fields": "id,caption,permalink,media_type,timestamp",
+        "access_token": settings.PAGE_ACCESS_TOKEN
+    }
+    try:
+        res = requests.get(url, params=params, timeout=5)
+        if res.status_code == 200:
+            return res.json()
+        logger.warning(f"get_media_details API javobi [{res.status_code}]: {res.text}")
+    except Exception as e:
+        logger.error(f"Instagram media tafsilotlarini olishda xatolik ({media_id}): {e}")
+    return {}
+
+
+
 
 

@@ -230,7 +230,19 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
 
     from services.instagram import reply_public_comment, send_private_reply_to_comment
 
-    # 1. Ushbu video yoki kalit so'z bo'yicha maxsus qoida (aksiya) bormi, tekshiramiz
+    # 1. Ushbu video ma'lumotlarini aniqlash (qaysi videoga izoh qoldirganini bilish uchun)
+    from services.instagram import get_media_details
+    media_info = get_media_details(media_id) if media_id else {}
+    media_caption = (media_info.get("caption") or "").replace("\n", " ").strip()
+    media_link = media_info.get("permalink") or ""
+
+    # Videoning sarlavhasi / mavzusini aniqlash (birinchi 50 ta belgisi)
+    short_caption = ""
+    if media_caption:
+        # Emosilardan tozalash va qisqa sarlavha olish
+        clean_cap = media_caption[:65].strip()
+        short_caption = f"«{clean_cap}...»"
+
     matched = match_campaign(media_id=media_id, text=comment_text)
 
     if matched:
@@ -241,8 +253,8 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
             "Batafsil ma'lumot va narxlarni yuborishimiz uchun ismingizni yozib qoldiring:"
         )
     else:
-        # Standart umumiy qoida
-        campaign_name = "Umumiy video izohi"
+        # Standart umumiy qoida - video nomini avtomatik chiqarish
+        campaign_name = short_caption if short_caption else "Video izohi"
         public_reply_text = get_setting("public_comment_reply", settings.PUBLIC_COMMENT_REPLY)
         dm_welcome_text = (
             "Salom! Videomiz ostida qoldirgan izohingizni ko'rdik. 😊\n\n"
@@ -252,25 +264,40 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     # 2. Izoh ostiga ommaviy javob yozish (faqat bir marta)
     reply_public_comment(comment_id, public_reply_text)
 
-
     # Agar AI yoqilgan bo'lsa, izohga mos aqlli va shaxsiy Direct xabar yaratamiz
     if get_setting("ai_enabled", "1") == "1":
         from services.ai_assistant import generate_ai_comment_dm
         try:
-            ai_dm = generate_ai_comment_dm(comment_text=comment_text, username=username, campaign_name=campaign_name)
+            ai_dm = generate_ai_comment_dm(
+                comment_text=comment_text, 
+                username=username, 
+                campaign_name=media_caption[:100] if media_caption else campaign_name
+            )
             if ai_dm:
                 dm_welcome_text = ai_dm
         except Exception as e:
             logger.error(f"AI Comment DM yaratishda xato: {e}")
 
-    # 3. Bazada mijozni ro'yxatga olish (manba va qaysi aksiya ekanligi bilan)
+    # 3. Bazada mijozni ro'yxatga olish (qaysi video ekanligi, havolasi va sarlavhasi bilan)
     client = get_or_create_client(user_id)
+    
+    # Aniq manba matni
+    if media_link:
+        source_label = f"Reels: {media_link}"
+    elif short_caption:
+        source_label = f"Video: {short_caption}"
+    else:
+        source_label = f"Video izohi (@{username})" if username else "Video izohi"
+
+    last_msg_label = f"Izoh: «{comment_text}» ({short_caption})" if short_caption else f"Izoh: «{comment_text}»"
+
     c_updates = {
-        "source": f"Video izohi (@{username})" if username else "Video izohi",
+        "source": source_label,
         "campaign": campaign_name,
-        "last_message": f"Izoh: {comment_text}",
+        "last_message": last_msg_label,
         "step": "awaiting_name"
     }
+
     if username:
         c_updates["username"] = username
 
