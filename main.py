@@ -18,7 +18,6 @@ from database import (
     delete_campaign,
     delete_client_by_id,
     clear_all_clients,
-    reset_client,
     update_client_by_id,
     update_client_manager_comment
 )
