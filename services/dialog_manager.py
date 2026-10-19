@@ -212,7 +212,21 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     """
     Video/Reels ostida yozilgan izohni qabul qilib, o'sha videoga mos maxsus javob qaytarish
     """
-    logger.info(f"Yangi izoh keldi [User: {username}, Media: {media_id}]: {comment_text}")
+    # 0. Cheklovlar: o'z sahifamiz yozgan javoblarni e'tiborsiz qoldiramiz va takrorlanishdan saqlaymiz
+    BOT_USERNAMES = ["ita_samarkand", "ita_samarkandita_samarkand"]
+    if username and username.lower() in BOT_USERNAMES:
+        logger.info(f"Bot o'z izohiga javob bermaydi (ignoring self-comment: @{username})")
+        return
+
+    from database import is_comment_processed, mark_comment_processed
+    if is_comment_processed(comment_id):
+        logger.info(f"Izoh [{comment_id}] allaqachon qayta ishlangan. Takroriy javob yuborilmaydi.")
+        return
+
+    # Izohni darhol qayta ishlangan deb belgilaymiz (bir vaqtda kelgan so'rovlar loop yaratmasligi uchun)
+    mark_comment_processed(comment_id)
+
+    logger.info(f"Yangi haqiqiy mijoz izohi keldi [User: {username}, Media: {media_id}]: {comment_text}")
 
     from services.instagram import reply_public_comment, send_private_reply_to_comment
 
@@ -235,8 +249,9 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
             "Siz so'ragan batafsil ma'lumot va maxsus havolani yuborishimiz uchun ismingizni yozib qoldiring:"
         )
 
-    # 2. Izoh ostiga ommaviy javob yozish
+    # 2. Izoh ostiga ommaviy javob yozish (faqat bir marta)
     reply_public_comment(comment_id, public_reply_text)
+
 
     # Agar AI yoqilgan bo'lsa, izohga mos aqlli va shaxsiy Direct xabar yaratamiz
     if get_setting("ai_enabled", "1") == "1":

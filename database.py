@@ -87,6 +87,16 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # 3. Qayta ishlov berilgan izohlar jadvali (bir izohga faqat 1 marta javob berish va takrorlanishni to'xtatish uchun)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS processed_comments (
+            comment_id TEXT PRIMARY KEY,
+            created_at TIMESTAMP
+        )
+    """)
+
+
+
     # Standart matnlarni tekshirib kiritish
     default_settings = {
         "direct_welcome": "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan qayta tayyorlash va malaka oshirish kurslari bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:",
@@ -596,17 +606,32 @@ def match_campaign(media_id: str = "", text: str = "") -> dict:
 
     return None
 
-def delete_all_clients():
-    """Lidlar doimiy saqlanadi - o'chirish taqiqlangan"""
-    pass
-
-def reset_client(instagram_id: str):
-    """Mijoz yozishmasini tozalash (agar kerak bo'lsa) - lekin lid ma'lumotlari saqlanadi"""
+def is_comment_processed(comment_id: str) -> bool:
+    """Izohga avval javob berilganmi yoki yo'qligini tekshirish"""
+    if not comment_id:
+        return False
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE clients SET step = 'start', updated_at = ? WHERE instagram_id = ?", (datetime.now().isoformat(), instagram_id))
-    conn.commit()
+    cursor.execute("SELECT 1 FROM processed_comments WHERE comment_id = ?", (comment_id,))
+    row = cursor.fetchone()
     conn.close()
-    sync_leads_backup()
+    return bool(row)
+
+def mark_comment_processed(comment_id: str):
+    """Izohni qayta ishlangan deb belgilash"""
+    if not comment_id:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT OR IGNORE INTO processed_comments (comment_id, created_at) VALUES (?, ?)",
+            (comment_id, datetime.now().isoformat())
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 
