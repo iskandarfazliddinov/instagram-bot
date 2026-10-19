@@ -16,7 +16,8 @@ from database import (
     get_all_campaigns,
     create_campaign,
     delete_campaign,
-    delete_all_clients,
+    delete_client_by_id,
+    clear_all_clients,
     reset_client,
     update_client_by_id,
     update_client_manager_comment
@@ -449,11 +450,28 @@ def save_security_settings(
 
 @app.post("/admin/clients/clear")
 def clear_clients(request: Request):
-    """Lidlar doimiy saqlanadi - o'chirish taqiqlangan"""
+    """Barcha test ma'lumotlarini tozalash"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    clear_all_clients()
     return RedirectResponse(
-        url="/admin?notice=Lidlar+doimiy+saqlanadi+va+ularni+o%27chirish+taqiqlangan!#leads",
+        url="/admin?notice=Barcha+test+lidlar+muvaffaqiyatli+tozalandi!#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+@app.post("/admin/clients/{client_id}/delete")
+def delete_single_client(client_id: int, request: Request):
+    """Bitta lidni o'chirish"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    delete_client_by_id(client_id)
+    return RedirectResponse(
+        url="/admin?notice=Lid+muvaffaqiyatli+o%27chirildi#leads",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
 
 @app.post("/admin/clients/{client_id}/status")
 def update_status_from_admin(

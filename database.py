@@ -179,7 +179,7 @@ def init_db():
     if not current_key_row or not current_key_row[0] or not current_key_row[0].strip():
         cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)", (DEFAULT_GEMINI_KEY,))
 
-    # Doimiy saqlanadigan lidlarni zaxiradan tiklash (Konteyner yangilanganda ham yo'qolmaydi)
+    # Doimiy saqlanadigan lidlarni zaxiradan tiklash (agar mavjud bo'lsa)
     if os.path.exists(BACKUP_FILE):
         try:
             with open(BACKUP_FILE, "r", encoding="utf-8") as f:
@@ -187,7 +187,7 @@ def init_db():
             for b in backup_leads:
                 ig_id = b.get("instagram_id")
                 if ig_id:
-                    cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE instagram_id = ?", (ig_id,))
+                    cursor.execute("SELECT id FROM clients WHERE instagram_id = ?", (ig_id,))
                     row = cursor.fetchone()
                     if not row:
                         cursor.execute("""
@@ -216,67 +216,12 @@ def init_db():
                             b.get("created_at", datetime.now().isoformat()),
                             b.get("updated_at", datetime.now().isoformat())
                         ))
-                    else:
-                        # Mavjud bo'lsa, agar ismi yoki telefoni bo'sh bo'lsa, zaxiradan to'ldiramiz
-                        if b.get("phone_number") or b.get("full_name"):
-                            cursor.execute("""
-                                UPDATE clients SET 
-                                    username = COALESCE(NULLIF(username, ''), ?),
-                                    full_name = COALESCE(full_name, ?),
-                                    phone_number = COALESCE(phone_number, ?),
-                                    campaign = CASE WHEN campaign = 'Umumiy' OR campaign IS NULL THEN ? ELSE campaign END,
-                                    last_message = CASE WHEN last_message IS NULL OR last_message = '' OR last_message = 'Salom' THEN ? ELSE last_message END,
-                                    ai_summary = COALESCE(NULLIF(ai_summary, ''), ?),
-                                    manager_comment = COALESCE(NULLIF(manager_comment, ''), ?)
-                                WHERE instagram_id = ?
-                            """, (
-                                b.get("username", ""),
-                                b.get("full_name"),
-                                b.get("phone_number"),
-                                b.get("campaign", "Front Office (Mehmonxona)"),
-                                b.get("last_message", "Frontoffice qancha"),
-                                b.get("ai_summary", ""),
-                                b.get("manager_comment", ""),
-                                ig_id
-                            ))
         except Exception:
             pass
 
-    # Iskandar lidi (20:20 da Telegramga tushgan rasmiy lid)
-    try:
-        cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE instagram_id = '2215649625966523'")
-        row = cursor.fetchone()
-        now_iso = datetime.now().isoformat()
-        if not row:
-            cursor.execute("""
-                INSERT INTO clients (
-                    instagram_id, username, full_name, phone_number, source,
-                    campaign, step, last_message, lead_status, is_follower, 
-                    ai_summary, manager_comment, created_at, updated_at
-                ) VALUES (
-                    '2215649625966523', 'isak.dev', 'Iskandar Fazliddinov', '+998902857276', 'Direct',
-                    'Front Office (Mehmonxona)', 'completed', 'Frontoffice qancha', 'yangi', 0,
-                    'Front Office (Mehmonxona boshqaruvi) kursi narxi, o''qish davomiyligi va sertifikat berilishi haqida so''ragan.',
-                    '', ?, ?
-                )
-            """, (now_iso, now_iso))
-        else:
-            cursor.execute("""
-                UPDATE clients SET
-                    username = 'isak.dev',
-                    full_name = 'Iskandar Fazliddinov',
-                    phone_number = '+998902857276',
-                    campaign = 'Front Office (Mehmonxona)',
-                    last_message = 'Frontoffice qancha',
-                    is_follower = 0,
-                    ai_summary = COALESCE(NULLIF(ai_summary, ''), 'Front Office (Mehmonxona boshqaruvi) kursi narxi, o''qish davomiyligi va sertifikat berilishi haqida so''ragan.')
-                WHERE instagram_id = '2215649625966523'
-            """)
-    except Exception:
-        pass
-
     conn.commit()
     conn.close()
+
 
 def sync_leads_backup():
     """Lidlarni doimiy JSON zaxira faylida saqlab borish"""
@@ -633,5 +578,25 @@ def mark_comment_processed(comment_id: str):
         pass
     finally:
         conn.close()
+
+def delete_client_by_id(client_id: int):
+    """Bitta lidni o'chirish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+    sync_leads_backup()
+
+def clear_all_clients():
+    """Barcha test ma'lumotlarini tozalash"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM clients")
+    conn.commit()
+    conn.close()
+    sync_leads_backup()
+
+
 
 

@@ -220,19 +220,25 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </td>
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
             <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
-                    <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500">
-                        <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                        <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
-                        <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
-                        <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
-                        <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
-                    </select>
-                    <input type="hidden" name="manager_name" value="Admin">
-                    <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
-                </form>
+                <div class="inline-flex items-center gap-1.5">
+                    <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
+                        <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500">
+                            <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                            <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
+                            <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
+                            <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                            <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                        </select>
+                        <input type="hidden" name="manager_name" value="Admin">
+                        <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
+                    </form>
+                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\'chirmoqchimisiz?')" class="inline">
+                        <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
+                    </form>
+                </div>
             </td>
         </tr>
+
         """
 
     # 3. Video Qoidalari HTML
@@ -418,12 +424,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="oylanyapti">💭 O'ylayapti</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
-                        <span class="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-xl font-medium" title="Barcha lidlar xavfsiz va doimiy saqlanadi">
-                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"></path></svg>
-                            <span>Doimiy saqlanadi</span>
-                        </span>
+                        <form method="POST" action="/admin/clients/clear" onsubmit="return confirm('Barcha test lidlarni tozalashni tasdiqlaysizmi?')" class="inline">
+                            <button type="submit" class="inline-flex items-center gap-1.5 text-xs text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2.5 rounded-xl font-semibold transition" title="Barcha test lidlarni tozalash">
+                                <span>🧹</span>
+                                <span>Testlarni tozalash</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
+
 
                 <!-- Lidlar Jadvali -->
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
