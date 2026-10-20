@@ -1,4 +1,6 @@
 import re
+import json
+from datetime import datetime, timedelta
 
 def get_login_page_html(error: str = "") -> str:
     """Zamonaviy va xavfsiz CRM kirish (Login) sahifasi"""
@@ -77,15 +79,231 @@ def get_login_page_html(error: str = "") -> str:
 """
 
 def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "") -> str:
-    """Professional va qulay Instagram CRM boshqaruv paneli"""
+    """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     
-    # 1. Lidlar hisob-kitobi (Statistika)
+    # ---------------- 1. LIDLAR ASOSIY HISOB-KITOBLARI ----------------
     total_leads = len(clients)
     new_leads = len([c for c in clients if c.get("lead_status") in ["yangi", None, ""]])
     in_progress_leads = len([c for c in clients if c.get("lead_status") == "jarayonda"])
     done_leads = len([c for c in clients if c.get("lead_status") == "boglandi"])
+    thinking_leads = len([c for c in clients if c.get("lead_status") == "oylanyapti"])
+    rejected_leads = len([c for c in clients if c.get("lead_status") == "rad"])
 
-    # 2. Mijozlar ro'yxati jadvali
+    conversion_rate = round((done_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+    leads_with_phone = len([c for c in clients if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]])
+    phone_rate = round((leads_with_phone / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+    follower_leads = len([c for c in clients if c.get("is_follower") in (1, "1", True)])
+    follower_rate = round((follower_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+    followup_leads = len([c for c in clients if (c.get("followup_count") or 0) > 0])
+
+    # ---------------- 2. SO'NGGI 14 KUNLIK VAQT DINAMIKASI ----------------
+    today = datetime.now().date()
+    daily_dates = [(today - timedelta(days=i)) for i in range(13, -1, -1)]
+    daily_labels = [d.strftime('%d.%m') for d in daily_dates]
+    daily_keys = [d.strftime('%Y-%m-%d') for d in daily_dates]
+
+    daily_total_map = {k: 0 for k in daily_keys}
+    daily_phone_map = {k: 0 for k in daily_keys}
+
+    for c in clients:
+        ca = (c.get('created_at') or '')[:10]
+        if ca in daily_total_map:
+            daily_total_map[ca] += 1
+            if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]:
+                daily_phone_map[ca] += 1
+
+    chart_daily_totals = [daily_total_map[k] for k in daily_keys]
+    chart_daily_phones = [daily_phone_map[k] for k in daily_keys]
+
+    # ---------------- 3. VIDEO VA YO'NALISHLAR (KAMPANIYALAR) TAHLILI ----------------
+    campaign_stats = {}
+    for c in clients:
+        cmp_name = (c.get('campaign') or 'Umumiy').strip()
+        if not cmp_name:
+            cmp_name = 'Umumiy'
+        if cmp_name not in campaign_stats:
+            campaign_stats[cmp_name] = {
+                "name": cmp_name,
+                "total": 0,
+                "phone": 0,
+                "done": 0,
+                "sources": set()
+            }
+        campaign_stats[cmp_name]["total"] += 1
+        src = c.get('source') or 'Direct'
+        campaign_stats[cmp_name]["sources"].add(src)
+        if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]:
+            campaign_stats[cmp_name]["phone"] += 1
+        if c.get("lead_status") == "boglandi":
+            campaign_stats[cmp_name]["done"] += 1
+
+    sorted_campaigns = sorted(campaign_stats.values(), key=lambda x: x["total"], reverse=True)
+    if sorted_campaigns:
+        top_campaign_labels = [sc["name"] for sc in sorted_campaigns[:6]]
+        top_campaign_counts = [sc["total"] for sc in sorted_campaigns[:6]]
+        top_campaign_name = sorted_campaigns[0]["name"]
+        top_campaign_lead_cnt = sorted_campaigns[0]["total"]
+    else:
+        top_campaign_labels = ["Hozircha lid yo'q"]
+        top_campaign_counts = [0]
+        top_campaign_name = "Umumiy"
+        top_campaign_lead_cnt = 0
+
+    # ---------------- 4. TRAFIK MANBALARI (SOURCES) TAHLILI ----------------
+    source_stats = {"Direct": 0, "Video Izohi": 0, "Boshqa": 0}
+    for c in clients:
+        src = (c.get('source') or 'Direct').lower()
+        if any(w in src for w in ['izoh', 'komment', 'comment', 'video', 'reel', 'post']):
+            source_stats["Video Izohi"] += 1
+        elif 'direct' in src:
+            source_stats["Direct"] += 1
+        else:
+            source_stats["Boshqa"] += 1
+
+    # ---------------- 5. MENEJERLAR FAOLIYATI (LEADERBOARD) TAHLILI ----------------
+    manager_stats = {}
+    for c in clients:
+        m_name = (c.get('manager_name') or '').strip()
+        if not m_name or m_name == "—":
+            m_key = "Biriktirilmagan (Yangi)"
+        else:
+            m_key = m_name
+
+        if m_key not in manager_stats:
+            manager_stats[m_key] = {
+                "name": m_key,
+                "total": 0,
+                "boglandi": 0,
+                "jarayonda": 0,
+                "oylanyapti": 0,
+                "rad": 0,
+                "yangi": 0,
+                "comments": 0
+            }
+        manager_stats[m_key]["total"] += 1
+        st = c.get("lead_status") or "yangi"
+        if st in manager_stats[m_key]:
+            manager_stats[m_key][st] += 1
+        else:
+            manager_stats[m_key]["yangi"] += 1
+
+        if c.get("manager_comment") and c.get("manager_comment").strip():
+            manager_stats[m_key]["comments"] += 1
+
+    sorted_managers = sorted(manager_stats.values(), key=lambda m: (m["boglandi"], m["total"]), reverse=True)
+
+    # Menejerlar HTML jadvali
+    managers_table_html = ""
+    if not sorted_managers:
+        managers_table_html = """
+        <tr>
+            <td colspan="8" class="px-6 py-8 text-center text-slate-400">
+                Hozircha menejerlar biriktirilgan lidlar mavjud emas.
+            </td>
+        </tr>
+        """
+    for m in sorted_managers:
+        m_name = m["name"]
+        m_total = m["total"]
+        m_done = m["boglandi"]
+        m_prog = m["jarayonda"]
+        m_think = m["oylanyapti"]
+        m_rad = m["rad"]
+        m_comm = m["comments"]
+        m_conv = round((m_done / m_total * 100), 1) if m_total > 0 else 0.0
+
+        if m_name == "Biriktirilmagan (Yangi)":
+            m_avatar = "⚪"
+            m_badge = f'<span class="font-medium text-slate-500 italic">{m_name}</span>'
+        else:
+            m_avatar = "👤"
+            m_badge = f'<span class="font-bold text-slate-800">{m_name}</span>'
+
+        managers_table_html += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center text-sm font-bold border border-purple-100">{m_avatar}</span>
+                    {m_badge}
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-800">{m_total}</td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{m_done}</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">{m_prog}</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700">{m_think}</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-rose-50 text-rose-700">{m_rad}</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center gap-1 text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium">💬 {m_comm}</span>
+            </td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-2">
+                    <span class="font-bold text-xs text-emerald-700">{m_conv}%</span>
+                    <div class="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div class="bg-emerald-500 h-2 rounded-full" style="width: {min(m_conv, 100)}%"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        """
+
+    # Kampaniyalar HTML jadvali
+    campaigns_table_html = ""
+    if not sorted_campaigns:
+        campaigns_table_html = """
+        <tr>
+            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                Hozircha kampaniyalar bo'yicha lidlar mavjud emas.
+            </td>
+        </tr>
+        """
+    for c_stat in sorted_campaigns:
+        c_name = c_stat["name"]
+        c_total = c_stat["total"]
+        c_phone = c_stat["phone"]
+        c_done = c_stat["done"]
+        c_sources = ", ".join(sorted(list(c_stat["sources"]))) if c_stat["sources"] else "Direct"
+        c_phone_pct = round((c_phone / c_total * 100), 1) if c_total > 0 else 0.0
+        c_conv = round((c_done / c_total * 100), 1) if c_total > 0 else 0.0
+
+        campaigns_table_html += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🎬</span>
+                    <span class="font-bold text-slate-800">{c_name}</span>
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">{c_sources}</td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-900">{c_total} ta</td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                    📞 {c_phone} ({c_phone_pct}%)
+                </span>
+            </td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-800">{c_done} ta</td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-2">
+                    <span class="font-bold text-xs text-indigo-700">{c_conv}%</span>
+                    <div class="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div class="bg-indigo-600 h-2 rounded-full" style="width: {min(c_conv, 100)}%"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        """
+
+    # ---------------- 6. MIJOZLAR JADVALI QATORLARI ----------------
     clients_html = ""
     if not clients:
         clients_html = """
@@ -133,14 +351,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         # AI Ehtiyoj Tahlili kartasi
         if ai_summary:
-            ai_card = f'''
+            ai_card = f"""
             <div class="mb-1.5 p-2 rounded-xl bg-indigo-50/90 border border-indigo-200/80 text-indigo-950 text-xs font-medium max-w-[280px] shadow-sm">
                 <div class="flex items-center gap-1 text-[11px] font-bold text-indigo-700 mb-0.5">
                     <span>💡</span> <span>AI Tahlili (Ehtiyoji):</span>
                 </div>
                 <div class="leading-relaxed">{ai_summary}</div>
             </div>
-            '''
+            """
         else:
             ai_card = ""
 
@@ -170,12 +388,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         comment_block = ""
         if manager_comment:
-            comment_block = f'''
+            comment_block = f"""
             <div class="mt-1 p-1.5 rounded-lg bg-amber-50/90 border border-amber-200 text-amber-950 text-[11px] max-w-[220px] shadow-sm">
                 <span class="font-bold text-amber-800">📝 Izoh:</span> {manager_comment}
                 {f'<span class="block text-[10px] text-slate-400 mt-0.5 font-normal">{manager_time}</span>' if manager_time else ''}
             </div>
-            '''
+            """
 
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
@@ -232,16 +450,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <input type="hidden" name="manager_name" value="Admin">
                         <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
                     </form>
-                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\'chirmoqchimisiz?')" class="inline">
+                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
                         <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
                     </form>
                 </div>
             </td>
         </tr>
-
         """
 
-    # 3. Video Qoidalari HTML
+    # ---------------- 7. VIDEO QOIDALARI JADVALI ----------------
     campaigns_html = ""
     if not campaigns:
         campaigns_html = """
@@ -272,7 +489,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <td class="px-6 py-4 text-xs text-slate-500 truncate max-w-xs">{c.get('public_reply', '—')}</td>
             <td class="px-6 py-4 text-xs text-blue-600 truncate max-w-xs"><a href="{c.get('promo_link', '#')}" target="_blank" class="hover:underline">{c.get('promo_link', '—')}</a></td>
             <td class="px-6 py-4 text-right">
-                <form method="POST" action="/admin/campaign/delete" onsubmit="return confirm('Rostdan ham ushbu qoidani o\'chirmoqchimisiz?');">
+                <form method="POST" action="/admin/campaign/delete" onsubmit="return confirm('Rostdan ham ushbu qoidani o\\'chirmoqchimisiz?');">
                     <input type="hidden" name="campaign_id" value="{c['id']}">
                     <button type="submit" class="text-rose-500 hover:text-rose-700 text-xs font-semibold px-2 py-1 rounded hover:bg-rose-50 transition">O'chirish</button>
                 </form>
@@ -314,6 +531,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     admin_username = settings.get("admin_username", "admin")
 
+    # Chart.js JSON ma'lumotlari
+    json_daily_labels = json.dumps(daily_labels)
+    json_daily_totals = json.dumps(chart_daily_totals)
+    json_daily_phones = json.dumps(chart_daily_phones)
+    json_top_campaign_labels = json.dumps(top_campaign_labels)
+    json_top_campaign_counts = json.dumps(top_campaign_counts)
+
     html = f"""<!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -321,6 +545,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instagram CRM — Xalqaro Turizm Akademiyasi</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
@@ -349,7 +574,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <p class="text-xs text-slate-500 font-medium">Xalqaro Turizm Akademiyasi (Samarqand kampusi) — Lidlar va Muloqot Boshqaruvi</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
+                <button onclick="switchTab('analytics')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">
+                    📊 Statistika
+                </button>
                 <a href="/api/clients/csv" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
                     📥 Excel (.CSV)
                 </a>
@@ -371,17 +599,20 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </button>
+            <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                📊 2. Statistika & Tahlil
+            </button>
             <button onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🤖 2. Sun'iy Intellekt (AI Maslahatchi)
+                🤖 3. Sun'iy Intellekt (AI Maslahatchi)
             </button>
             <button onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🎬 3. Video (Reels) Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
+                🎬 4. Video (Reels) Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
             </button>
             <button onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                💬 4. Direct Shabloni
+                💬 5. Direct Shabloni
             </button>
             <button onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🔐 5. Login & Parol
+                🔐 6. Login & Parol
             </button>
         </div>
 
@@ -427,7 +658,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
 
-
                 <!-- Lidlar Jadvali -->
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
                     <table class="w-full text-left text-sm" id="leads_table">
@@ -452,7 +682,271 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 2-TAB: SUN'IY INTELLEKT (AI MASLAHATCHI) -->
+        <!-- 2-TAB: STATISTIKA VA TAHLIL (YANGI ANALITIKA DASHBOARD) -->
+        <div id="tab_analytics" class="tab-content hidden space-y-6">
+            <!-- Asosiy Sarlavha banneri -->
+            <div class="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-purple-200 text-xs font-semibold mb-3 border border-white/10">
+                            <span>📊</span> <span>Analitika & Konversiya Hisoboti</span>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Akademiya Instagram Faoliyati Tahlili</h2>
+                        <p class="text-indigo-200/80 text-xs sm:text-sm mt-1.5 max-w-2xl font-medium leading-relaxed">
+                            Reels videolari samaradorligi, kelib tushgan lidlar dinamikasi, telefon raqami olish foizi va sotuv bo'limi menejerlari natijadorligi.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2.5 self-start md:self-center">
+                        <button onclick="window.location.reload()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition shadow-sm" title="Ma'lumotlarni yangilash">
+                            🔄 Yangilash
+                        </button>
+                        <button onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition shadow-sm" title="Hisobotni chop etish yoki PDF saqlash">
+                            🖨️ Chop etish / PDF
+                        </button>
+                        <a href="/api/clients/csv" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-bold shadow-lg shadow-purple-500/25 transition">
+                            📥 Excel (.CSV)
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asosiy Ko'rsatkichlar (KPI Kartalari) -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Card 1: Jami Lidlar -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-purple-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Jami Lidlar</span>
+                        <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">👥</span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                    <div class="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1 font-medium">
+                        <span class="text-purple-600 font-bold">100%</span> <span>barcha lidlar</span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Telefon Raqamlar -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-emerald-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Telefonli Lidlar</span>
+                        <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">📞</span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{leads_with_phone} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                    <div class="text-[11px] text-emerald-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <span class="font-bold">{phone_rate}%</span> <span>kontakt qoldirgan</span>
+                    </div>
+                </div>
+
+                <!-- Card 3: Konversiya (Bog'lanildi) -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Bog'lanildi</span>
+                        <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">🟢</span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                    <div class="text-[11px] text-indigo-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <span class="font-bold">{conversion_rate}%</span> <span>konversiya foizi</span>
+                    </div>
+                </div>
+
+                <!-- Card 4: Eng Ommabop Video/Yo'nalish -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-600">Eng Faol Mavzu</span>
+                        <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold">🎬</span>
+                    </div>
+                    <div class="text-sm font-extrabold text-slate-900 truncate" title="{top_campaign_name}">{top_campaign_name}</div>
+                    <div class="text-[11px] text-amber-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <span class="font-bold">{top_campaign_lead_cnt} ta lid</span> <span>eng yuqori natija</span>
+                    </div>
+                </div>
+
+                <!-- Card 5: Obunachilar Nisbati -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-pink-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-pink-600">Obunachilar</span>
+                        <span class="w-7 h-7 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center text-sm font-bold">⭐</span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-pink-600">{follower_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                    <div class="text-[11px] text-pink-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <span class="font-bold">{follower_rate}%</span> <span>profil a'zolari</span>
+                    </div>
+                </div>
+
+                <!-- Card 6: AI Qayta Eslatmalar (Follow-up) -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-purple-300 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-600">AI Follow-up</span>
+                        <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">🤖</span>
+                    </div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-purple-600">{followup_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                    <div class="text-[11px] text-purple-700 mt-1.5 flex items-center gap-1 font-medium">
+                        <span>qayta eslatma berilgan</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interaktiv Grafiklar Paneli (1-qator) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- 1-Grafik: Kunlik Lidlar Oqimi (8 cols) -->
+                <div class="lg:col-span-8 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+                        <div>
+                            <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                                <span>📈</span> <span>Lidlar Oqimi Dinamikasi (So'nggi 14 kun)</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Kunlar kesimida barcha kelgan lidlar va telefon raqami olingan sifatli mijozlar</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs font-semibold">
+                            <span class="inline-flex items-center gap-1.5 text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100">
+                                <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span> Jami Lidlar
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Telefon Raqamlar
+                            </span>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-72">
+                        <canvas id="chartDailyTrend"></canvas>
+                    </div>
+                </div>
+
+                <!-- 2-Grafik: Lidlar Holati Funneli (4 cols) -->
+                <div class="lg:col-span-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="mb-4 pb-3 border-b border-slate-100">
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>🍩</span> <span>Lidlar Holati & Funnel</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Mijozlarning bosqichlar bo'yicha taqsimoti</p>
+                    </div>
+                    <div class="relative w-full h-52 flex items-center justify-center">
+                        <canvas id="chartLeadStatus"></canvas>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs font-medium">
+                        <div class="flex items-center justify-between p-1.5 bg-slate-50 rounded-lg">
+                            <span class="flex items-center gap-1 text-slate-600"><span class="w-2 h-2 rounded-full bg-slate-400"></span> Yangi:</span>
+                            <span class="font-bold text-slate-800">{new_leads} ta</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 bg-indigo-50 rounded-lg">
+                            <span class="flex items-center gap-1 text-indigo-700"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Jarayonda:</span>
+                            <span class="font-bold text-indigo-900">{in_progress_leads} ta</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 bg-emerald-50 rounded-lg">
+                            <span class="flex items-center gap-1 text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Bog'lanildi:</span>
+                            <span class="font-bold text-emerald-900">{done_leads} ta</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 bg-amber-50 rounded-lg">
+                            <span class="flex items-center gap-1 text-amber-700"><span class="w-2 h-2 rounded-full bg-amber-500"></span> O'ylayapti:</span>
+                            <span class="font-bold text-amber-900">{thinking_leads} ta</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interaktiv Grafiklar Paneli (2-qator) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- 3-Grafik: Video va Yo'nalishlar Samaradorligi (7 cols) -->
+                <div class="lg:col-span-7 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="mb-4 pb-3 border-b border-slate-100">
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>🎬</span> <span>Video va Yo'nalishlar Samaradorligi</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Qaysi video yoki kurs eng ko'p murojaat olib kelganligi</p>
+                    </div>
+                    <div class="relative w-full h-64">
+                        <canvas id="chartCampaigns"></canvas>
+                    </div>
+                </div>
+
+                <!-- 4-Grafik: Trafik Manbalari (5 cols) -->
+                <div class="lg:col-span-5 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="mb-4 pb-3 border-b border-slate-100">
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>🎯</span> <span>Trafik Manbalari Taqsimoti</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Direct xabarlar vs Reels va Post izohlari</p>
+                    </div>
+                    <div class="relative w-full h-52 flex items-center justify-center">
+                        <canvas id="chartSources"></canvas>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs font-medium">
+                        <div class="flex items-center justify-between p-2 bg-purple-50 rounded-xl border border-purple-100">
+                            <span class="flex items-center gap-1 text-purple-700"><span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span> Direct:</span>
+                            <span class="font-bold text-purple-900">{source_stats['Direct']} ta</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-pink-50 rounded-xl border border-pink-100">
+                            <span class="flex items-center gap-1 text-pink-700"><span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> Video Izohi:</span>
+                            <span class="font-bold text-pink-900">{source_stats['Video Izohi']} ta</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menejerlar Faoliyati Jadvali (Leaderboard) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>👔</span> <span>Menejerlar Natijadorligi va Reytingi (Leaderboard)</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Sotuv bo'limi xodimlarining lidlar bilan ishlash ko'rsatkichlari va konversiyasi</p>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                        Jami: {len(sorted_managers)} ta guruh/menejer
+                    </span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
+                            <tr>
+                                <th class="px-5 py-3">Menejer / Xodim</th>
+                                <th class="px-4 py-3 text-center">Biriktirilgan Lidlar</th>
+                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
+                                <th class="px-4 py-3 text-center">🟡 Jarayonda</th>
+                                <th class="px-4 py-3 text-center">💭 O'ylayapti</th>
+                                <th class="px-4 py-3 text-center">🔴 Rad etildi</th>
+                                <th class="px-4 py-3 text-center">💬 Izohlar</th>
+                                <th class="px-5 py-3 text-right">Konversiya (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {managers_table_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Kampaniyalar / Videolar bo'yicha Tahliliy Jadval -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>📊</span> <span>Mavzular & Videolar Bo'yicha Chuqurlashtirilgan Tahlil</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Har bir video va ta'lim yo'nalishi keltirgan lidlar soni, telefon olish darajasi va yakuniy natijasi</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
+                            <tr>
+                                <th class="px-5 py-3">Video / Yo'nalish Nomi</th>
+                                <th class="px-4 py-3">Manba Turi</th>
+                                <th class="px-4 py-3 text-center">Jami Lidlar</th>
+                                <th class="px-4 py-3 text-center">📞 Telefonli Lidlar</th>
+                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
+                                <th class="px-5 py-3 text-right">Konversiya Darajasi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {campaigns_table_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3-TAB: SUN'IY INTELLEKT (AI MASLAHATCHI) -->
         <div id="tab_ai" class="tab-content hidden">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
@@ -525,12 +1019,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 3-TAB: VIDEO (REELS) QOIDALARI -->
+        <!-- 4-TAB: VIDEO (REELS) QOIDALARI -->
         <div id="tab_campaigns" class="tab-content hidden space-y-6">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        🎬 3. Har Bir Video (Reels) Uchun Maxsus Qoidalar
+                        🎬 4. Har Bir Video (Reels) Uchun Maxsus Qoidalar
                     </h2>
                     <p class="text-sm text-slate-500">Mijoz ma'lum bir videongizga yoki kalit so'zga (masalan: "gid", "narx") izoh qoldirganda boshqacha matn va havola yuborish.</p>
                 </div>
@@ -608,12 +1102,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 4-TAB: DIRECT SHABLONI -->
+        <!-- 5-TAB: DIRECT SHABLONI -->
         <div id="tab_templates" class="tab-content hidden space-y-6">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        💬 4. Standart Direct Xabarlar Shabloni
+                        💬 5. Standart Direct Xabarlar Shabloni
                     </h2>
                     <p class="text-sm text-slate-500">Mijoz to'g'ridan-to'g'ri Directga yozganda bot ushbu matnlardan foydalanadi.</p>
                 </div>
@@ -650,12 +1144,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 5-TAB: XAVFSIZLIK & LOGIN PAROL -->
+        <!-- 6-TAB: XAVFSIZLIK & LOGIN PAROL -->
         <div id="tab_security" class="tab-content hidden space-y-6">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl">
                 <div class="border-b border-slate-100 pb-4 mb-6">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        🔐 5. CRM Xavfsizlik Sozlamalari (Login va Parol)
+                        🔐 6. CRM Xavfsizlik Sozlamalari (Login va Parol)
                     </h2>
                     <p class="text-sm text-slate-500">Boshqaruv paneliga kirish login va parolini bu yerdan xavfsiz o'zgartirishingiz mumkin.</p>
                 </div>
@@ -706,8 +1200,180 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </div>
     </div>
 
-    <!-- Qidiruv va Tab almashtirish skriptlari -->
+    <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
+        let chartsInitialized = false;
+        let chartInstances = {{}};
+
+        function initOrUpdateAnalyticsCharts() {{
+            if (chartsInitialized) {{
+                Object.values(chartInstances).forEach(c => {{
+                    if (c && typeof c.resize === 'function') c.resize();
+                }});
+                return;
+            }}
+
+            const dailyLabels = {json_daily_labels};
+            const dailyTotals = {json_daily_totals};
+            const dailyPhones = {json_daily_phones};
+            const topCampaignLabels = {json_top_campaign_labels};
+            const topCampaignCounts = {json_top_campaign_counts};
+
+            // 1. Kunlik Dinamika Grafigi
+            const ctxDaily = document.getElementById('chartDailyTrend');
+            if (ctxDaily) {{
+                chartInstances.daily = new Chart(ctxDaily, {{
+                    type: 'line',
+                    data: {{
+                        labels: dailyLabels,
+                        datasets: [
+                            {{
+                                label: 'Jami Lidlar',
+                                data: dailyTotals,
+                                borderColor: '#8b5cf6',
+                                backgroundColor: 'rgba(139, 92, 246, 0.12)',
+                                fill: true,
+                                tension: 0.35,
+                                borderWidth: 2.5,
+                                pointBackgroundColor: '#8b5cf6',
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }},
+                            {{
+                                label: 'Telefon Raqamlar',
+                                data: dailyPhones,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                fill: false,
+                                tension: 0.35,
+                                borderWidth: 2.5,
+                                pointBackgroundColor: '#10b981',
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }}
+                        ]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {{
+                            legend: {{ display: false }},
+                            tooltip: {{
+                                backgroundColor: '#0f172a',
+                                titleFont: {{ size: 12, family: "'Plus Jakarta Sans', sans-serif" }},
+                                bodyFont: {{ size: 12, family: "'Plus Jakarta Sans', sans-serif" }},
+                                padding: 10,
+                                cornerRadius: 8
+                            }}
+                        }},
+                        scales: {{
+                            y: {{
+                                beginAtZero: true,
+                                ticks: {{ precision: 0, font: {{ size: 11 }} }},
+                                grid: {{ color: '#f1f5f9' }}
+                            }},
+                            x: {{
+                                ticks: {{ font: {{ size: 11 }} }},
+                                grid: {{ display: false }}
+                            }}
+                        }}
+                    }}
+                }});
+            }}
+
+            // 2. Lidlar Holati Funnel Grafigi
+            const ctxStatus = document.getElementById('chartLeadStatus');
+            if (ctxStatus) {{
+                chartInstances.status = new Chart(ctxStatus, {{
+                    type: 'doughnut',
+                    data: {{
+                        labels: ["⚪ Yangi", "🟡 Jarayonda", "🟢 Bog'lanildi", "💭 O'ylayapti", "🔴 Rad"],
+                        datasets: [{{
+                            data: [{new_leads}, {in_progress_leads}, {done_leads}, {thinking_leads}, {rejected_leads}],
+                            backgroundColor: ['#94a3b8', '#6366f1', '#10b981', '#f59e0b', '#f43f5e'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {{
+                            legend: {{ display: false }},
+                            tooltip: {{ cornerRadius: 8 }}
+                        }},
+                        cutout: '68%'
+                    }}
+                }});
+            }}
+
+            // 3. Video va Yo'nalishlar Gorizontal Grafigi
+            const ctxCampaigns = document.getElementById('chartCampaigns');
+            if (ctxCampaigns) {{
+                chartInstances.campaigns = new Chart(ctxCampaigns, {{
+                    type: 'bar',
+                    data: {{
+                        labels: topCampaignLabels,
+                        datasets: [{{
+                            label: 'Lidlar soni',
+                            data: topCampaignCounts,
+                            backgroundColor: '#8b5cf6',
+                            borderRadius: 8,
+                            barThickness: 20
+                        }}]
+                    }},
+                    options: {{
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {{
+                            legend: {{ display: false }},
+                            tooltip: {{ cornerRadius: 8 }}
+                        }},
+                        scales: {{
+                            x: {{
+                                beginAtZero: true,
+                                ticks: {{ precision: 0, font: {{ size: 11 }} }},
+                                grid: {{ color: '#f1f5f9' }}
+                            }},
+                            y: {{
+                                ticks: {{ font: {{ size: 11 }} }},
+                                grid: {{ display: false }}
+                            }}
+                        }}
+                    }}
+                }});
+            }}
+
+            // 4. Trafik Manbalari Grafigi
+            const ctxSources = document.getElementById('chartSources');
+            if (ctxSources) {{
+                chartInstances.sources = new Chart(ctxSources, {{
+                    type: 'doughnut',
+                    data: {{
+                        labels: ["Direct Xabarlar", "Video Izohlari", "Boshqa"],
+                        datasets: [{{
+                            data: [{source_stats['Direct']}, {source_stats['Video Izohi']}, {source_stats['Boshqa']}],
+                            backgroundColor: ['#8b5cf6', '#ec4899', '#06b6d4'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {{
+                            legend: {{ display: false }},
+                            tooltip: {{ cornerRadius: 8 }}
+                        }},
+                        cutout: '68%'
+                    }}
+                }});
+            }}
+
+            chartsInitialized = true;
+        }}
+
         function switchTab(tabId) {{
             // Barcha tab kontentlarini yashirish
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -721,6 +1387,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             if (btn) btn.classList.add('active');
 
             window.location.hash = tabId;
+
+            // Agar Statistika tabi ochilsa chartlarni render qilish / o'lchamini to'g'rilash
+            if (tabId === 'analytics') {{
+                setTimeout(initOrUpdateAnalyticsCharts, 60);
+            }}
         }}
 
         // Sahifa yuklanganda URL hash bo'yicha tabni ochish
