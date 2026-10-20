@@ -160,13 +160,15 @@ def process_incoming_message(sender_id: str, user_text: str):
             return
         else:
             # AI kutilmaganda javob bermay qolsa (masalan, tarmoq xatoligi bo'lsa):
-            # Savolni "ism" deb tushunib olmaslik uchun professional xabar qaytariladi
+            # Quruq yoki sovuq xabar emas, samimiy va aloqa ma'lumotini oluvchi xabar yuboriladi
             fallback_msg = (
-                "Xabaringiz uchun tashakkur! Xalqaro Turizm Akademiyasi Samarqand kampusi maslahatchisi tez orada sizga javob beradi. 😊\n\n"
-                "Qo'shimcha ma'lumot yoki qabul bo'yicha: +998 (90) 103 30 00 yoki https://tourism-edu.uz"
+                "Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz. 😊\n\n"
+                "Sizni qiziqtirgan barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot, o'quv dasturi hamda narxlarni taqdim etishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:"
             )
             send_message(sender_id, fallback_msg)
             append_client_chat_history(sender_id, "assistant", fallback_msg)
+            if step == "start":
+                update_client(sender_id, step="awaiting_phone")
             return
 
     # 3. Faqat AI o'chiq bo'lsa (ai_enabled == 0) — Standart shablon bo'yicha ketadi:
