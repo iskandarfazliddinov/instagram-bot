@@ -1,12 +1,16 @@
 import logging
+import base64
+import json
 import requests
 from config import settings
 from database import get_setting
 
 logger = logging.getLogger(__name__)
 
-PRIMARY_MODEL = "gemini-flash-lite-latest"
+PRIMARY_MODEL = "gemini-3.5-flash"
 FALLBACK_MODEL = "gemini-3.5-flash-lite"
+AUDIO_PRIMARY_MODEL = "gemini-3.5-flash"
+AUDIO_FALLBACK_MODEL = "gemini-3.5-flash-lite"
 
 def generate_ai_reply(user_message: str, client_context: dict, is_first_message: bool = False, chat_history: list = None) -> str | None:
     """
@@ -308,3 +312,134 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
         f"Sizga yordam berishdan mamnun bo'lamiz!"
     )
 
+def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", client_context: dict = None, chat_history: list = None) -> dict | None:
+    """
+    Google Gemini Multimodal Audio orqali ovozli xabarni (Voice Message):
+    1. So'zma-so'z matnga aylantirish (Speech-to-Text / Transkripsiya)
+    2. Tinglovchining savoliga mos AI javob yaratish
+    3. Agar ovozda ism yoki telefon raqami aytilgan bo'lsa, ularni ajratib olish
+    4. Qiziqqan kurs yo'nalishini aniqlash
+    """
+    if get_setting("ai_enabled", "1") != "1":
+        logger.info("AI o'chirilgan, ovozli xabar qayta ishlanmadi.")
+        return None
+
+    api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
+    if not api_key:
+        logger.warning("Gemini API kalit yo'q, ovozli xabar qayta ishlanmadi.")
+        return None
+
+    if not client_context:
+        client_context = {}
+
+    client_name = client_context.get("full_name") or "Hali noma'lum"
+    phone_status = client_context.get("phone_number") or "Hali olinmagan"
+    campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
+    system_prompt = get_setting("ai_system_prompt", "")
+
+    # Suhbat tarixi
+    history_section = ""
+    if chat_history and len(chat_history) > 0:
+        history_lines = []
+        for h in chat_history[-6:]:
+            r = "Tinglovchi" if h.get("role") == "user" else "Siz"
+            t = (h.get("text") or "").strip()
+            if t:
+                history_lines.append(f"{r}: {t}")
+        if history_lines:
+            history_section = f"\n--- OLDINGI SUHBAT TARIXI ---\n" + "\n".join(history_lines) + "\n"
+
+    instruction = (
+        f"{system_prompt}\n\n"
+        f"--- HOZIRGI TINGLOVCHI HAQIDA ---\n"
+        f"Ismi: {client_name}\n"
+        f"Telefon raqami holati: {phone_status}\n"
+        f"Kurs yo'nalishi: {campaign}\n"
+        f"{history_section}\n"
+        "--- SIZNING ASOSIY VAZIFANGIZ ---\n"
+        "Tinglovchi Instagram Direct orqali sizga OVOZLI XABAR (Audio / Voice Message) yubordi.\n"
+        "1. TRANSKRIPSIYA (transcription): Ovozli xabarni diqqat bilan eshiting va unda aytilgan barcha so'zlarni so'zma-so'z, aniq o'zbek yoki rus tilida matnga aylantiring (Transcribe).\n"
+        "2. JAVOB (reply): Tinglovchining ovozli xabardagi savoliga xushmuomala, do'stona, qisqa (2-3 jumla), Instagram chatiga mos professional javob yozing. Agar tinglovchi telefon raqamini aytmagan bo'lsa, javobingiz oxirida unga to'liq o'quv dasturi, qabul shartlari va jadvalni yuborishimiz uchun telefon raqamini qoldirishini muloyimlik bilan so'rang.\n"
+        "3. TELEFON RAQAM (extracted_phone): Agar tinglovchi ovozida o'z telefon raqamini aytgan bo'lsa, uni toza formatda (+998...) ko'rsating, aytmagan bo'lsa null.\n"
+        "4. ISM (extracted_name): Agar tinglovchi o'z ismini aytgan bo'lsa ko'rsating, aks holda null.\n"
+        "5. KURS YO'NALISHI (detected_course): Front Office (Mehmonxona) / Gidlik / Mehmonxona boshqaruvi / Restoran ishi / Turoperatorlik kurslaridan mosini ko'rsating.\n"
+        "6. TAHLIL (summary): Tinglovchining so'rovi va ehtiyoji haqida 1 jumlalik xulosa.\n\n"
+        "QAT'IY TALAB: Faqat va faqat quyidagi JSON formatida javob qaytaring:\n"
+        "{\n"
+        '  "transcription": "Ovozli xabar matni...",\n'
+        '  "reply": "Tinglovchiga yuboriladigan javob matni...",\n'
+        '  "extracted_phone": null,\n'
+        '  "extracted_name": null,\n'
+        '  "detected_course": "...",\n'
+        '  "summary": "..."\n'
+        "}"
+    )
+
+    try:
+        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    except Exception as e:
+        logger.error(f"Audio faylni base64 ga aylantirishda xatolik: {e}")
+        return None
+
+    # MIME-type tozalash
+    clean_mime = mime_type.split(";")[0].strip() if ";" in mime_type else mime_type.strip()
+    if not clean_mime or not clean_mime.startswith("audio/"):
+        clean_mime = "audio/mp4"
+
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": clean_mime,
+                            "data": audio_b64
+                        }
+                    },
+                    {
+                        "text": instruction
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.2,
+            "maxOutputTokens": 1500
+        }
+    }
+
+    headers = {"Content-Type": "application/json"}
+
+    for model_name in [AUDIO_PRIMARY_MODEL, AUDIO_FALLBACK_MODEL]:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        try:
+            logger.info(f"Ovozli xabar Gemini ({model_name}) ga yuborilmoqda...")
+            response = requests.post(url, json=payload, headers=headers, timeout=25)
+            if response.status_code == 200:
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        raw_json = parts[0].get("text", "").strip()
+                        if raw_json.startswith("```json"):
+                            raw_json = raw_json[7:]
+                        elif raw_json.startswith("```"):
+                            raw_json = raw_json[3:]
+                        if raw_json.endswith("```"):
+                            raw_json = raw_json[:-3]
+                        raw_json = raw_json.strip()
+                        try:
+                            parsed = json.loads(raw_json)
+                        except Exception:
+                            parsed = json.loads(raw_json, strict=False)
+                        logger.info(f"Gemini Audio ({model_name}) muvaffaqiyatli transkripsiya qildi: {parsed.get('transcription', '')[:60]}...")
+                        return parsed
+            else:
+                logger.error(f"Gemini Audio xatosi ({model_name}) [{response.status_code}]: {response.text[:200]}")
+        except Exception as e:
+            logger.error(f"Gemini Audio so'rovida xatolik ({model_name}): {e}")
+
+    return None

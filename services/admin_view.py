@@ -364,7 +364,16 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         # So'rov xabari
         if last_msg and last_msg != "—":
-            last_msg_html = f'<div class="text-xs text-slate-500 italic max-w-[280px] truncate" title="{last_msg}">"{last_msg}"</div>'
+            if str(last_msg).startswith("🎙️"):
+                voice_clean = str(last_msg).replace("🎙️", "").strip()
+                last_msg_html = f"""
+                <div class="max-w-[280px]">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded mb-0.5">🎙️ Ovozli xabar</span>
+                    <div class="text-xs text-slate-700 italic truncate" title="{voice_clean}">"{voice_clean}"</div>
+                </div>
+                """
+            else:
+                last_msg_html = f'<div class="text-xs text-slate-500 italic max-w-[280px] truncate" title="{last_msg}">"{last_msg}"</div>'
         else:
             last_msg_html = '<span class="text-xs text-slate-400">—</span>'
 
@@ -985,6 +994,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                     <option value="60" {'selected' if ai_followup_delay=='60' else ''}>1 soat</option>
                                     <option value="120" {'selected' if ai_followup_delay=='120' else ''}>2 soat</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-indigo-50/70 rounded-xl border border-indigo-200 flex items-start gap-3.5">
+                            <div class="text-2xl mt-0.5">🎙️</div>
+                            <div>
+                                <div class="text-sm font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                                    <span>Ovozli xabarlar (Voice Messages) bilan ishlash</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Faol ● Gemini 3.5 Multimodal Audio</span>
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    Mijozlar Instagram Direct orqali audio yoki ovozli xabar yuborishganda, tizim ularni avtomatik tinglaydi, o'zbek va rus tillarida so'zma-so'z matnga aylantiradi (transkripsiya), savollariga professional javob qaytaradi hamda ovozda aytilgan telefon raqamini aniqlab Telegram va CRM ga uzatadi.
+                                </p>
                             </div>
                         </div>
                     </div>

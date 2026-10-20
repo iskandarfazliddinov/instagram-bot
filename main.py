@@ -21,7 +21,11 @@ from database import (
     update_client_by_id,
     update_client_manager_comment
 )
-from services.dialog_manager import process_incoming_message, process_incoming_comment
+from services.dialog_manager import (
+    process_incoming_message,
+    process_incoming_comment,
+    process_incoming_audio_message
+)
 from services.instagram import get_recent_media, resolve_media_id_from_url
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
 from services.telegram import (
@@ -199,6 +203,13 @@ async def receive_instagram_events(request: Request):
                     user_text = message.get("text", "")
                     logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
                     process_incoming_message(sender_id, user_text)
+                elif "attachments" in message:
+                    for att in message.get("attachments", []):
+                        att_type = att.get("type")
+                        att_url = att.get("payload", {}).get("url")
+                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])):
+                            logger.info(f"Yangi Direct ovozli xabar keldi [{sender_id}]")
+                            process_incoming_audio_message(sender_id, att_url)
                 elif "quick_reply" in message:
                     payload = message["quick_reply"].get("payload", "")
                     process_incoming_message(sender_id, payload)
@@ -220,6 +231,13 @@ async def receive_instagram_events(request: Request):
                         user_text = message.get("text", "")
                         logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
                         process_incoming_message(sender_id, user_text)
+                    elif "attachments" in message:
+                        for att in message.get("attachments", []):
+                            att_type = att.get("type")
+                            att_url = att.get("payload", {}).get("url")
+                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])):
+                                logger.info(f"Yangi Direct ovozli xabar (v26.0) keldi [{sender_id}]")
+                                process_incoming_audio_message(sender_id, att_url)
 
                 # B) Video/Reels izohlari
                 elif field == "comments":

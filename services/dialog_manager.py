@@ -1,5 +1,6 @@
 import re
 import logging
+import requests
 from config import settings
 from database import (
     get_or_create_client,
@@ -319,5 +320,148 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     send_private_reply_to_comment(comment_id, dm_welcome_text)
     append_client_chat_history(user_id, "user", f"[Video izohi]: {comment_text}")
     append_client_chat_history(user_id, "assistant", dm_welcome_text)
+
+def process_incoming_audio_message(sender_id: str, audio_url: str):
+    """
+    Mijoz Instagram Direct orqali Ovozli xabar (Voice message) yuborganda:
+    1. Ovozli faylni yuklab oladi.
+    2. Gemini Multimodal Audio orqali ovozni tinglab matnga (Transcribe) aylantiradi va professional javob tayyorlaydi.
+    3. Agar ovozda telefon raqam aytilgan bo'lsa, uni bazaga saqlab Telegramga yangi lid sifatida uzatadi.
+    4. Instagram Directga AI tayyorlagan javobni yuboradi.
+    5. CRM bazasiga suhbat tarixi va ovozli xabar matnini yozadi.
+    """
+    logger.info(f"Ovozli xabar qabul qilindi [{sender_id}], yuklab olinmoqda...")
+    client = get_or_create_client(sender_id)
+
+    # 1. Instagram profilini tekshirish
+    if not client.get("username") or not client.get("full_name") or client.get("is_follower") is None:
+        try:
+            profile = get_user_profile(sender_id)
+            if profile:
+                prof_updates = {}
+                if profile.get("username"):
+                    prof_updates["username"] = profile["username"]
+                    client["username"] = profile["username"]
+                if profile.get("name") and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+                    prof_updates["full_name"] = profile["name"]
+                    client["full_name"] = profile["name"]
+                if "is_user_follow_business" in profile:
+                    is_fol = 1 if profile["is_user_follow_business"] else 0
+                    prof_updates["is_follower"] = is_fol
+                    client["is_follower"] = is_fol
+                if prof_updates:
+                    update_client(sender_id, **prof_updates)
+        except Exception as e:
+            logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
+
+    # 2. Audio faylni yuklab olish
+    try:
+        resp = requests.get(audio_url, timeout=20)
+        if resp.status_code != 200:
+            logger.error(f"Audio faylni yuklab bo'lmadi [status {resp.status_code}]")
+            send_message(sender_id, "Ovozli xabaringiz qabul qilindi! Mutaxassislarimiz siz bilan bog'lanishlari uchun, iltimos, telefon raqamingizni qoldiring 😊")
+            return
+        audio_bytes = resp.content
+        mime_type = resp.headers.get("Content-Type") or "audio/mp4"
+        if ";" in mime_type:
+            mime_type = mime_type.split(";")[0].strip()
+        if not mime_type.startswith("audio/"):
+            mime_type = "audio/mp4"
+    except Exception as e:
+        logger.error(f"Audio faylni yuklab olishda tarmoq xatoligi: {e}")
+        send_message(sender_id, "Ovozli xabaringiz uchun rahmat! Sizga to'liq ma'lumot yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni yozib qoldiring 😊")
+        return
+
+    # 3. Gemini Multimodal Audio orqali ovozni qayta ishlash
+    from services.ai_assistant import process_voice_message
+    chat_history = get_client_chat_history(sender_id)
+    result = process_voice_message(
+        audio_bytes=audio_bytes,
+        mime_type=mime_type,
+        client_context=client,
+        chat_history=chat_history
+    )
+
+    if not result:
+        fallback_msg = "Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:"
+        send_message(sender_id, fallback_msg)
+        update_client(sender_id, last_message="🎙️ [Ovozli xabar]")
+        append_client_chat_history(sender_id, "user", "[Ovozli xabar]")
+        append_client_chat_history(sender_id, "assistant", fallback_msg)
+        return
+
+    transcription = result.get("transcription", "").strip()
+    ai_reply = result.get("reply", "").strip()
+    extracted_phone = result.get("extracted_phone")
+    extracted_name = result.get("extracted_name")
+    detected_course = result.get("detected_course")
+    summary = result.get("summary", "")
+
+    logger.info(f"Ovozli xabar transkripsiyasi [{sender_id}]: «{transcription}»")
+
+    display_msg = f"🎙️ {transcription}" if transcription else "🎙️ [Ovozli xabar]"
+    updates = {"last_message": display_msg}
+    if summary:
+        updates["ai_summary"] = summary
+        client["ai_summary"] = summary
+
+    if extracted_name and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+        updates["full_name"] = extracted_name
+        client["full_name"] = extracted_name
+
+    if detected_course and detected_course not in ["Umumiy", "", None] and client.get("campaign") in ["Umumiy", "", None]:
+        updates["campaign"] = detected_course
+        client["campaign"] = detected_course
+
+    append_client_chat_history(sender_id, "user", f"[Ovozli xabar]: {transcription}" if transcription else "[Ovozli xabar]")
+
+    # 4. Agar ovozda telefon raqami aytilgan bo'lsa -> To'liq Lid yaratiladi
+    if extracted_phone:
+        digits = re.sub(r"\D", "", str(extracted_phone))
+        if len(digits) >= 9:
+            clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
+            updates["phone_number"] = clean_phone
+            updates["step"] = "completed"
+            updates["lead_status"] = "yangi"
+            client["phone_number"] = clean_phone
+            client["step"] = "completed"
+            client["lead_status"] = "yangi"
+
+            update_client(sender_id, **updates)
+
+            # Telegram guruhiga to'liq lid xabarini yuborish
+            notify_admin_new_lead(client, source="Direct (Ovozli xabar 🎙️)")
+
+            # Mijozga javob va platforma havolasini yuborish
+            if ai_reply:
+                send_message(sender_id, ai_reply)
+                append_client_chat_history(sender_id, "assistant", ai_reply)
+
+            final_caption = get_setting(
+                "final_message",
+                "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan tanishishingiz mumkin:"
+            )
+            default_link = get_setting("default_promo_link", settings.PROMO_LINK)
+            send_link_button(
+                recipient_id=sender_id,
+                text=final_caption,
+                button_title="Ta'lim platformasini ochish 🚀",
+                url=default_link
+            )
+            append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {default_link}")
+            return
+
+    # 5. Agar telefon raqam hali aytilmagan bo'lsa
+    update_client(sender_id, **updates)
+
+    # Telegram guruhga ovozli xabar kelgani haqida xabarnoma yuborish
+    from services.telegram import notify_admin_voice_message
+    notify_admin_voice_message(client, transcription=transcription or "Ovoz eshitilmadi", reply=ai_reply or "—")
+
+    # Instagram Directga AI javobini yuborish
+    if ai_reply:
+        send_message(sender_id, ai_reply)
+        append_client_chat_history(sender_id, "assistant", ai_reply)
+
 
 
