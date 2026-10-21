@@ -8,7 +8,7 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PAGE_ACCESS_TOKEN
-        value: IGAAZAqJ7Decx9BZAGFDVFdrZAWJzUGVaaUdsemZAnamdGNWN0VExOWU1LandLYWxjQ1JlV0JrZAmJQSzhZAMW84bTVvWTBwN1JQQkF0cTdvVnl5bFU3N2E3NHBzTEtLSkJxWHpKQkQxa1JpZA194Ymp3dS10ajc3R0hyQ3I4X2VsSEZAMWQZDZD
+        value: IGAAXP2dYpjPxBZAFp6WjZAraG5PODdwc19pZADBNS3lzamhHdVl4R082c0stbmFMM3MxeTk2cW1xS1JCdkVyQjJyMG5yOVhWRENuU1RXazMzckRfSlc4TVJTMWwtaEZAQU0l0QlByZAHdKZA04wcGFEaHQtejVn
       - key: VERIFY_TOKEN
         value: mening_maxfiy_webhook_tokenim_123
       - key: TELEGRAM_BOT_TOKEN
