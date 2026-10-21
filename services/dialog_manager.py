@@ -153,8 +153,11 @@ def process_incoming_message(sender_id: str, user_text: str):
             chat_history=chat_history
         )
         if ai_reply:
-            send_message(sender_id, ai_reply)
-            append_client_chat_history(sender_id, "assistant", ai_reply)
+            res = send_message(sender_id, ai_reply)
+            if not res or not res.get("error"):
+                append_client_chat_history(sender_id, "assistant", ai_reply)
+            else:
+                logger.error(f"Xabar yuborilmadi (Meta rad etdi): {res}")
             if step == "start":
                 update_client(sender_id, step="in_dialog")
             return
@@ -165,8 +168,11 @@ def process_incoming_message(sender_id: str, user_text: str):
                 "Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz. 😊\n\n"
                 "Sizni qiziqtirgan barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot, o'quv dasturi hamda narxlarni taqdim etishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:"
             )
-            send_message(sender_id, fallback_msg)
-            append_client_chat_history(sender_id, "assistant", fallback_msg)
+            res = send_message(sender_id, fallback_msg)
+            if not res or not res.get("error"):
+                append_client_chat_history(sender_id, "assistant", fallback_msg)
+            else:
+                logger.error(f"Fallback xabar yuborilmadi (Meta rad etdi): {res}")
             if step == "start":
                 update_client(sender_id, step="awaiting_phone")
             return

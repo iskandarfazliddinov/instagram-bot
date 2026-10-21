@@ -1,17 +1,101 @@
 import logging
+import time
 import requests
 from config import settings
+from database import get_setting
 
 logger = logging.getLogger(__name__)
 
 GRAPH_API_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}/me/messages"
 GRAPH_BASE_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}"
 
+_last_token_alert_time = 0
+
+def get_access_token() -> str:
+    """
+    Ma'lumotlar bazasidagi (CRM sozlamalari) yoki .env / render.yaml dagi tokenni olish
+    """
+    db_token = get_setting("page_access_token", "").strip()
+    if db_token:
+        return db_token
+    return settings.PAGE_ACCESS_TOKEN.strip()
+
+def notify_admin_token_error(error_details: str):
+    """
+    Token eskirgan yoki Meta tomonidan bloklanganda Telegram adminga shoshilinch xabar yuborish
+    (Takroriy spamlarni oldini olish uchun har 30 daqiqada ko'pi bilan 1 marta)
+    """
+    global _last_token_alert_time
+    now = time.time()
+    if now - _last_token_alert_time > 1800:
+        _last_token_alert_time = now
+        try:
+            from services.telegram import send_telegram_alert
+            send_telegram_alert(
+                f"🚨 <b>DIQQAT: Instagram Token ishlamayapti!</b>\n\n"
+                f"❌ <b>Meta API xatosi:</b> <code>{error_details[:200]}</code>\n\n"
+                f"⚠️ Bot mijozlarga avtomatik javob qaytara olmayapti!\n"
+                f"Iltimos, Meta for Developers (Instagram Graph API) sahifasidan yangi token oling va CRM Boshqaruv paneliga kiriting."
+            )
+        except Exception as e:
+            logger.error(f"Telegram alert yuborishda xatolik: {e}")
+
+def check_meta_response_for_errors(data: dict):
+    """
+    Meta API javobini xatoliklarga tekshirish
+    """
+    if not isinstance(data, dict):
+        return
+    err = data.get("error")
+    if err:
+        err_msg = err.get("message", "")
+        err_type = err.get("type", "")
+        err_code = err.get("code")
+        if (
+            "API access blocked" in err_msg
+            or "OAuthException" in err_type
+            or err_code in [190, 200]
+            or "access token" in err_msg.lower()
+        ):
+            logger.critical(f"Meta Access Token xatosi aniqlandi: {err}")
+            notify_admin_token_error(err_msg or str(err))
+
+def check_instagram_token(token: str = None) -> dict:
+    """
+    Token faolligini va qaysi Instagram akkauntiga tegishli ekanligini tekshirish
+    """
+    tok = token.strip() if token else get_access_token()
+    if not tok or tok == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+        return {"ok": False, "error": "Token kiritilmagan"}
+
+    url = f"{GRAPH_BASE_URL}/me"
+    params = {
+        "fields": "id,username,name,account_type",
+        "access_token": tok
+    }
+    try:
+        r = requests.get(url, params=params, timeout=8)
+        data = r.json()
+        if r.status_code == 200 and "id" in data:
+            return {
+                "ok": True,
+                "id": data.get("id"),
+                "username": data.get("username", ""),
+                "name": data.get("name", ""),
+                "account_type": data.get("account_type", "")
+            }
+        else:
+            err_msg = data.get("error", {}).get("message", "Noma'lum Meta API xatoligi")
+            return {"ok": False, "error": err_msg, "raw": data}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 def send_message(recipient_id: str, text: str) -> dict:
     """
     Instagram Direct orqali mijozga xabar yuborish
     """
-    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+    token = get_access_token()
+    if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         logger.warning("PAGE_ACCESS_TOKEN kiritilmagan. Xabar yuborilmadi.")
         return {"error": "PAGE_ACCESS_TOKEN is not configured"}
 
@@ -20,7 +104,7 @@ def send_message(recipient_id: str, text: str) -> dict:
         "message": {"text": text}
     }
     headers = {
-        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
@@ -28,7 +112,8 @@ def send_message(recipient_id: str, text: str) -> dict:
         response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
         data = response.json()
         if response.status_code != 200:
-            logger.error(f"Meta API xatoligi: {data}")
+            logger.error(f"Meta API xatoligi ({response.status_code}): {data}")
+            check_meta_response_for_errors(data)
         return data
     except Exception as e:
         logger.error(f"Instagram xabar yuborishda xatolik: {e}")
@@ -38,7 +123,8 @@ def send_link_button(recipient_id: str, text: str, button_title: str, url: str) 
     """
     Tugmali havola (Web URL button) yuborish
     """
-    if not settings.PAGE_ACCESS_TOKEN:
+    token = get_access_token()
+    if not token:
         return {"error": "No token"}
 
     payload = {
@@ -61,16 +147,18 @@ def send_link_button(recipient_id: str, text: str, button_title: str, url: str) 
         }
     }
     headers = {
-        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
     try:
         response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
-        return response.json()
+        data = response.json()
+        if response.status_code != 200:
+            check_meta_response_for_errors(data)
+        return data
     except Exception as e:
         logger.error(f"Tugmali havola yuborishda xatolik: {e}")
-        # Fallback: oddiy matn sifatida jo'natamiz
         return send_message(recipient_id, f"{text}\n\n👉 {url}")
 
 def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
@@ -78,7 +166,8 @@ def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
     Videodagi izoh qoldirgan mijozning Directiga avtomatik shaxsiy xabar yuborish
     (Meta Instagram Private Reply to Comment API)
     """
-    if not settings.PAGE_ACCESS_TOKEN:
+    token = get_access_token()
+    if not token:
         return {"error": "No token"}
 
     payload = {
@@ -86,7 +175,7 @@ def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
         "message": {"text": text}
     }
     headers = {
-        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
@@ -95,6 +184,7 @@ def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
         data = response.json()
         if response.status_code != 200:
             logger.error(f"Izohga Direct javob yuborishda xatolik: {data}")
+            check_meta_response_for_errors(data)
         return data
     except Exception as e:
         logger.error(f"Izohga Direct yuborishda xatolik: {e}")
@@ -104,19 +194,23 @@ def reply_public_comment(comment_id: str, text: str) -> dict:
     """
     Videodagi izoh ostiga ommaviy javob yozish (Public reply)
     """
-    if not settings.PAGE_ACCESS_TOKEN:
+    token = get_access_token()
+    if not token:
         return {"error": "No token"}
 
     url = f"{GRAPH_BASE_URL}/{comment_id}/replies"
     payload = {"message": text}
     headers = {
-        "Authorization": f"Bearer {settings.PAGE_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
-        return response.json()
+        data = response.json()
+        if response.status_code != 200:
+            check_meta_response_for_errors(data)
+        return data
     except Exception as e:
         logger.error(f"Izoh ostiga ommaviy javob yozishda xatolik: {e}")
         return {"error": str(e)}
@@ -125,19 +219,22 @@ def get_recent_media(limit: int = 25) -> list:
     """
     Instagram akkauntdagi so'nggi video va postlarni olish
     """
-    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+    token = get_access_token()
+    if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return []
 
     url = f"{GRAPH_BASE_URL}/me/media"
     params = {
         "fields": "id,caption,permalink,media_type,thumbnail_url,timestamp",
-        "access_token": settings.PAGE_ACCESS_TOKEN,
+        "access_token": token,
         "limit": limit
     }
     try:
         res = requests.get(url, params=params, timeout=5)
         if res.status_code == 200:
             return res.json().get("data", [])
+        data = res.json()
+        check_meta_response_for_errors(data)
         logger.warning(f"me/media so'rovi xatolik berdi: {res.text}")
     except Exception as e:
         logger.error(f"Instagram media olishda xatolik: {e}")
@@ -152,41 +249,40 @@ def resolve_media_id_from_url(url_or_id: str) -> tuple[str, str]:
         return ("", "")
 
     cleaned = url_or_id.strip()
-    # 1. Agar to'g'ridan-to'g'ri raqamli ID kiritilgan bo'lsa
     if cleaned.isdigit():
         return (cleaned, f"https://www.instagram.com/p/{cleaned}/")
 
-    # 2. Havoladan shortcode ajratib olish (/reel/SHORTCODE/ yoki /p/SHORTCODE/)
     import re
     match = re.search(r"/(?:reel|p)/([A-Za-z0-9_-]+)", cleaned)
     shortcode = match.group(1) if match else cleaned
 
-    # Instagram API orqali media ro'yxatidan qidirish
     media_list = get_recent_media(limit=50)
     for item in media_list:
         permalink = item.get("permalink", "")
         if shortcode in permalink or item.get("id") == cleaned:
             return (item["id"], permalink)
 
-    # Agar topilmasa ham shortcode/linkni qaytaramiz
     return ("", cleaned)
 
 def get_user_profile(instagram_id: str) -> dict:
     """
     Instagram Graph API orqali foydalanuvchining profil ma'lumotlarini (ism, @username, obuna holati) olish
     """
-    if not settings.PAGE_ACCESS_TOKEN or settings.PAGE_ACCESS_TOKEN == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+    token = get_access_token()
+    if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return {}
 
     url = f"{GRAPH_BASE_URL}/{instagram_id}"
     params = {
         "fields": "name,username,profile_pic,is_user_follow_business",
-        "access_token": settings.PAGE_ACCESS_TOKEN
+        "access_token": token
     }
     try:
         res = requests.get(url, params=params, timeout=6)
         if res.status_code == 200:
             return res.json()
+        data = res.json()
+        check_meta_response_for_errors(data)
         logger.warning(f"get_user_profile API javobi [{res.status_code}]: {res.text}")
     except Exception as e:
         logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
@@ -196,24 +292,22 @@ def get_media_details(media_id: str) -> dict:
     """
     Instagram Graph API orqali video/post tafsilotlarini (caption, permalink, media_type) olish
     """
-    if not media_id or not settings.PAGE_ACCESS_TOKEN:
+    token = get_access_token()
+    if not media_id or not token:
         return {}
 
     url = f"{GRAPH_BASE_URL}/{media_id}"
     params = {
         "fields": "id,caption,permalink,media_type,timestamp",
-        "access_token": settings.PAGE_ACCESS_TOKEN
+        "access_token": token
     }
     try:
         res = requests.get(url, params=params, timeout=5)
         if res.status_code == 200:
             return res.json()
+        data = res.json()
+        check_meta_response_for_errors(data)
         logger.warning(f"get_media_details API javobi [{res.status_code}]: {res.text}")
     except Exception as e:
         logger.error(f"Instagram media tafsilotlarini olishda xatolik ({media_id}): {e}")
     return {}
-
-
-
-
-

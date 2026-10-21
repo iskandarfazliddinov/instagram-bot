@@ -1,6 +1,7 @@
 import re
 import json
 from datetime import datetime, timedelta
+from config import settings as config_settings
 
 def get_login_page_html(error: str = "") -> str:
     """Zamonaviy va xavfsiz CRM kirish (Login) sahifasi"""
@@ -80,6 +81,7 @@ def get_login_page_html(error: str = "") -> str:
 
 def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "") -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
+    current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
     
     # ---------------- 1. LIDLAR ASOSIY HISOB-KITOBLARI ----------------
     total_leads = len(clients)
@@ -1129,12 +1131,31 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        💬 5. Standart Direct Xabarlar Shabloni
+                        💬 5. Instagram Ulanish & Direct Xabarlar Shabloni
                     </h2>
-                    <p class="text-sm text-slate-500">Mijoz to'g'ridan-to'g'ri Directga yozganda bot ushbu matnlardan foydalanadi.</p>
+                    <p class="text-sm text-slate-500">Instagram Access Token va mijoz Directga yozganda bot foydalanadigan matnlar.</p>
                 </div>
 
                 <form method="POST" action="/admin/settings/save" class="space-y-6">
+                    <!-- Instagram Access Token Bo'limi -->
+                    <div class="bg-gradient-to-r from-purple-50/70 to-indigo-50/70 rounded-2xl border border-purple-200/80 p-5 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span>🔑</span> <span>Instagram Page Access Token:</span>
+                                </label>
+                                <p class="text-xs text-slate-500 mt-0.5">Meta for Developers (<a href="https://developers.facebook.com" target="_blank" class="text-purple-600 underline font-semibold">developers.facebook.com</a>) dan olingan token.</p>
+                            </div>
+                            <button type="button" onclick="checkCurrentToken()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-purple-200 text-purple-700 text-xs font-bold rounded-xl shadow-xs transition cursor-pointer">
+                                🔍 Tokenni tekshirish
+                            </button>
+                        </div>
+                        <div>
+                            <input type="text" id="page_access_token_input" name="page_access_token" value="{current_token_val}" class="w-full px-4 py-2.5 rounded-xl border border-purple-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-xs font-mono bg-white" placeholder="IGAA...">
+                        </div>
+                        <div id="token_status_box" class="hidden text-xs rounded-xl p-3 font-medium"></div>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">1. Salomlashish matni (Birinchi xabar):</label>
                         <textarea name="direct_welcome" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm leading-relaxed">{settings.get('direct_welcome', '')}</textarea>
@@ -1457,6 +1478,31 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         function closeCommentModal() {{
             document.getElementById('commentModal').classList.add('hidden');
+        }}
+
+        async function checkCurrentToken() {{
+            const input = document.getElementById('page_access_token_input');
+            const box = document.getElementById('token_status_box');
+            const tokenVal = input ? input.value.trim() : '';
+            if (!box) return;
+
+            box.className = 'text-xs rounded-xl p-3 font-medium bg-blue-50 text-blue-700 border border-blue-200 block';
+            box.innerHTML = '⏳ Meta API orqali token holati tekshirilmoqda...';
+
+            try {{
+                const resp = await fetch('/api/check-token?token=' + encodeURIComponent(tokenVal));
+                const data = await resp.json();
+                if (data.ok) {{
+                    box.className = 'text-xs rounded-xl p-3 font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+                    box.innerHTML = '✅ <b>Token 100% Faol!</b> Akkaunt: <b>@' + (data.username || '') + '</b> (' + (data.name || '') + ') | ID: ' + (data.id || '');
+                }} else {{
+                    box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
+                    box.innerHTML = '❌ <b>Token nofaol yoki bloklangan:</b> ' + (data.error || 'Xatolik') + '<br><span class="text-[11px] text-rose-600 mt-1 block">👉 developers.facebook.com dan yangi token olib, shu yerga qo\'ying va pastdagi "Direct Shabloni Saqlash" tugmasini bosing.</span>';
+                }}
+            }} catch (e) {{
+                box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
+                box.innerHTML = '⚠️ Server bilan bog\'lanishda xatolik: ' + e.message;
+            }}
         }}
     </script>
 </body>

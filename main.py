@@ -329,15 +329,18 @@ def admin_dashboard(request: Request, notice: str = ""):
 @app.post("/admin/settings/save")
 async def save_settings(
     request: Request,
+    page_access_token: str = Form(""),
     direct_welcome: str = Form(""),
     ask_phone: str = Form(""),
     final_message: str = Form(""),
     default_promo_link: str = Form("")
 ):
-    """Direct xabar shablonlarini yangilash"""
+    """Direct xabar shablonlari va Instagram tokenni yangilash"""
     if not is_authenticated(request):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
+    if page_access_token.strip():
+        set_setting("page_access_token", page_access_token.strip())
     if direct_welcome.strip():
         set_setting("direct_welcome", direct_welcome.strip())
     if ask_phone.strip():
@@ -348,9 +351,17 @@ async def save_settings(
         set_setting("default_promo_link", default_promo_link.strip())
 
     return RedirectResponse(
-        url="/admin?notice=Direct+shablonlari+muvaffaqiyatli+saqlandi#templates",
+        url="/admin?notice=Sozlamalar+va+Instagram+token+muvaffaqiyatli+saqlandi#templates",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+@app.get("/api/check-token")
+def check_token_api(request: Request, token: str = ""):
+    """Instagram Page Access Token holatini tekshirish API"""
+    if not is_authenticated(request):
+        return {"ok": False, "error": "Ruxsat berilmagan (Avtorizatsiyadan o'ting)"}
+    from services.instagram import check_instagram_token
+    return check_instagram_token(token=token if token.strip() else None)
 
 @app.post("/admin/campaign/create")
 async def add_campaign(

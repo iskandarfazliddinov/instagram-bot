@@ -147,6 +147,27 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
     except Exception as e:
         logger.error(f"Telegram bildirishnoma yuborishda xatolik: {e}")
 
+def send_telegram_alert(text: str) -> bool:
+    """
+    Tizim xatolari yoki muhim ogohlantirishlarni Telegram admin/monitoring guruhiga yuborish
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
+        return False
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+
+    try:
+        r = requests.post(url, json=payload, timeout=6)
+        return r.status_code == 200
+    except Exception as e:
+        logger.error(f"Telegram alert yuborishda xatolik: {e}")
+        return False
+
 def handle_telegram_callback(update: dict):
     """
     Telegram guruhdagi tugmalar bosilganda mas'ul xodimni belgilash va xabarni yangilash
