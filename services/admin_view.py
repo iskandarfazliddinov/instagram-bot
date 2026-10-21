@@ -646,7 +646,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     box.innerHTML = '✅ <b>Token 100% Faol!</b> Akkaunt: <b>@' + (data.username || '') + '</b> (' + (data.name || '') + ') | ID: ' + (data.id || '');
                 } else {
                     box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
-                    box.innerHTML = '❌ <b>Token nofaol yoki bloklangan:</b> ' + (data.error || 'Xatolik') + '<br><span class=\"text-[11px] text-rose-600 mt-1 block\">👉 developers.facebook.com dan yangi token olib, shu yerga qo\\'ying va pastdagi \"Direct Shabloni Saqlash\" tugmasini bosing.</span>';
+                    box.innerHTML = '❌ <b>Token nofaol yoki bloklangan:</b> ' + (data.error || 'Xatolik') + '<br><span class="text-[11px] text-rose-600 mt-1 block">👉 developers.facebook.com dan yangi token olib, shu yerga kiriting va pastdagi &quot;Direct Shabloni Saqlash&quot; tugmasini bosing.</span>';
                 }
             } catch (e) {
                 box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
@@ -1372,10 +1372,58 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
+        function switchTab(tabId) {{
+            try {{
+                // Barcha tab kontentlarini yashirish
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                // Barcha tugmalardan active klassini olish
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+                // Tanlangan tabni ochish
+                const content = document.getElementById('tab_' + tabId);
+                const btn = document.getElementById('tab_btn_' + tabId);
+                if (content) content.classList.remove('hidden');
+                if (btn) btn.classList.add('active');
+
+                try {{
+                    window.location.hash = tabId;
+                }} catch (e) {{}}
+
+                // Agar Statistika tabi ochilsa chartlarni render qilish
+                if (tabId === 'analytics') {{
+                    setTimeout(() => {{
+                        try {{
+                            if (typeof initOrUpdateAnalyticsCharts === 'function') {{
+                                initOrUpdateAnalyticsCharts();
+                            }}
+                        }} catch (err) {{
+                            console.warn('Chart error:', err);
+                        }}
+                    }}, 50);
+                }}
+            }} catch (err) {{
+                console.error('switchTab error:', err);
+            }}
+        }}
+
+        // Sahifa yuklanganda URL hash bo'yicha tabni ochish
+        window.addEventListener('DOMContentLoaded', () => {{
+            try {{
+                const hash = window.location.hash.replace('#', '');
+                if (hash && document.getElementById('tab_' + hash)) {{
+                    switchTab(hash);
+                }}
+            }} catch (e) {{}}
+        }});
+
         let chartsInitialized = false;
         let chartInstances = {{}};
 
         function initOrUpdateAnalyticsCharts() {{
+            if (typeof Chart === 'undefined') {{
+                console.warn('Chart.js kutubxonasi hali yuklanmadi');
+                return;
+            }}
             if (chartsInitialized) {{
                 Object.values(chartInstances).forEach(c => {{
                     if (c && typeof c.resize === 'function') c.resize();
@@ -1543,34 +1591,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             chartsInitialized = true;
         }}
-
-        function switchTab(tabId) {{
-            // Barcha tab kontentlarini yashirish
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            // Barcha tugmalardan active klassini olish
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-
-            // Tanlangan tabni ochish
-            const content = document.getElementById('tab_' + tabId);
-            const btn = document.getElementById('tab_btn_' + tabId);
-            if (content) content.classList.remove('hidden');
-            if (btn) btn.classList.add('active');
-
-            window.location.hash = tabId;
-
-            // Agar Statistika tabi ochilsa chartlarni render qilish / o'lchamini to'g'rilash
-            if (tabId === 'analytics') {{
-                setTimeout(initOrUpdateAnalyticsCharts, 60);
-            }}
-        }}
-
-        // Sahifa yuklanganda URL hash bo'yicha tabni ochish
-        window.addEventListener('DOMContentLoaded', () => {{
-            const hash = window.location.hash.replace('#', '');
-            if (hash && document.getElementById('tab_' + hash)) {{
-                switchTab(hash);
-            }}
-        }});
 
         // Lidlar jadvalida tezkor qidiruv va filtrlash
         function filterLeads() {{
