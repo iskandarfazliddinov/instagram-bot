@@ -46,8 +46,13 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     ai_line = f"💡 <b>Mijoz ehtiyoji (AI tahlili):</b>\n<i>{ai_summary}</i>\n" if ai_summary else ""
     comment_line = f"📝 <b>Mutaxassis izohi:</b>\n<i>«{manager_comment}»</i>\n" if manager_comment else ""
 
+    if client.get("is_reengagement"):
+        header_title = "🔄 <b>MIJOZDAN QAYTA MUROJAAT (YANGI SO'ROV)!</b>\n⚠️ <i>Ushbu mijoz avval ham murojaat qilgan va yana yangi kursga qiziqmoqda!</i>\n"
+    else:
+        header_title = "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
+
     text = (
-        "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
+        f"{header_title}"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Mijoz:</b> {full_name}\n"
         f"{ig_line}"
@@ -110,35 +115,72 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
         return
 
-    # Client ID va tg_message_id ni aniqlash (takroriy xabar yuborishning oldini olish)
+    # Client ID, tg_message_id, oldingi holat va yo'nalishni aniqlash
     client_id = client.get("id")
     ig_id = client.get("instagram_id")
     existing_tg_mid = client.get("tg_message_id")
+    prev_status = None
+    prev_campaign = None
+    prev_updated = None
 
     from database import get_connection
     conn = get_connection()
     cursor = conn.cursor()
     if client_id:
-        cursor.execute("SELECT tg_message_id FROM clients WHERE id = ?", (client_id,))
+        cursor.execute("SELECT tg_message_id, lead_status, campaign, updated_at FROM clients WHERE id = ?", (client_id,))
         row = cursor.fetchone()
-        if row and row["tg_message_id"]:
-            existing_tg_mid = row["tg_message_id"]
+        if row:
+            if row["tg_message_id"]:
+                existing_tg_mid = row["tg_message_id"]
+            prev_status = row["lead_status"]
+            prev_campaign = row["campaign"]
+            prev_updated = row["updated_at"]
     elif ig_id:
-        cursor.execute("SELECT id, tg_message_id FROM clients WHERE instagram_id = ?", (ig_id,))
+        cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at FROM clients WHERE instagram_id = ?", (ig_id,))
         row = cursor.fetchone()
         if row:
             client_id = row["id"]
             client["id"] = client_id
             if row["tg_message_id"]:
                 existing_tg_mid = row["tg_message_id"]
+            prev_status = row["lead_status"]
+            prev_campaign = row["campaign"]
+            prev_updated = row["updated_at"]
     conn.close()
 
-    # AGAR TELEGRAMDA USHBU MIJOZ UCHUN ALLAQACHON XABAR BO'LSA - QAYTA YANGI XABAR YUBORILMAYDI!
-    # Faqat mavjud xabar joyida yangilanadi (editMessageText)
-    if existing_tg_mid and client_id:
+    # RE-ENGAGEMENT (Qayta murojaat yoki yangi kursga qiziqish) shartlari:
+    # 1. Mijoz avval ko'rib chiqilgan bo'lsa (boglandi, oylanyapti, rad) YOKI
+    # 2. Yangi kurs / yo'nalish so'ragan bo'lsa (campaign o'zgargan) YOKI
+    # 3. Avvalgi xabaridan so'ng 4 soatdan ko'p vaqt o'tgan bo'lsa:
+    is_reengagement = False
+    current_campaign = client.get("campaign", "Umumiy")
+    if existing_tg_mid:
+        time_diff_hours = 0
+        if prev_updated:
+            try:
+                from datetime import datetime
+                dt_prev = datetime.fromisoformat(str(prev_updated))
+                time_diff_hours = (datetime.now() - dt_prev).total_seconds() / 3600
+            except Exception:
+                pass
+        
+        status_handled = (prev_status in ["boglandi", "rad", "oylanyapti"])
+        campaign_changed = (prev_campaign and current_campaign and prev_campaign != current_campaign and current_campaign != "Umumiy")
+
+        if status_handled or campaign_changed or time_diff_hours >= 4:
+            is_reengagement = True
+            client["is_reengagement"] = True
+            client["lead_status"] = "yangi"
+            from database import update_client
+            if ig_id:
+                update_client(ig_id, lead_status="yangi")
+            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (is_reengagement=True). Telegramga yangi xabar yuboriladi.")
+
+    # Agar 1-2 soat ichidagi bir xil takroriy xabar bo'lsa -> faqat mavjud xabarni yangilaymiz (spam qilmaymiz)
+    if existing_tg_mid and client_id and not is_reengagement:
         try:
             update_telegram_lead_message(client_id)
-            logger.info(f"Mijoz [{client_id}] Telegramda mavjud xabar tahrirlandi (takroriy yangi xabar yuborilmadi).")
+            logger.info(f"Mijoz [{client_id}] mavjud Telegram xabari yangilandi (takroriy yangi xabar yuborilmadi).")
             return
         except Exception as e:
             logger.warning(f"Telegramdagi eski xabarni yangilab bo'lmadi, yangi yuboriladi: {e}")

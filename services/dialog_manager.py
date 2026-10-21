@@ -164,6 +164,32 @@ def process_incoming_message(sender_id: str, user_text: str):
         append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {send_link}")
         return
 
+    # 1.5. Qayta murojaat tekshiruvi: Agar mijoz avval ro'yxatdan o'tgan bo'lsa (step == "completed")
+    # va suhbat davomida yangi kurs/yo'nalish nomi tilga olinsa:
+    if step == "completed":
+        new_course_found = None
+        for k, c_name in [
+            ("frontoffice", "Front Office (Mehmonxona)"),
+            ("front office", "Front Office (Mehmonxona)"),
+            ("gid", "Gid-hamrohlik / Ekskursovod"),
+            ("ekskurs", "Gid-hamrohlik / Ekskursovod"),
+            ("hotel", "Mehmonxona boshqaruvi"),
+            ("mehmonxona", "Mehmonxona boshqaruvi"),
+            ("restoran", "Restoran ishi va servis"),
+            ("servis", "Restoran ishi va servis"),
+            ("f&b", "Restoran ishi va servis"),
+            ("turoperator", "Turoperatorlik va agentlik"),
+            ("turagent", "Turoperatorlik va agentlik")
+        ]:
+            if k in text_clean.lower():
+                new_course_found = c_name
+                break
+
+        if new_course_found and new_course_found != client.get("campaign"):
+            client["campaign"] = new_course_found
+            update_client(sender_id, campaign=new_course_found, lead_status="yangi")
+            notify_admin_new_lead(client, source="Direct (Yangi kursga qiziqish 🔄)")
+
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
     # AI yoqilgan bo'lsa, u barcha savollarga bevosita javob beradi
     ai_enabled = (get_setting("ai_enabled", "1") == "1")
