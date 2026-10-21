@@ -25,13 +25,13 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     status_label = "Yangi (Bog'lanish kutilmoqda ⏳)"
     if status == "jarayonda":
         status_icon = "🟡"
-        status_label = f"Bog'lanilmoqda ⏳\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Qabul qildi:</b> {manager_time}"
+        status_label = f"Aloqaga chiqilmoqda 📞\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Qabul qildi:</b> {manager_time}"
     elif status == "boglandi":
         status_icon = "🟢"
         status_label = f"Muvaffaqiyatli bog'lanildi ✅\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
     elif status == "oylanyapti":
         status_icon = "💭"
-        status_label = f"O'ylab ko'rmoqchi (Keyinroq aloqaga chiqiladi) ⏳\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
+        status_label = f"Mijoz o'ylab ko'rmoqchi (Keyinroq bog'laniladi) 🤔\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
     elif status == "rad":
         status_icon = "🔴"
         status_label = f"Bog'lana olmadi (Ko'tarmadi / Rad etdi) ❌\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
@@ -84,7 +84,7 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
             {"text": "✅ Muvaffaqiyatli gaplashildi", "callback_data": f"done_{client_id}"}
         ])
         keyboard.append([
-            {"text": "⏳ O'ylayapti", "callback_data": f"thinking_{client_id}"},
+            {"text": "🤔 Mijoz o'ylab ko'rmoqchi", "callback_data": f"thinking_{client_id}"},
             {"text": "❌ Ko'tarmadi / Rad", "callback_data": f"reject_{client_id}"}
         ])
     elif status in ["boglandi", "rad", "oylanyapti"]:
@@ -182,6 +182,33 @@ def handle_telegram_callback(update: dict):
     msg = cq.get("message", {})
     chat_id = msg.get("chat", {}).get("id")
     msg_id = msg.get("message_id")
+    ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+
+    # Action va client_id ni ajratib olish
+    parts = cq_data.split("_")
+    if len(parts) != 2:
+        try:
+            requests.post(ans_url, json={"callback_query_id": cq_id, "text": "Noma'lum buyruq", "show_alert": False}, timeout=3)
+        except Exception:
+            pass
+        return
+
+    action, client_id_str = parts[0], parts[1]
+    try:
+        client_id = int(client_id_str)
+    except ValueError:
+        return
+
+    if action == "commentinfo":
+        try:
+            requests.post(ans_url, json={
+                "callback_query_id": cq_id, 
+                "text": "Ushbu xabarga 'Reply' (Javob) qilib izoh yozing. U avtomatik CRM ga va xabarga saqlanadi!", 
+                "show_alert": True
+            }, timeout=4)
+        except Exception:
+            pass
+        return
 
     # Mas'ul xodim nomini aniqlash
     username = user.get("username")
@@ -190,32 +217,38 @@ def handle_telegram_callback(update: dict):
     full_user = f"{first_name} {last_name}".strip()
     manager_label = f"@{username}" if username else full_user
 
-    # Action va client_id ni ajratib olish
-    parts = cq_data.split("_")
-    if len(parts) != 2:
-        return
-    action, client_id_str = parts[0], parts[1]
-    try:
-        client_id = int(client_id_str)
-    except ValueError:
-        return
-
-    if action == "commentinfo":
-        ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
-        requests.post(ans_url, json={
-            "callback_query_id": cq_id, 
-            "text": "Ushbu xabarga 'Reply' (Javob) qilib izoh yozing. U avtomatik CRM ga va xabarga saqlanadi!", 
-            "show_alert": True
-        }, timeout=5)
-        return
-
     client = get_client_by_id(client_id)
-    if not client:
-        return
+    msg_text = msg.get("text", "")
+
+    # Agar server qayta tushib client_id topilmasa, Telegram xabaridagi ma'lumotlardan avtomatik tiklash
+    if not client and msg_text:
+        ig_id_match = re.search(r"Instagram ID:\s*<code>?(\d+)</code>?", msg_text)
+        phone_match = re.search(r"Telefon:\s*<code>?([+\d]+)</code>?", msg_text)
+        name_match = re.search(r"Mijoz:\s*([^\n]+)", msg_text)
+        username_match = re.search(r"@([a-zA-Z0-9_\.]+)", msg_text)
+        course_match = re.search(r"Yo'nalish / Kurs:\s*<b>?([^\n<]+)</b>?", msg_text)
+
+        ig_id = ig_id_match.group(1) if ig_id_match else None
+        if ig_id:
+            from database import get_or_create_client, update_client
+            client = get_or_create_client(ig_id)
+            updates = {}
+            if phone_match:
+                updates["phone_number"] = phone_match.group(1).strip()
+            if name_match:
+                updates["full_name"] = name_match.group(1).strip()
+            if username_match:
+                updates["username"] = username_match.group(1).strip()
+            if course_match:
+                updates["campaign"] = course_match.group(1).strip()
+            if updates:
+                update_client(ig_id, **updates)
+                client.update(updates)
+            client_id = client.get("id") or client_id
 
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    alert_text = "Status yangilandi!"
-    new_status = client.get("lead_status", "yangi")
+    alert_text = "Holat yangilandi! ✅"
+    new_status = client.get("lead_status", "yangi") if client else "jarayonda"
 
     if action == "claim":
         new_status = "jarayonda"
@@ -225,12 +258,21 @@ def handle_telegram_callback(update: dict):
         alert_text = f"Lid yopildi: Muvaffaqiyatli bog'lanildi! ✅"
     elif action == "thinking":
         new_status = "oylanyapti"
-        alert_text = f"Belgilandi: Mijoz o'ylab ko'rmoqchi ⏳"
+        alert_text = f"Belgilandi: Mijoz o'ylab ko'rmoqchi 🤔"
     elif action == "reject":
         new_status = "rad"
         alert_text = f"Belgilandi: Bog'lanib bo'lmadi ❌"
 
-    # Bazada saqlash
+    # 1. Telegram tugmasi aylanib qotib qolmasligi uchun DARHOL callback javobini berish
+    try:
+        requests.post(ans_url, json={"callback_query_id": cq_id, "text": alert_text, "show_alert": False}, timeout=3)
+    except Exception as e:
+        logger.warning(f"answerCallbackQuery xatoligi: {e}")
+
+    if not client:
+        return
+
+    # 2. Bazada saqlash
     update_client_by_id(
         client_id,
         lead_status=new_status,
@@ -241,7 +283,7 @@ def handle_telegram_callback(update: dict):
     client["manager_name"] = manager_label
     client["manager_time"] = now_str
 
-    # Telegram xabarini tahrirlash (In-place update)
+    # 3. Telegram xabarini tahrirlash (In-place update)
     new_text = build_lead_message_text(client, source=client.get("source", "Direct"))
     new_keyboard = build_inline_keyboard(client_id, client.get("phone_number", ""), status=new_status, username=client.get("username", ""))
 
@@ -253,11 +295,10 @@ def handle_telegram_callback(update: dict):
         "parse_mode": "HTML",
         "reply_markup": {"inline_keyboard": new_keyboard}
     }
-    requests.post(edit_url, json=edit_payload, timeout=5)
-
-    # Tugma bosilganda bildirishnoma chiqarish
-    ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
-    requests.post(ans_url, json={"callback_query_id": cq_id, "text": alert_text, "show_alert": False}, timeout=5)
+    try:
+        requests.post(edit_url, json=edit_payload, timeout=5)
+    except Exception as e:
+        logger.error(f"Telegram editMessageText xatosi: {e}")
 
 def handle_telegram_reply_comment(update: dict):
     """

@@ -192,32 +192,61 @@ def init_db():
                     cursor.execute("SELECT id FROM clients WHERE instagram_id = ?", (ig_id,))
                     row = cursor.fetchone()
                     if not row:
-                        cursor.execute("""
-                            INSERT INTO clients (
-                                instagram_id, username, full_name, phone_number, source,
-                                campaign, step, last_message, lead_status, is_follower,
-                                ai_summary, manager_comment, chat_history,
-                                manager_name, manager_time, created_at, updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            ig_id,
-                            b.get("username", ""),
-                            b.get("full_name"),
-                            b.get("phone_number"),
-                            b.get("source", "Direct"),
-                            b.get("campaign", "Umumiy"),
-                            b.get("step", "completed"),
-                            b.get("last_message", ""),
-                            b.get("lead_status", "yangi"),
-                            b.get("is_follower", 0),
-                            b.get("ai_summary", ""),
-                            b.get("manager_comment", ""),
-                            b.get("chat_history", "[]"),
-                            b.get("manager_name", ""),
-                            b.get("manager_time", ""),
-                            b.get("created_at", datetime.now().isoformat()),
-                            b.get("updated_at", datetime.now().isoformat())
-                        ))
+                        if b.get("id"):
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO clients (
+                                    id, instagram_id, username, full_name, phone_number, source,
+                                    campaign, step, last_message, lead_status, is_follower,
+                                    ai_summary, manager_comment, chat_history,
+                                    manager_name, manager_time, created_at, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                b.get("id"),
+                                ig_id,
+                                b.get("username", ""),
+                                b.get("full_name"),
+                                b.get("phone_number"),
+                                b.get("source", "Direct"),
+                                b.get("campaign", "Umumiy"),
+                                b.get("step", "completed"),
+                                b.get("last_message", ""),
+                                b.get("lead_status", "yangi"),
+                                b.get("is_follower", 0),
+                                b.get("ai_summary", ""),
+                                b.get("manager_comment", ""),
+                                b.get("chat_history", "[]"),
+                                b.get("manager_name", ""),
+                                b.get("manager_time", ""),
+                                b.get("created_at", datetime.now().isoformat()),
+                                b.get("updated_at", datetime.now().isoformat())
+                            ))
+                        else:
+                            cursor.execute("""
+                                INSERT INTO clients (
+                                    instagram_id, username, full_name, phone_number, source,
+                                    campaign, step, last_message, lead_status, is_follower,
+                                    ai_summary, manager_comment, chat_history,
+                                    manager_name, manager_time, created_at, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                ig_id,
+                                b.get("username", ""),
+                                b.get("full_name"),
+                                b.get("phone_number"),
+                                b.get("source", "Direct"),
+                                b.get("campaign", "Umumiy"),
+                                b.get("step", "completed"),
+                                b.get("last_message", ""),
+                                b.get("lead_status", "yangi"),
+                                b.get("is_follower", 0),
+                                b.get("ai_summary", ""),
+                                b.get("manager_comment", ""),
+                                b.get("chat_history", "[]"),
+                                b.get("manager_name", ""),
+                                b.get("manager_time", ""),
+                                b.get("created_at", datetime.now().isoformat()),
+                                b.get("updated_at", datetime.now().isoformat())
+                            ))
         except Exception:
             pass
 
