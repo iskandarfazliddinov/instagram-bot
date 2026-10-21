@@ -588,6 +588,12 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram webhook callback xatoligi: {e}")
     return {"ok": True}
 
+@app.get("/api/sync-backup")
+def sync_backup_route():
+    from database import init_db, get_all_clients
+    init_db()
+    return {"ok": True, "total": len(get_all_clients())}
+
 @app.get("/api/clients")
 def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""
