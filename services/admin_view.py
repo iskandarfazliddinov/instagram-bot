@@ -630,20 +630,24 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <!-- 1-TAB: LIDLAR BAZASI (CRM) -->
         <div id="tab_leads" class="tab-content space-y-6">
             <!-- Statistika kartalari -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Jami Lidlar</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">⚪ Yangi Lidlar</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">🟡 Jarayonda</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-purple-600 mb-1">💭 O'ylayapti</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-purple-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
