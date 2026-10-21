@@ -90,6 +90,35 @@ def check_instagram_token(token: str = None) -> dict:
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def refresh_long_lived_token() -> bool:
+    """
+    Instagram Long-Lived (60 kunlik) tokenni muddati tugamasdan avtomatik uzaytirish (Auto-Refresh)
+    """
+    current_token = get_access_token()
+    if not current_token or not current_token.startswith("IGAA"):
+        return False
+
+    url = f"{GRAPH_BASE_URL}/refresh_access_token"
+    params = {
+        "grant_type": "ig_refresh_token",
+        "access_token": current_token
+    }
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+        if r.status_code == 200 and "access_token" in data:
+            new_token = data["access_token"]
+            from database import set_setting
+            set_setting("page_access_token", new_token)
+            logger.info(f"✅ Instagram tokeni avtomatik yana 60 kunga uzaytirildi (expires_in: {data.get('expires_in')}s)!")
+            return True
+        else:
+            logger.warning(f"Tokenni uzaytirishda Meta javobi: {data}")
+            return False
+    except Exception as e:
+        logger.error(f"Tokenni avtomatik yangilashda xatolik: {e}")
+        return False
+
 def send_message(recipient_id: str, text: str) -> dict:
     """
     Instagram Direct orqali mijozga xabar yuborish

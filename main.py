@@ -82,6 +82,20 @@ async def follow_up_background_worker():
         # Har 5 daqiqada tekshirish
         await asyncio.sleep(300)
 
+async def token_auto_refresh_worker():
+    """
+    Instagram 60 kunlik tokenini muddati tugamasdan avtomatik yangilash (Auto-Refresh)
+    """
+    await asyncio.sleep(120)  # Server ishga tushgandan so'ng 2 daqiqa kutish
+    while True:
+        try:
+            from services.instagram import refresh_long_lived_token
+            refresh_long_lived_token()
+        except Exception as e:
+            logger.error(f"Token auto-refresh xatoligi: {e}")
+        # Har 24 soatda tekshirish
+        await asyncio.sleep(86400)
+
 app = FastAPI(
     title="Instagram Automation & Lead Capture API",
     description="Instagram Direct va Video izohlari orqali avtomatik javob berish, havola ulashish va Telegramga lidlarni uzatish tizimi",
@@ -96,7 +110,8 @@ async def on_startup():
     except Exception as e:
         logger.error(f"Telegram webhook ulashda xatolik: {e}")
     asyncio.create_task(follow_up_background_worker())
-    logger.info("Ma'lumotlar bazasi va AI Follow-up xizmati ishga tushirildi.")
+    asyncio.create_task(token_auto_refresh_worker())
+    logger.info("Ma'lumotlar bazasi, AI Follow-up va Token Auto-Refresh xizmati ishga tushirildi.")
 
 @app.get("/")
 def home():
