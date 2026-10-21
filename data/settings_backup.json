@@ -1,4 +1,6 @@
 {
+  "operator_username": "operator",
+  "operator_password": "operator123",
   "ai_followup_enabled": "1",
   "ai_followup_delay_minutes": "30",
   "ask_phone": "Rahmat, {name}! 🙌\n\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):",

@@ -105,6 +105,8 @@ def init_db():
         "default_promo_link": "https://tourism-edu.uz",
         "admin_username": "admin",
         "admin_password": "admin",
+        "operator_username": "operator",
+        "operator_password": "operator123",
         "ai_enabled": "1",
         "ai_followup_enabled": "1",
         "ai_followup_delay_minutes": "30",

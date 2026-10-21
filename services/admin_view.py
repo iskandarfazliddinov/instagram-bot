@@ -66,7 +66,7 @@ def get_login_page_html(error: str = "") -> str:
 
             <div class="mt-6 pt-5 border-t border-slate-800 text-center">
                 <p class="text-xs text-slate-400">
-                    Standart boshlang'ich login: <code class="text-purple-400 font-mono">admin</code> | parol: <code class="text-purple-400 font-mono">admin</code>
+                    Admin: <code class="text-purple-400 font-mono">admin</code> | Operator: <code class="text-blue-400 font-mono">operator</code>
                 </p>
             </div>
         </div>
@@ -79,8 +79,9 @@ def get_login_page_html(error: str = "") -> str:
 </html>
 """
 
-def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "") -> str:
+def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin") -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
+    is_operator = (user_role == "operator")
     current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
     
     # ---------------- 1. LIDLAR ASOSIY HISOB-KITOBLARI ----------------
@@ -307,10 +308,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     # ---------------- 6. MIJOZLAR JADVALI QATORLARI ----------------
     clients_html = ""
+    colspan_num = 8 if is_operator else 9
     if not clients:
-        clients_html = """
+        clients_html = f"""
         <tr id="empty_row">
-            <td colspan="9" class="px-6 py-12 text-center text-slate-400">
+            <td colspan="{colspan_num}" class="px-6 py-12 text-center text-slate-400">
                 <div class="text-4xl mb-2">📭</div>
                 <div class="font-medium text-slate-600">Hozircha lidlar yo'q</div>
                 <div class="text-xs text-slate-400 mt-1">Instagram Direct yoki izohlardan mijozlar yozishi bilan bu yerda paydo bo'ladi.</div>
@@ -406,6 +408,37 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
             """
 
+        comment_btn = ""
+        if not is_operator:
+            comment_btn = f"""
+            <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1">
+                💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
+            </button>
+            """
+
+        action_td = ""
+        if not is_operator:
+            action_td = f"""
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-1.5">
+                    <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
+                        <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500">
+                            <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                            <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
+                            <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
+                            <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                            <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                        </select>
+                        <input type="hidden" name="manager_name" value="Admin">
+                        <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
+                    </form>
+                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
+                        <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
+                    </form>
+                </div>
+            </td>
+            """
+
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
         clients_html += f"""
@@ -443,29 +476,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="text-xs font-bold text-slate-800">{manager_name}</div>
                 {comment_block}
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1">
-                    💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
-                </button>
+                {comment_btn}
             </td>
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
-            <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                <div class="inline-flex items-center gap-1.5">
-                    <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
-                        <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500">
-                            <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                            <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
-                            <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
-                            <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
-                            <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
-                        </select>
-                        <input type="hidden" name="manager_name" value="Admin">
-                        <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
-                    </form>
-                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
-                        <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
-                    </form>
-                </div>
-            </td>
+            {action_td}
         </tr>
         """
 
@@ -541,70 +555,27 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     """ if notice else ""
 
     admin_username = settings.get("admin_username", "admin")
+    operator_username = settings.get("operator_username", "operator")
+    operator_password = settings.get("operator_password", "operator123")
 
-    # Chart.js JSON ma'lumotlari
-    json_daily_labels = json.dumps(daily_labels)
-    json_daily_totals = json.dumps(chart_daily_totals)
-    json_daily_phones = json.dumps(chart_daily_phones)
-    json_top_campaign_labels = json.dumps(top_campaign_labels)
-    json_top_campaign_counts = json.dumps(top_campaign_counts)
+    leads_header_action_th = '<th class="px-5 py-3.5 text-right">Boshqarish</th>' if not is_operator else ''
+    user_role_badge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">👤 Operator (Cheklangan)</span>' if is_operator else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">👑 Admin</span>'
+    header_stats_btn = '<button onclick="switchTab(\'analytics\')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">📊 Statistika</button>' if not is_operator else ''
 
-    html = f"""<!DOCTYPE html>
-<html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram CRM — Xalqaro Turizm Akademiyasi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
-        .tab-btn.active {{
-            background-color: white;
-            color: #1e1b4b;
-            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-        }}
-    </style>
-</head>
-<body class="bg-slate-50/80 min-h-screen text-slate-800">
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div class="flex items-center space-x-3.5">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-purple-500/10">
-                    📸
-                </div>
-                <div>
-                    <div class="flex items-center gap-2.5">
-                        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Instagram CRM</h1>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {ai_status_badge}">
-                            {ai_status_text}
-                        </span>
-                    </div>
-                    <p class="text-xs text-slate-500 font-medium">Xalqaro Turizm Akademiyasi (Samarqand kampusi) — Lidlar va Muloqot Boshqaruvi</p>
-                </div>
+    if is_operator:
+        tabs_nav_html = f"""
+        <!-- CRM Bo'limlar Navigatsiyasi (Operator rejimi) -->
+        <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center justify-between mb-6 text-sm font-semibold text-slate-600">
+            <div class="tab-btn active px-4 py-2.5 rounded-xl flex items-center gap-2">
+                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </div>
-            <div class="flex items-center gap-2.5">
-                <button onclick="switchTab('analytics')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">
-                    📊 Statistika
-                </button>
-                <a href="/api/clients/csv" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
-                    📥 Excel (.CSV)
-                </a>
-                <a href="/logout" class="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Tizimdan chiqish">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path>
-                    </svg>
-                    <span>Chiqish</span>
-                </a>
+            <div class="text-xs text-slate-500 font-medium px-3 flex items-center gap-1.5">
+                <span>🔒</span> <span>Operator paneli: Faqat lidlar (o'zgartirish va o'chirish taqiqlangan)</span>
             </div>
         </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {notice_banner}
-
+        """
+    else:
+        tabs_nav_html = f"""
         <!-- CRM Bo'limlar Navigatsiyasi (Tablar) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 text-sm font-semibold text-slate-600">
             <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
@@ -626,77 +597,65 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 🔐 6. Login & Parol
             </button>
         </div>
+        """
 
-        <!-- 1-TAB: LIDLAR BAZASI (CRM) -->
-        <div id="tab_leads" class="tab-content space-y-6">
-            <!-- Statistika kartalari -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Jami Lidlar</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">⚪ Yangi Lidlar</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">🟡 Jarayonda</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-purple-600 mb-1">💭 O'ylayapti</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-purple-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-            </div>
+    # Chart.js JSON ma'lumotlari
+    json_daily_labels = json.dumps(daily_labels)
+    json_daily_totals = json.dumps(chart_daily_totals)
+    json_daily_phones = json.dumps(chart_daily_phones)
+    json_top_campaign_labels = json.dumps(top_campaign_labels)
+    json_top_campaign_counts = json.dumps(top_campaign_counts)
 
-            <!-- Qidiruv va Filtrlash Paneli -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
-                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-4">
-                    <div class="flex-1 relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
-                        <input type="text" id="lead_search" onkeyup="filterLeads()" placeholder="Ism, telefon yoki kurs bo'yicha qidirish..."
-                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none">
-                            <option value="all">Barcha holatlar</option>
-                            <option value="yangi">⚪ Yangi</option>
-                            <option value="jarayonda">🟡 Jarayonda</option>
-                            <option value="boglandi">🟢 Bog'lanildi</option>
-                            <option value="oylanyapti">💭 O'ylayapti</option>
-                            <option value="rad">🔴 Rad / Ko'tarmadi</option>
-                        </select>
-                    </div>
-                </div>
+    if is_operator:
+        admin_only_tabs_html = ""
+        admin_only_modals_html = ""
+        admin_scripts_js = ""
+    else:
+        admin_scripts_js = """
+        function openCommentModal(clientId, currentComment, clientName) {
+            const form = document.getElementById('modalCommentForm');
+            if (!form) return;
+            form.action = '/admin/clients/' + clientId + '/comment';
+            document.getElementById('modalCommentInput').value = currentComment || '';
+            document.getElementById('modalClientInfo').textContent = (clientName || 'Mijoz') + ' uchun mutaxassis izohini kiriting:';
+            const modal = document.getElementById('commentModal');
+            if (modal) modal.classList.remove('hidden');
+            const inp = document.getElementById('modalCommentInput');
+            if (inp) inp.focus();
+        }
 
-                <!-- Lidlar Jadvali -->
-                <div class="overflow-x-auto rounded-xl border border-slate-100">
-                    <table class="w-full text-left text-sm" id="leads_table">
-                        <thead class="bg-slate-50 text-xs font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
-                            <tr>
-                                <th class="px-5 py-3.5">Mijoz / Instagram Profil</th>
-                                <th class="px-5 py-3.5">Telefon & Aloqa</th>
-                                <th class="px-5 py-3.5">Qiziqqan Yo'nalishi</th>
-                                <th class="px-5 py-3.5">💡 AI Tahlili & So'rovi</th>
-                                <th class="px-5 py-3.5">Obuna</th>
-                                <th class="px-5 py-3.5">Holati</th>
-                                <th class="px-5 py-3.5">Mas'ul & Mutaxassis Izohi</th>
-                                <th class="px-5 py-3.5">Vaqti</th>
-                                <th class="px-5 py-3.5 text-right">Boshqarish</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {clients_html}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        function closeCommentModal() {
+            const modal = document.getElementById('commentModal');
+            if (modal) modal.classList.add('hidden');
+        }
 
+        async function checkCurrentToken() {
+            const input = document.getElementById('page_access_token_input');
+            const box = document.getElementById('token_status_box');
+            const tokenVal = input ? input.value.trim() : '';
+            if (!box) return;
+
+            box.className = 'text-xs rounded-xl p-3 font-medium bg-blue-50 text-blue-700 border border-blue-200 block';
+            box.innerHTML = '⏳ Meta API orqali token holati tekshirilmoqda...';
+
+            try {
+                const resp = await fetch('/api/check-token?token=' + encodeURIComponent(tokenVal));
+                const data = await resp.json();
+                if (data.ok) {
+                    box.className = 'text-xs rounded-xl p-3 font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+                    box.innerHTML = '✅ <b>Token 100% Faol!</b> Akkaunt: <b>@' + (data.username || '') + '</b> (' + (data.name || '') + ') | ID: ' + (data.id || '');
+                } else {
+                    box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
+                    box.innerHTML = '❌ <b>Token nofaol yoki bloklangan:</b> ' + (data.error || 'Xatolik') + '<br><span class=\"text-[11px] text-rose-600 mt-1 block\">👉 developers.facebook.com dan yangi token olib, shu yerga qo\\'ying va pastdagi \"Direct Shabloni Saqlash\" tugmasini bosing.</span>';
+                }
+            } catch (e) {
+                box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
+                box.innerHTML = '⚠️ Server bilan bog\\'lanishda xatolik: ' + e.message;
+            }
+        }
+        """
+
+        admin_only_tabs_html = f"""
         <!-- 2-TAB: STATISTIKA VA TAHLIL (YANGI ANALITIKA DASHBOARD) -->
         <div id="tab_analytics" class="tab-content hidden space-y-6">
             <!-- Asosiy Sarlavha banneri -->
@@ -1219,14 +1178,45 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                     <div class="pt-2">
                         <button type="submit" class="bg-slate-900 hover:bg-black text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-sm transition">
-                            💾 Login va Parolni Yangilash
+                            💾 Admin Login va Parolni Yangilash
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Operator Akkaunti (Cheklangan Ruxsat) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mt-6">
+                <div class="border-b border-slate-100 pb-4 mb-6">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        👥 Operator Akkaunti (Faqat Lidlar & Read-Only)
+                    </h2>
+                    <p class="text-sm text-slate-500">
+                        Ushbu login va parol xodimlar (operatorlar) uchun. Ular tizimga kirganda <strong>faqat Lidlar bazasi</strong> ko'rinadi. O'zgartirish, o'chirish va tizim sozlamalari yashiriladi.
+                    </p>
+                </div>
+
+                <form method="POST" action="/admin/security/operator/save" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Operator Logini:</label>
+                        <input type="text" name="operator_username" required value="{operator_username}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-purple-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Operator Paroli:</label>
+                        <input type="text" name="operator_password" required value="{operator_password}" placeholder="Kamida 4 ta belgi" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                        <p class="text-xs text-slate-400 mt-1">Parolni bu yerdan istalgan vaqt yangilab, operatorga berishingiz mumkin.</p>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-sm transition">
+                            💾 Operator Login va Parolini Saqlash
                         </button>
                     </div>
                 </form>
             </div>
         </div>
-    </main>
-
+        """
+        admin_only_modals_html = f"""
     <!-- Mutaxassis Izohi Qoldirish Modali -->
     <div id="commentModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
@@ -1246,6 +1236,139 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </form>
         </div>
     </div>
+    """
+
+    html = f"""<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram CRM — Xalqaro Turizm Akademiyasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
+        .tab-btn.active {{
+            background-color: white;
+            color: #1e1b4b;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }}
+    </style>
+</head>
+<body class="bg-slate-50/80 min-h-screen text-slate-800">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex items-center space-x-3.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-purple-500/10">
+                    📸
+                </div>
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Instagram CRM</h1>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {ai_status_badge}">
+                            {ai_status_text}
+                        </span>
+                        {user_role_badge}
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">Xalqaro Turizm Akademiyasi (Samarqand kampusi) — Lidlar va Muloqot Boshqaruvi</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5">
+                {header_stats_btn}
+                <a href="/api/clients/csv" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
+                    📥 Excel (.CSV)
+                </a>
+                <a href="/logout" class="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Tizimdan chiqish">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path>
+                    </svg>
+                    <span>Chiqish</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {notice_banner}
+
+        {tabs_nav_html}
+
+        <!-- 1-TAB: LIDLAR BAZASI (CRM) -->
+        <div id="tab_leads" class="tab-content space-y-6">
+            <!-- Statistika kartalari -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Jami Lidlar</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">⚪ Yangi Lidlar</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">🟡 Jarayonda</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-purple-600 mb-1">💭 O'ylayapti</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-purple-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+            </div>
+
+            <!-- Qidiruv va Filtrlash Paneli -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-4">
+                    <div class="flex-1 relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
+                        <input type="text" id="lead_search" onkeyup="filterLeads()" placeholder="Ism, telefon yoki kurs bo'yicha qidirish..."
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none">
+                            <option value="all">Barcha holatlar</option>
+                            <option value="yangi">⚪ Yangi</option>
+                            <option value="jarayonda">🟡 Jarayonda</option>
+                            <option value="boglandi">🟢 Bog'lanildi</option>
+                            <option value="oylanyapti">💭 O'ylayapti</option>
+                            <option value="rad">🔴 Rad / Ko'tarmadi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Lidlar Jadvali -->
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left text-sm" id="leads_table">
+                        <thead class="bg-slate-50 text-xs font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
+                            <tr>
+                                <th class="px-5 py-3.5">Mijoz / Instagram Profil</th>
+                                <th class="px-5 py-3.5">Telefon & Aloqa</th>
+                                <th class="px-5 py-3.5">Qiziqqan Yo'nalishi</th>
+                                <th class="px-5 py-3.5">💡 AI Tahlili & So'rovi</th>
+                                <th class="px-5 py-3.5">Obuna</th>
+                                <th class="px-5 py-3.5">Holati</th>
+                                <th class="px-5 py-3.5">Mas'ul & Mutaxassis Izohi</th>
+                                <th class="px-5 py-3.5">Vaqti</th>
+                                {leads_header_action_th}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {clients_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {admin_only_tabs_html}
+    </main>
+
+    {admin_only_modals_html}
 
     <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
@@ -1472,42 +1595,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }});
         }}
 
-        function openCommentModal(clientId, currentComment, clientName) {{
-            document.getElementById('modalCommentForm').action = '/admin/clients/' + clientId + '/comment';
-            document.getElementById('modalCommentInput').value = currentComment || '';
-            document.getElementById('modalClientInfo').textContent = (clientName || 'Mijoz') + ' uchun mutaxassis izohini kiriting:';
-            document.getElementById('commentModal').classList.remove('hidden');
-            document.getElementById('modalCommentInput').focus();
-        }}
-
-        function closeCommentModal() {{
-            document.getElementById('commentModal').classList.add('hidden');
-        }}
-
-        async function checkCurrentToken() {{
-            const input = document.getElementById('page_access_token_input');
-            const box = document.getElementById('token_status_box');
-            const tokenVal = input ? input.value.trim() : '';
-            if (!box) return;
-
-            box.className = 'text-xs rounded-xl p-3 font-medium bg-blue-50 text-blue-700 border border-blue-200 block';
-            box.innerHTML = '⏳ Meta API orqali token holati tekshirilmoqda...';
-
-            try {{
-                const resp = await fetch('/api/check-token?token=' + encodeURIComponent(tokenVal));
-                const data = await resp.json();
-                if (data.ok) {{
-                    box.className = 'text-xs rounded-xl p-3 font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block';
-                    box.innerHTML = '✅ <b>Token 100% Faol!</b> Akkaunt: <b>@' + (data.username || '') + '</b> (' + (data.name || '') + ') | ID: ' + (data.id || '');
-                }} else {{
-                    box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
-                    box.innerHTML = '❌ <b>Token nofaol yoki bloklangan:</b> ' + (data.error || 'Xatolik') + '<br><span class="text-[11px] text-rose-600 mt-1 block">👉 developers.facebook.com dan yangi token olib, shu yerga qo\'ying va pastdagi "Direct Shabloni Saqlash" tugmasini bosing.</span>';
-                }}
-            }} catch (e) {{
-                box.className = 'text-xs rounded-xl p-3 font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
-                box.innerHTML = '⚠️ Server bilan bog\'lanishda xatolik: ' + e.message;
-            }}
-        }}
+        {admin_scripts_js}
     </script>
 </body>
 </html>
