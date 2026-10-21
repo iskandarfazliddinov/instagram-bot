@@ -12,7 +12,7 @@ from database import (
 )
 from services.instagram import send_message, send_link_button, get_user_profile
 from services.telegram import notify_admin_new_lead
-from services.ai_assistant import analyze_lead_need, is_russian_message
+from services.ai_assistant import analyze_lead_need, detect_message_language, is_russian_message, is_english_message
 
 logger = logging.getLogger(__name__)
 
@@ -112,13 +112,14 @@ def process_incoming_message(sender_id: str, user_text: str):
         source = client.get("source", "Direct")
         notify_admin_new_lead(client, source=source)
 
-        # Tilni aniqlash (mijoz ruscha yozganmi?)
+        # Tilni aniqlash (mijoz qaysi tilda yozgan?)
         chat_history_now = get_client_chat_history(sender_id)
-        is_client_ru = is_russian_message(text_clean) or is_russian_message(client.get("last_message", ""))
-        if not is_client_ru and chat_history_now:
+        lang_client = detect_message_language(text_clean)
+        if lang_client == "uz" and chat_history_now:
             for h in chat_history_now:
-                if is_russian_message(h.get("text", "")):
-                    is_client_ru = True
+                l_h = detect_message_language(h.get("text", ""))
+                if l_h in ["ru", "en"]:
+                    lang_client = l_h
                     break
 
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
@@ -133,7 +134,14 @@ def process_incoming_message(sender_id: str, user_text: str):
                     send_link = c["promo_link"]
                     break
 
-        if is_client_ru:
+        if lang_client == "en":
+            final_caption = (
+                f"Thank you, {client.get('full_name') or ''}! Your request has been successfully received. 😊\n\n"
+                f"Our admission coordinator will contact you shortly.\n\n"
+                f"You can explore our programs and international standards on our platform:"
+            )
+            btn_title = "Explore Platform 🌐"
+        elif lang_client == "ru":
             final_caption = (
                 f"Спасибо, {client.get('full_name') or ''}! Ваша заявка успешно принята. 😊\n\n"
                 f"Наш специалист скоро свяжется с вами по указанному номеру и предоставит полную информацию.\n\n"
@@ -181,15 +189,22 @@ def process_incoming_message(sender_id: str, user_text: str):
             return
         else:
             # AI kutilmaganda javob bermay qolsa (masalan, tarmoq xatoligi bo'lsa):
-            # Tinglovchi tiliga qarab rus yoki o'zbek tilida samimiy xabar yuboriladi
-            is_ru_req = is_russian_message(text_clean)
-            if not is_ru_req and chat_history:
+            # Tinglovchi tiliga qarab ingliz, rus yoki o'zbek tilida samimiy xabar yuboriladi
+            lang_req = detect_message_language(text_clean)
+            if lang_req == "uz" and chat_history:
                 for h in reversed(chat_history):
-                    if h.get("role") == "user" and is_russian_message(h.get("text", "")):
-                        is_ru_req = True
-                        break
+                    if h.get("role") == "user":
+                        l_h = detect_message_language(h.get("text", ""))
+                        if l_h in ["ru", "en"]:
+                            lang_req = l_h
+                            break
 
-            if is_ru_req:
+            if lang_req == "en":
+                fallback_msg = (
+                    "Hello! Welcome to the International Tourism Academy (Samarkand Campus). 😊\n\n"
+                    "To receive full details on our training programs, curriculum, and tuition fees, please leave your name and phone number:"
+                )
+            elif lang_req == "ru":
                 fallback_msg = (
                     "Здравствуйте! Добро пожаловать в Самаркандский кампус Международной академии туризма. 😊\n\n"
                     "Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона:"
@@ -210,10 +225,15 @@ def process_incoming_message(sender_id: str, user_text: str):
             return
 
     # 3. Faqat AI o'chiq bo'lsa (ai_enabled == 0) — Standart shablon bo'yicha ketadi:
-    is_user_ru = is_russian_message(text_clean)
+    lang_user = detect_message_language(text_clean)
     if step == "awaiting_phone":
         if len(digits) < 7:
-            if is_user_ru:
+            if lang_user == "en":
+                send_message(
+                    sender_id,
+                    "Please enter your phone number in the correct international format (e.g.: +998901234567):"
+                )
+            elif lang_user == "ru":
                 send_message(
                     sender_id,
                     "Пожалуйста, введите ваш номер телефона в правильном формате (например: +998901234567):"
@@ -227,7 +247,12 @@ def process_incoming_message(sender_id: str, user_text: str):
 
     # 3.1. Boshlang'ich holat yoki kalit so'zlarni tutish
     if any(k in text_lower for k in TRIGGER_KEYWORDS) or step == "start":
-        if is_user_ru:
+        if lang_user == "en":
+            welcome_msg = (
+                "Hello! Welcome to the official page of the International Tourism Academy (Samarkand Campus). 😊\n\n"
+                "To receive information about our educational programs, please leave your name:"
+            )
+        elif lang_user == "ru":
             welcome_msg = (
                 "Здравствуйте! Добро пожаловать на официальную страницу Самаркандского кампуса Международной академии туризма. 😊\n\n"
                 "Чтобы получить подробную информацию об интересующих вас направлениях, пожалуйста, оставьте ваше имя:"
@@ -244,7 +269,9 @@ def process_incoming_message(sender_id: str, user_text: str):
     # 3.2. Ism qabul qilingan bosqich -> Telefon raqam so'rash
     if step == "awaiting_name":
         update_client(sender_id, full_name=text_clean, step="awaiting_phone")
-        if is_user_ru:
+        if lang_user == "en":
+            response_msg = f"Thank you, {text_clean}! 🙌\n\nPlease provide your phone number so we can send you full details (e.g.: +998901234567):"
+        elif lang_user == "ru":
             response_msg = f"Спасибо, {text_clean}! 🙌\n\nЧтобы мы могли отправить вам подробную информацию, пожалуйста, оставьте ваш номер телефона (например: +998901234567):"
         else:
             ask_phone_template = get_setting(
@@ -258,7 +285,13 @@ def process_incoming_message(sender_id: str, user_text: str):
     # 3.3. Mijoz allaqachon ro'yxatdan o'tgan bo'lsa
     if step == "completed":
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
-        if is_user_ru:
+        if lang_user == "en":
+            send_message(
+                sender_id,
+                f"Your request has already been received. Official website: {default_link}\n\n"
+                "Our coordinator will contact you shortly."
+            )
+        elif lang_user == "ru":
             send_message(
                 sender_id,
                 f"Ваша заявка уже принята. Наш официальный сайт: {default_link}\n\n"

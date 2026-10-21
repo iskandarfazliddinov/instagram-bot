@@ -15,13 +15,16 @@ THIRD_MODEL = "gemini-3.5-flash-lite"
 AUDIO_PRIMARY_MODEL = "gemini-3.1-flash-lite"
 AUDIO_FALLBACK_MODEL = "gemini-flash-lite-latest"
 
-def is_russian_message(text: str) -> bool:
+def detect_message_language(text: str) -> str:
     """
-    Xabar rus tilida yozilganligini aniqlash (aniq va sezgir algoritm)
+    Xabar qaysi tilda yozilganini aniqlash:
+    Qaytaradi: 'en' (Ingliz tili), 'ru' (Rus tili) yoki 'uz' (O'zbek tili)
     """
     if not text:
-        return False
-    text_lower = text.lower().strip()
+        return "uz"
+    t = text.lower().strip()
+
+    # 1. Rus tili tekshiruvi (Kirill va ruscha kalit so'zlar)
     ru_markers = [
         "сколько", "стоит", "цена", "обучение", "курс", "курсы", "здравствуйте",
         "привет", "добрый", "день", "вечер", "можно", "информация", "расскажите",
@@ -30,12 +33,40 @@ def is_russian_message(text: str) -> bool:
         "скажите", "программа", "условия", "поступления", "прием", "платно", "скидка",
         "сертификат", "диплом", "модуль", "модули"
     ]
-    if any(w in text_lower for w in ru_markers):
-        return True
-    # Rus tili uchun xos bo'lgan harflar (o'zbek kirillida kam yoki umuman yo'q)
-    if any(c in text_lower for c in ['ы', 'щ', 'ъ', 'ь', 'ц', 'ё']):
-        return True
-    return False
+    if any(w in t for w in ru_markers) or any(c in t for c in ['ы', 'щ', 'ъ', 'ь', 'ц', 'ё']):
+        return "ru"
+    if len(re.findall(r"[\u0400-\u04FF]", t)) >= 3:
+        uz_cyrillic = ["катнаш", "керак", "нарх", "качон", "салом", "рахмат", "укув", "модул"]
+        if not any(k in t for k in uz_cyrillic):
+            return "ru"
+
+    # 2. Ingliz tili tekshiruvi (So'z chegaralari bilan xatosiz qidirish)
+    en_patterns = [
+        r"\b(?:hello|hi|hey|good\s+(?:morning|afternoon|evening))\b",
+        r"\b(?:how\s+much|cost|price|tuition|fees?)\b",
+        r"\b(?:training|courses?|program(?:me)?s?|admission|apply|register|registration)\b",
+        r"\b(?:hotel|tourism|hospitality|management)\b",
+        r"\b(?:information|details|requirements|schedule)\b",
+        r"\b(?:can\s+i|i\s+want|i\s+would\s+like|tell\s+me|where\s+is|when\s+does)\b",
+        r"\b(?:thank\s+you|thanks|please|interested)\b"
+    ]
+    for pat in en_patterns:
+        if re.search(pat, t):
+            uz_indicators = [
+                r"\bqancha\b", r"\bkerak\b", r"\bbormi\b", r"\bhaqida\b", r"\buchun\b", 
+                r"\bsalom\b", r"\bqachon\b", r"\bqatnash\b", r"\bedim\b", r"\bman\b", 
+                r"\bsiz\b", r"\biltimos\b", r"\bboladimi\b", r"\bo‘quv\b", r"\bo'quv\b"
+            ]
+            if not any(re.search(u, t) for u in uz_indicators):
+                return "en"
+
+    return "uz"
+
+def is_russian_message(text: str) -> bool:
+    return detect_message_language(text) == "ru"
+
+def is_english_message(text: str) -> bool:
+    return detect_message_language(text) == "en"
 
 def clean_ai_output(text: str) -> str:
     """
@@ -51,15 +82,15 @@ def clean_ai_output(text: str) -> str:
         text = text[1:-1].strip()
 
     # Agar model bir nechta variant chiqargan bo'lsa (masalan: **1-variant:**), 1-variant matnini ajratib olish
-    if "**1-variant" in text.lower() or "**variant 1" in text.lower() or "1-variant:" in text.lower() or "**вариант 1" in text.lower():
+    if "**1-variant" in text.lower() or "**variant 1" in text.lower() or "1-variant:" in text.lower() or "**вариант 1" in text.lower() or "**option 1" in text.lower():
         lines = text.split("\n")
         cleaned_lines = []
         capture = False
         for line in lines:
-            if ("variant" in line.lower() or "вариант" in line.lower()) and ("1" in line or "1-" in line):
+            if any(term in line.lower() for term in ["variant", "вариант", "option"]) and ("1" in line or "1-" in line):
                 capture = True
                 continue
-            if capture and ("variant 2" in line.lower() or "2-variant" in line.lower() or "вариант 2" in line.lower() or "maslahat" in line.lower() or "qaysi birini" in line.lower()):
+            if capture and any(term in line.lower() for term in ["variant 2", "2-variant", "вариант 2", "option 2", "maslahat"]):
                 break
             if capture and line.strip():
                 cleaned_lines.append(line.strip().strip('"').strip('«').strip('»'))
@@ -80,19 +111,16 @@ def clean_ai_output(text: str) -> str:
 
 def generate_ai_reply(user_message: str, client_context: dict, is_first_message: bool = False, chat_history: list = None) -> str | None:
     """
-    Google Gemini AI orqali mijoz xabariga professional, do'stona va suhbat tarixini hisobga olgan holda javob yaratish
+    Google Gemini AI orqali mijoz xabariga professional, do'stona va suhbat tarixini hisobga olgan holda javob yaratish (O'zbek, Rus, Ingliz tillarida)
     """
-    # 1. AI yoqilganligini tekshirish
     if get_setting("ai_enabled", "1") != "1":
         return None
 
-    # 2. API kalitni olish
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     if not api_key:
         logger.info("AI Yordamchi yoqilgan, lekin Gemini API kalit kiritilmagan.")
         return None
 
-    # 3. Tizim yo'riqnomasi (System prompt / Bilimlar bazasi)
     system_prompt = get_setting("ai_system_prompt", "")
 
     client_name = client_context.get("full_name") or "Hali noma'lum"
@@ -100,39 +128,40 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
 
     # Tilni aniqlash
-    is_ru = is_russian_message(user_message)
-    if not is_ru and chat_history and len(chat_history) > 1:
-        # Agar hozirgi xabar qisqa bo'lsa (masalan "Ha" yoki "Xa"), oldingi xabarlar tilini tekshirish
+    lang = detect_message_language(user_message)
+    if lang == "uz" and chat_history and len(chat_history) > 1:
         for prev in reversed(chat_history[:-1]):
-            if prev.get("role") == "user" and is_russian_message(prev.get("text", "")):
-                is_ru = True
-                break
+            if prev.get("role") == "user":
+                prev_lang = detect_message_language(prev.get("text", ""))
+                if prev_lang in ["ru", "en"]:
+                    lang = prev_lang
+                    break
 
     # Salomlashish qoidasi
     if is_first_message:
-        if is_ru:
-            greeting_instruction = (
-                "Это ПЕРВОЕ сообщение клиента. Поздоровайтесь дружелюбно (например: «Здравствуйте!» или «Добрый день!»)."
-            )
+        if lang == "en":
+            greeting_instruction = "This is the client's FIRST message. Greet politely in English (e.g.: «Hello!» or «Welcome!»)."
+        elif lang == "ru":
+            greeting_instruction = "Это ПЕРВОЕ сообщение клиента. Поздоровайтесь дружелюбно (например: «Здравствуйте!» или «Добрый день!»)."
         else:
-            greeting_instruction = (
-                "Bu mijozning BIRINCHI xabari. Salomlashish lozim (masalan: «Assalomu alaykum!» deb boshlang)."
-            )
+            greeting_instruction = "Bu mijozning BIRINCHI xabari. Salomlashish lozim (masalan: «Assalomu alaykum!» deb boshlang)."
     else:
-        if is_ru:
-            greeting_instruction = (
-                "СТРОГОЕ ПРАВИЛО: Это продолжающийся диалог! Вы УЖЕ здоровались с этим клиентом ранее. "
-                "НЕ здоровайтесь заново, сразу и прямо отвечайте на вопрос клиента."
-            )
+        if lang == "en":
+            greeting_instruction = "STRICT RULE: This is an ongoing conversation! You have ALREADY greeted this client before. Do NOT greet again. Answer the question directly."
+        elif lang == "ru":
+            greeting_instruction = "СТРОГОЕ ПРАВИЛО: Это продолжающийся диалог! Вы УЖЕ здоровались с этим клиентом ранее. НЕ здоровайтесь заново, сразу и прямо отвечайте на вопрос клиента."
         else:
-            greeting_instruction = (
-                "QAT'IY QOIDA: Bu davom etayotgan muloqot! Siz bu tinglovchi bilan allaqachon salomlashgansiz. "
-                "HECH QACHON xabaringiz boshida «Assalomu alaykum», «Salom» yoki «Vaalaykum assalom» deb qayta salomlashmang! "
-                "Salomlashmasdan darhol to'g'ridan-to'g'ri savolga javob bering."
-            )
+            greeting_instruction = "QAT'IY QOIDA: Bu davom etayotgan muloqot! Siz bu tinglovchi bilan allaqachon salomlashgansiz. HECH QACHON qayta salomlashmang! Salomlashmasdan darhol to'g'ridan-to'g'ri savolga javob bering."
 
     # Qat'iy til yo'riqnomasi
-    if is_ru:
+    if lang == "en":
+        lang_rule = (
+            "🚨 CRITICAL LANGUAGE RULE: The user wrote in ENGLISH! "
+            "Your response MUST be 100% in natural, fluent, professional ENGLISH! Not a single word in Uzbek or Russian! "
+            "If the client hasn't provided a phone number yet, politely request contact details in English: "
+            "«To send you the detailed curriculum, schedule, and tuition fees, please leave your name and phone number 😊»"
+        )
+    elif lang == "ru":
         lang_rule = (
             "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
             "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского слова! "
@@ -151,7 +180,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     if chat_history and len(chat_history) > 1:
         history_lines = []
         for h in chat_history[:-1]:
-            r = "Tinglovchi" if h.get("role") == "user" else "Siz (Virtual maslahatchi)"
+            r = "Tinglovchi" if h.get("role") == "user" else "Virtual maslahatchi"
             t = (h.get("text") or "").strip()
             if t:
                 history_lines.append(f"{r}: {t}")
@@ -284,11 +313,11 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
         summary_parts.append(f"{campaign} yo'nalishiga qiziqqan.")
     if last_msg:
         lm_lower = last_msg.lower()
-        if "narx" in lm_lower or "qancha" in lm_lower or "nechpul" in lm_lower or "стоит" in lm_lower or "цена" in lm_lower:
+        if any(w in lm_lower for w in ["narx", "qancha", "nechpul", "стоит", "цена", "how much", "cost", "price", "fee"]):
             summary_parts.append("Kurs narxi va to'lov shartlarini so'ragan.")
-        elif "sertifikat" in lm_lower or "diplom" in lm_lower or "диплом" in lm_lower:
+        elif any(w in lm_lower for w in ["sertifikat", "diplom", "диплом", "certificate"]):
             summary_parts.append("Sertifikat berilishi va maqomi bilan qiziqqan.")
-        elif "vaqt" in lm_lower or "boshlan" in lm_lower or "jadval" in lm_lower or "когда" in lm_lower:
+        elif any(w in lm_lower for w in ["vaqt", "boshlan", "jadval", "когда", "schedule", "when"]):
             summary_parts.append("Darslar boshlanish sanasi va vaqti kerak.")
         else:
             summary_parts.append(f"So'rovi: «{last_msg[:60]}»")
@@ -298,15 +327,21 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
 def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name: str = "") -> str:
     """
     Instagram post/video ostida izoh qoldirgan tinglovchining Directiga
-    AI orqali moslashtirilgan shaxsiy xabar (DM) yaratish (rus yoki o'zbek tilida)
+    AI orqali moslashtirilgan shaxsiy xabar (DM) yaratish (rus, ingliz yoki o'zbek tilida)
     """
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     system_prompt = get_setting("ai_system_prompt", "")
     user_label = f"@{username}" if username else "tinglovchi"
-    is_ru = is_russian_message(comment_text)
+    lang = detect_message_language(comment_text)
 
     if api_key and get_setting("ai_enabled", "1") == "1":
-        if is_ru:
+        if lang == "en":
+            lang_inst = (
+                "🚨 LANGUAGE RULE: Comment is in ENGLISH! Your reply MUST be 100% in natural ENGLISH! "
+                "Thank them for their interest in our video and kindly ask them to reply with their name "
+                "so we can send full program details, schedule, and tuition fees."
+            )
+        elif lang == "ru":
             lang_inst = (
                 "🚨 ПРАВИЛО ЯЗЫКА: Комментарий на РУССКОМ языке! Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ! "
                 "Поблагодарите за проявленный интерес к нашему видео и вежливо попросите написать имя в ответном сообщении, "
@@ -358,7 +393,12 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
                 logger.error(f"AI Comment DM xatosi ({model_name}): {e}")
 
     # Fallback
-    if is_ru:
+    if lang == "en":
+        return (
+            f"Hello {user_label}! Thank you for your interest in our video. 😊\n\n"
+            f"To receive the detailed curriculum, schedule, and admission details, please reply with your name:"
+        )
+    elif lang == "ru":
         return (
             f"Здравствуйте, {user_label}! Спасибо за интерес к нашему видео. 😊\n\n"
             f"Чтобы мы могли отправить вам подробную учебную программу и условия поступления, пожалуйста, напишите ваше имя:"
@@ -370,7 +410,7 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
 
 def generate_ai_followup(chat_history: list, client_context: dict) -> str:
     """
-    Suhbati to'xtab qolgan (telefonini bermagan) mijozga samimiy qayta eslatma (Follow-up) yaratish (rus yoki o'zbek tilida)
+    Suhbati to'xtab qolgan (telefonini bermagan) mijozga samimiy qayta eslatma (Follow-up) yaratish (rus, ingliz yoki o'zbek tilida)
     """
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     client_name = client_context.get("full_name") or ""
@@ -387,11 +427,16 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
                 full_text_corpus += " " + text
 
     dialog_str = "\n".join(history_lines[-6:]) if history_lines else f"Qiziqqan kursi: {campaign}"
-    is_ru = is_russian_message(full_text_corpus)
-    safe_name = client_name or ("клиент" if is_ru else "tinglovchi")
+    lang = detect_message_language(full_text_corpus)
+    safe_name = client_name or ("student" if lang == "en" else "клиент" if lang == "ru" else "tinglovchi")
 
     if api_key and get_setting("ai_enabled", "1") == "1":
-        if is_ru:
+        if lang == "en":
+            lang_inst = (
+                "🚨 LANGUAGE RULE: The conversation is in ENGLISH! Your follow-up reminder MUST be 100% in natural ENGLISH! "
+                "Politely offer assistance and invite them to leave their phone number for course details and schedule."
+            )
+        elif lang == "ru":
             lang_inst = (
                 "🚨 ПРАВИЛО ЯЗЫКА: Диалог ведется на РУССКОМ языке! Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ! "
                 "Напишите вежливое, дружелюбное напоминание (1-2 предложения) с предложением продолжить общение и оставить номер телефона "
@@ -443,10 +488,15 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
                 logger.error(f"AI Follow-up xatosi ({model_name}): {e}")
 
     # Fallback
-    if is_ru:
+    if lang == "en":
         return (
-            f"Здравствуйте! Вы интересовались нашими программами обучения. "
-            f"Чтобы мы могли прислать вам расписание занятий и забронировать место, пожалуйста, оставьте ваш номер телефона 😊"
+            "Hello! You were inquiring about our training programs. "
+            "To send you the schedule, fees, and secure your spot, please leave your phone number 😊"
+        )
+    elif lang == "ru":
+        return (
+            "Здравствуйте! Вы интересовались нашими программами обучения. "
+            "Чтобы мы могли прислать вам расписание занятий и забронировать место, пожалуйста, оставьте ваш номер телефона 😊"
         )
     return (
         f"Salom! Boya {campaign} haqida ma'lumot so'ragan edingiz. "
@@ -490,8 +540,8 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         f"Yo'nalishi: {campaign}\n"
         f"{history_section}\n\n"
         "VAZIFA:\n"
-        "1. Ilovadagi audio faylni tinglang va uning to'liq matnini (transkripsiyasini) aniqlang (o'zbek yoki rus tilida).\n"
-        "2. Ushbu savolga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, audio tili qaysi tilda bo'lsa xuddi shu tilda javob bering.\n"
+        "1. Ilovadagi audio faylni tinglang va uning to'liq matnini (transkripsiyasini) aniqlang (o'zbek, rus yoki ingliz tilida).\n"
+        "2. Ushbu savolga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, audio qaysi tilda bo'lsa xuddi shu tilda javob bering.\n"
         "3. Agar tinglovchi hali telefon raqamini qoldirmagan bo'lsa, javobingiz oxirida muloyimlik bilan ism va telefon raqamini so'rang.\n\n"
         "JAVOBNI FAQAT QUYIDAGI JSON FORMATDA QAYTARING:\n"
         "{\n"
