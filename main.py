@@ -4,7 +4,9 @@ import csv
 import logging
 import hashlib
 import urllib.parse
-from fastapi import FastAPI, Request, Response, Form, status
+import time
+from collections import OrderedDict
+from fastapi import FastAPI, Request, Response, Form, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from config import settings
 from database import (
@@ -183,10 +185,33 @@ async def verify_webhook(request: Request):
     logger.warning("Noto'g'ri verify_token bilan so'rov keldi!")
     return Response(status_code=status.HTTP_403_FORBIDDEN)
 
-@app.post("/webhook")
-async def receive_instagram_events(request: Request):
+# ----------------- TAKRORIY XABARLARNI (DUPLICATE / RETRY) OLDINI OLISH -----------------
+PROCESSED_MIDS = OrderedDict()
+MAX_MID_CACHE = 5000
+
+def is_duplicate_mid(mid: str) -> bool:
     """
-    Instagram Direct va Videolardagi izohlarni qabul qilish
+    Meta qayta yuborgan takroriy (retry) xabarlarni filtrlash.
+    Meta 5 soniyada javob olmasa bir xil mid bilan xabarni 5-6 marta qayta yuboradi.
+    """
+    if not mid:
+        return False
+    now = time.time()
+    while PROCESSED_MIDS and (len(PROCESSED_MIDS) > MAX_MID_CACHE or now - next(iter(PROCESSED_MIDS.values())) > 900):
+        PROCESSED_MIDS.popitem(last=False)
+        
+    if mid in PROCESSED_MIDS:
+        return True
+    PROCESSED_MIDS[mid] = now
+    return False
+
+@app.post("/webhook")
+async def receive_instagram_events(request: Request, background_tasks: BackgroundTasks):
+    """
+    Instagram Direct va Videolardagi izohlarni qabul qilish.
+    Meta 5 soniyada 200 OK kutadi, shuning uchun barcha og'ir AI va media ishlovlari
+    background_tasks da fonda bajariladi, Meta so'rovi esa 10ms ichida 200 OK bilan yakunlanadi.
+    Bu xabarlar cheksiz takrorlanib (loop) ketishining oldini oladi.
     """
     try:
         body = await request.json()
@@ -199,9 +224,10 @@ async def receive_instagram_events(request: Request):
             val = body.get("value", {})
             sender_id = val.get("sender", {}).get("id")
             msg_text = val.get("message", {}).get("text", "")
-            if sender_id and msg_text:
+            mid = val.get("message", {}).get("mid")
+            if sender_id and msg_text and not is_duplicate_mid(mid):
                 logger.info(f"Test xabar keldi [{sender_id}]: {msg_text}")
-                process_incoming_message(sender_id, msg_text)
+                background_tasks.add_task(process_incoming_message, sender_id, msg_text)
             return {"status": "ok"}
 
         for entry in body.get("entry", []):
@@ -220,6 +246,11 @@ async def receive_instagram_events(request: Request):
                 if message.get("is_echo") or (sender_id in PAGE_IDS):
                     continue
 
+                mid = message.get("mid")
+                if mid and is_duplicate_mid(mid):
+                    logger.info(f"Takroriy xabar (mid={mid}) rad etildi, qayta ishlanmaydi.")
+                    continue
+
                 attachments = message.get("attachments") or []
                 user_text = (message.get("text") or "").strip()
 
@@ -229,17 +260,17 @@ async def receive_instagram_events(request: Request):
                         att_type = att.get("type", "")
                         att_url = att.get("payload", {}).get("url", "")
                         logger.info(f"Yangi attachment qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
-                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type != "image"):
+                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type not in ["image", "video"]):
                             logger.info(f"Yangi Direct ovozli xabar keldi [{sender_id}]")
-                            process_incoming_audio_message(sender_id, att_url)
+                            background_tasks.add_task(process_incoming_audio_message, sender_id, att_url)
                 # B) Oddiy matnli xabar
                 elif user_text:
                     logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
-                    process_incoming_message(sender_id, user_text)
+                    background_tasks.add_task(process_incoming_message, sender_id, user_text)
                 # C) Quick reply tugmasi bosilgan bo'lsa
                 elif message.get("quick_reply"):
                     payload = message["quick_reply"].get("payload", "")
-                    process_incoming_message(sender_id, payload)
+                    background_tasks.add_task(process_incoming_message, sender_id, payload)
 
             # 2. Yangi Instagram API formati (entry -> changes)
             for change in entry.get("changes", []):
@@ -254,6 +285,11 @@ async def receive_instagram_events(request: Request):
                     if message.get("is_echo") or (sender_id in PAGE_IDS):
                         continue
 
+                    mid = message.get("mid")
+                    if mid and is_duplicate_mid(mid):
+                        logger.info(f"Takroriy xabar (v26.0 mid={mid}) rad etildi, qayta ishlanmaydi.")
+                        continue
+
                     attachments = message.get("attachments") or []
                     user_text = (message.get("text") or "").strip()
 
@@ -262,12 +298,12 @@ async def receive_instagram_events(request: Request):
                             att_type = att.get("type", "")
                             att_url = att.get("payload", {}).get("url", "")
                             logger.info(f"Yangi attachment (v26.0) qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
-                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type != "image"):
+                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type not in ["image", "video"]):
                                 logger.info(f"Yangi Direct ovozli xabar (v26.0) keldi [{sender_id}]")
-                                process_incoming_audio_message(sender_id, att_url)
+                                background_tasks.add_task(process_incoming_audio_message, sender_id, att_url)
                     elif user_text:
                         logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
-                        process_incoming_message(sender_id, user_text)
+                        background_tasks.add_task(process_incoming_message, sender_id, user_text)
 
                 # B) Video/Reels izohlari
                 elif field == "comments":
@@ -279,7 +315,10 @@ async def receive_instagram_events(request: Request):
                     username = from_user.get("username", "")
 
                     if comment_id and user_id:
-                        process_incoming_comment(
+                        if is_duplicate_mid(f"cmt_{comment_id}"):
+                            continue
+                        background_tasks.add_task(
+                            process_incoming_comment,
                             comment_id=comment_id,
                             media_id=media_id,
                             user_id=user_id,

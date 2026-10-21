@@ -9,11 +9,11 @@ from database import get_setting
 logger = logging.getLogger(__name__)
 
 # Eng tezkor, barqaror va yuqori kvotali Gemini modellar
-PRIMARY_MODEL = "gemini-flash-lite-latest"
-FALLBACK_MODEL = "gemini-3.1-flash-lite"
-THIRD_MODEL = "gemini-3.5-flash-lite"
-AUDIO_PRIMARY_MODEL = "gemini-flash-lite-latest"
-AUDIO_FALLBACK_MODEL = "gemini-3.1-flash-lite"
+PRIMARY_MODEL = "gemini-flash-latest"
+FALLBACK_MODEL = "gemini-flash-lite-latest"
+THIRD_MODEL = "gemini-3.1-flash-lite"
+AUDIO_PRIMARY_MODEL = "gemini-flash-latest"
+AUDIO_FALLBACK_MODEL = "gemini-flash-lite-latest"
 
 def detect_message_language(text: str) -> str:
     """
