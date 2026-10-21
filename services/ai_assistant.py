@@ -8,11 +8,34 @@ from database import get_setting
 
 logger = logging.getLogger(__name__)
 
-# Eng tezkor va yuqori kvotali modellar
-PRIMARY_MODEL = "gemini-3-flash-preview"
-FALLBACK_MODEL = "gemini-flash-latest"
-AUDIO_PRIMARY_MODEL = "gemini-3-flash-preview"
-AUDIO_FALLBACK_MODEL = "gemini-3.5-flash"
+# Eng tezkor, barqaror va yuqori kvotali Gemini modellar
+PRIMARY_MODEL = "gemini-flash-lite-latest"
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
+THIRD_MODEL = "gemini-3.5-flash-lite"
+AUDIO_PRIMARY_MODEL = "gemini-3.1-flash-lite"
+AUDIO_FALLBACK_MODEL = "gemini-flash-lite-latest"
+
+def is_russian_message(text: str) -> bool:
+    """
+    Xabar rus tilida yozilganligini aniqlash (aniq va sezgir algoritm)
+    """
+    if not text:
+        return False
+    text_lower = text.lower().strip()
+    ru_markers = [
+        "сколько", "стоит", "цена", "обучение", "курс", "курсы", "здравствуйте",
+        "привет", "добрый", "день", "вечер", "можно", "информация", "расскажите",
+        "подробнее", "хочу", "поступить", "где", "когда", "стоимость", "учеба",
+        "какие", "направления", "адрес", "номер", "телефон", "пожалуйста", "спасибо",
+        "скажите", "программа", "условия", "поступления", "прием", "платно", "скидка",
+        "сертификат", "диплом", "модуль", "модули"
+    ]
+    if any(w in text_lower for w in ru_markers):
+        return True
+    # Rus tili uchun xos bo'lgan harflar (o'zbek kirillida kam yoki umuman yo'q)
+    if any(c in text_lower for c in ['ы', 'щ', 'ъ', 'ь', 'ц', 'ё']):
+        return True
+    return False
 
 def clean_ai_output(text: str) -> str:
     """
@@ -28,15 +51,15 @@ def clean_ai_output(text: str) -> str:
         text = text[1:-1].strip()
 
     # Agar model bir nechta variant chiqargan bo'lsa (masalan: **1-variant:**), 1-variant matnini ajratib olish
-    if "**1-variant" in text.lower() or "**variant 1" in text.lower() or "1-variant:" in text.lower():
+    if "**1-variant" in text.lower() or "**variant 1" in text.lower() or "1-variant:" in text.lower() or "**вариант 1" in text.lower():
         lines = text.split("\n")
         cleaned_lines = []
         capture = False
         for line in lines:
-            if "variant" in line.lower() and ("1" in line or "1-" in line):
+            if ("variant" in line.lower() or "вариант" in line.lower()) and ("1" in line or "1-" in line):
                 capture = True
                 continue
-            if capture and ("variant 2" in line.lower() or "2-variant" in line.lower() or "maslahat" in line.lower() or "qaysi birini" in line.lower()):
+            if capture and ("variant 2" in line.lower() or "2-variant" in line.lower() or "вариант 2" in line.lower() or "maslahat" in line.lower() or "qaysi birini" in line.lower()):
                 break
             if capture and line.strip():
                 cleaned_lines.append(line.strip().strip('"').strip('«').strip('»'))
@@ -59,30 +82,68 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     """
     Google Gemini AI orqali mijoz xabariga professional, do'stona va suhbat tarixini hisobga olgan holda javob yaratish
     """
+    # 1. AI yoqilganligini tekshirish
     if get_setting("ai_enabled", "1") != "1":
         return None
 
+    # 2. API kalitni olish
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     if not api_key:
         logger.info("AI Yordamchi yoqilgan, lekin Gemini API kalit kiritilmagan.")
         return None
 
+    # 3. Tizim yo'riqnomasi (System prompt / Bilimlar bazasi)
     system_prompt = get_setting("ai_system_prompt", "")
 
     client_name = client_context.get("full_name") or "Hali noma'lum"
-    phone_status = client_context.get("phone_number") or "Hali olinmagan"
-    campaign = client_context.get("campaign") or "Umumiy"
+    phone_status = "Berilgan" if client_context.get("phone") else "Hali berilmagan"
+    campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
 
+    # Tilni aniqlash
+    is_ru = is_russian_message(user_message)
+    if not is_ru and chat_history and len(chat_history) > 1:
+        # Agar hozirgi xabar qisqa bo'lsa (masalan "Ha" yoki "Xa"), oldingi xabarlar tilini tekshirish
+        for prev in reversed(chat_history[:-1]):
+            if prev.get("role") == "user" and is_russian_message(prev.get("text", "")):
+                is_ru = True
+                break
+
+    # Salomlashish qoidasi
     if is_first_message:
-        greeting_instruction = (
-            "SALOMLASHISH QOIDASI: Bu yangi muloqotning birinchi xabari. "
-            "Shu sababli xushmuomala salomlashing."
+        if is_ru:
+            greeting_instruction = (
+                "Это ПЕРВОЕ сообщение клиента. Поздоровайтесь дружелюбно (например: «Здравствуйте!» или «Добрый день!»)."
+            )
+        else:
+            greeting_instruction = (
+                "Bu mijozning BIRINCHI xabari. Salomlashish lozim (masalan: «Assalomu alaykum!» deb boshlang)."
+            )
+    else:
+        if is_ru:
+            greeting_instruction = (
+                "СТРОГОЕ ПРАВИЛО: Это продолжающийся диалог! Вы УЖЕ здоровались с этим клиентом ранее. "
+                "НЕ здоровайтесь заново, сразу и прямо отвечайте на вопрос клиента."
+            )
+        else:
+            greeting_instruction = (
+                "QAT'IY QOIDA: Bu davom etayotgan muloqot! Siz bu tinglovchi bilan allaqachon salomlashgansiz. "
+                "HECH QACHON xabaringiz boshida «Assalomu alaykum», «Salom» yoki «Vaalaykum assalom» deb qayta salomlashmang! "
+                "Salomlashmasdan darhol to'g'ridan-to'g'ri savolga javob bering."
+            )
+
+    # Qat'iy til yo'riqnomasi
+    if is_ru:
+        lang_rule = (
+            "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
+            "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского слова! "
+            "Если клиент еще не оставил номер телефона, в конце ответа вежливо запросите контактные данные на русском: "
+            "«Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона 😊»"
         )
     else:
-        greeting_instruction = (
-            "QAT'IY QOIDA: Bu davom etayotgan muloqot! Siz bu tinglovchi bilan allaqachon salomlashgansiz. "
-            "HECH QACHON xabaringiz boshida «Assalomu alaykum», «Salom» yoki «Vaalaykum assalom» deb qayta salomlashmang! "
-            "Salomlashmasdan darhol to'g'ridan-to'g'ri savolga javob bering."
+        lang_rule = (
+            "QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni o'zbek tilida, muloyim va samimiy bering. "
+            "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida: "
+            "«Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
         )
 
     # Suhbat tarixini kontekstga kiritish
@@ -96,10 +157,9 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
                 history_lines.append(f"{r}: {t}")
         if history_lines:
             history_section = (
-                f"\n--- AVVALGI SUHBAT TARIXI (Mijozning o'tmishdagi savollari va sizning javoblaringiz) ---\n"
-                + "\n".join(history_lines[-10:])
-                + "\nESLATMA: Tinglovchining oldingi so'ragan narsalarini eslab qoling. "
-                "Agar u avval biror kursni so'ragan bo'lsa, o'sha kontekstni davom ettiring.\n"
+                f"\n--- AVVALGI SUHBAT TARIXI ---\n"
+                + "\n".join(history_lines[-8:])
+                + "\n"
             )
 
     context_prompt = (
@@ -110,39 +170,32 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         f"Qiziqqan yo'nalishi/aksiyasi: {campaign}\n"
         f"{history_section}\n"
         f"{greeting_instruction}\n"
-        f"Eslatma: Tinglovchi qaysi tilda (o'zbek yoki rus) yozgan bo'lsa, xuddi shu tilda ravon, madaniyatli javob bering. "
-        f"Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida "
-        f"unga batafsil ma'lumot va dars jadvalini yuborish uchun muloyimlik bilan telefon raqamini so'rang. "
+        f"{lang_rule}\n"
         f"Javobingiz Instagram chatiga mos, qisqa (2-3 jumla), o'ta xushmuomala va samimiy bo'lsin. "
         f"Hech qanday ichki reja yoki sarlavhalarsiz, to'g'ridan-to'g'ri 1 ta yaxlit xabar qaytaring."
     )
 
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": user_message}]
-            }
-        ],
-        "systemInstruction": {
-            "parts": [{"text": context_prompt}]
-        },
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 800,
-            "thinkingConfig": {"thinkingBudget": 0}
-        }
-    }
-
     headers = {"Content-Type": "application/json"}
 
-    for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
+    for model_name in [PRIMARY_MODEL, FALLBACK_MODEL, THIRD_MODEL]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            data = response.json()
+        gen_config = {
+            "temperature": 0.3,
+            "maxOutputTokens": 600
+        }
+        if "gemini-3" in model_name:
+            gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": user_message}]}],
+            "systemInstruction": {"parts": [{"text": context_prompt}]},
+            "generationConfig": gen_config
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=8)
             if response.status_code == 200:
+                data = response.json()
                 candidates = data.get("candidates", [])
                 if candidates:
                     parts = candidates[0].get("content", {}).get("parts", [])
@@ -152,7 +205,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
                             logger.info(f"Gemini AI ({model_name}) javob yaratdi: {ai_text[:50]}...")
                             return ai_text
             else:
-                logger.error(f"Gemini API ({model_name}) xatoligi [{response.status_code}]: {data}")
+                logger.warning(f"Gemini API ({model_name}) javob kodi [{response.status_code}]: {response.text[:120]}")
 
         except Exception as e:
             logger.error(f"AI ({model_name}) so'rovida xatolik: {e}")
@@ -198,20 +251,20 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
             "Hech qanday kirish so'z yoki ortiqcha belgilarsiz, faqat xulosa matnini qaytaring."
         )
 
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 400,
-                "thinkingConfig": {"thinkingBudget": 0}
-            }
-        }
         headers = {"Content-Type": "application/json"}
 
         for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            gen_config = {"temperature": 0.2, "maxOutputTokens": 400}
+            if "gemini-3" in model_name:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": gen_config
+            }
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                response = requests.post(url, json=payload, headers=headers, timeout=8)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -231,52 +284,64 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
         summary_parts.append(f"{campaign} yo'nalishiga qiziqqan.")
     if last_msg:
         lm_lower = last_msg.lower()
-        if "narx" in lm_lower or "qancha" in lm_lower or "nechpul" in lm_lower:
+        if "narx" in lm_lower or "qancha" in lm_lower or "nechpul" in lm_lower or "стоит" in lm_lower or "цена" in lm_lower:
             summary_parts.append("Kurs narxi va to'lov shartlarini so'ragan.")
-        elif "sertifikat" in lm_lower or "diplom" in lm_lower:
+        elif "sertifikat" in lm_lower or "diplom" in lm_lower or "диплом" in lm_lower:
             summary_parts.append("Sertifikat berilishi va maqomi bilan qiziqqan.")
-        elif "vaqt" in lm_lower or "boshlan" in lm_lower or "jadval" in lm_lower:
+        elif "vaqt" in lm_lower or "boshlan" in lm_lower or "jadval" in lm_lower or "когда" in lm_lower:
             summary_parts.append("Darslar boshlanish sanasi va vaqti kerak.")
         else:
-            summary_parts.append(f"Murojaati: «{last_msg}».")
+            summary_parts.append(f"So'rovi: «{last_msg[:60]}»")
 
-    if not summary_parts:
-        return f"{campaign} bo'yicha batafsil o'quv dasturi va qabul tafsilotlari kerak."
-    return " ".join(summary_parts)
+    return " ".join(summary_parts) if summary_parts else f"{campaign} bo'yicha to'liq ma'lumot kutyapti."
 
 def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name: str = "") -> str:
     """
-    Video/Reels ostida izoh qoldirgan foydalanuvchiga uning izohiga mos aqlli shaxsiy Direct xabar yaratish
+    Instagram post/video ostida izoh qoldirgan tinglovchining Directiga
+    AI orqali moslashtirilgan shaxsiy xabar (DM) yaratish (rus yoki o'zbek tilida)
     """
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     system_prompt = get_setting("ai_system_prompt", "")
     user_label = f"@{username}" if username else "tinglovchi"
+    is_ru = is_russian_message(comment_text)
 
     if api_key and get_setting("ai_enabled", "1") == "1":
+        if is_ru:
+            lang_inst = (
+                "🚨 ПРАВИЛО ЯЗЫКА: Комментарий на РУССКОМ языке! Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ! "
+                "Поблагодарите за проявленный интерес к нашему видео и вежливо попросите написать имя в ответном сообщении, "
+                "чтобы отправить подробную программу и условия поступления."
+            )
+        else:
+            lang_inst = (
+                "Izoh O'ZBEK tilida! Uning izohidagi e'tibori uchun minnatdorchilik bildirib, "
+                "batafsil o'quv dasturi, dars jadvali va narxlarni Directda to'liq taqdim etishimiz uchun ismini yozib qoldirishini so'rang."
+            )
+
         prompt = (
             f"{system_prompt}\n\n"
             f"--- VAZIFA (VIDEO IZOHIGA SHAXSIY DIRECT XABAR) ---\n"
             f"Foydalanuvchi ({user_label}) Instagram videomiz ostida quyidagi izohni qoldirdi:\n"
             f"«{comment_text}»\n"
             f"Video aksiyasi/mavzusi: {campaign_name or 'Umumiy ta''lim'}\n\n"
-            f"Ushbu tinglovchining Instagram Directiga yuboriladigan samimiy, do'stona va professional 1 TA yaxlit xabar yozing (2-3 jumla).\n"
-            f"Uning izohidagi e'tibori uchun minnatdorchilik bildirib, batafsil o'quv dasturi, dars jadvali va narxlarni Directda to'liq taqdim etishimiz uchun ismini yozib qoldirishini so'rang.\n\n"
-            f"QAT'IY QOIDA: Hech qanday 'Variant 1', 'Variant 2', sarlavha, kirish so'z yoki tushuntirish YOZMANG! "
+            f"{lang_inst}\n\n"
+            f"QAT'IY QOIDA: Hech qanday 'Variant 1', sarlavha, kirish so'z yoki tushuntirish YOZMANG! "
             f"To'g'ridan-to'g'ri tinglovchiga yuboriladigan 1 dona tayyor xabar matnining o'zini qaytaring."
         )
 
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 600,
-                "thinkingConfig": {"thinkingBudget": 0}
-            }
-        }
         headers = {"Content-Type": "application/json"}
 
         for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            gen_config = {"temperature": 0.3, "maxOutputTokens": 600}
+            if "gemini-3" in model_name:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": gen_config
+            }
+
             try:
                 response = requests.post(url, json=payload, headers=headers, timeout=8)
                 if response.status_code == 200:
@@ -293,6 +358,11 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
                 logger.error(f"AI Comment DM xatosi ({model_name}): {e}")
 
     # Fallback
+    if is_ru:
+        return (
+            f"Здравствуйте, {user_label}! Спасибо за интерес к нашему видео. 😊\n\n"
+            f"Чтобы мы могли отправить вам подробную учебную программу и условия поступления, пожалуйста, напишите ваше имя:"
+        )
     return (
         f"Salom {user_label}! Videomizga bildirgan e'tiboringiz uchun tashakkur. 😊\n\n"
         f"Siz so'ragan batafsil o'quv dasturi va qabul tafsilotlarini yuborishimiz uchun ismingizni yozib qoldiring:"
@@ -300,24 +370,39 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
 
 def generate_ai_followup(chat_history: list, client_context: dict) -> str:
     """
-    Suhbati to'xtab qolgan (telefonini bermagan) mijozga samimiy qayta eslatma (Follow-up) yaratish
+    Suhbati to'xtab qolgan (telefonini bermagan) mijozga samimiy qayta eslatma (Follow-up) yaratish (rus yoki o'zbek tilida)
     """
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     client_name = client_context.get("full_name") or ""
     campaign = client_context.get("campaign") or "Turizm kurslari"
 
     history_lines = []
+    full_text_corpus = ""
     if chat_history and isinstance(chat_history, list):
         for msg in chat_history:
             role = "Tinglovchi" if msg.get("role") == "user" else "Siz"
             text = (msg.get("text") or "").strip()
             if text:
                 history_lines.append(f"{role}: {text}")
+                full_text_corpus += " " + text
 
     dialog_str = "\n".join(history_lines[-6:]) if history_lines else f"Qiziqqan kursi: {campaign}"
+    is_ru = is_russian_message(full_text_corpus)
+    safe_name = client_name or ("клиент" if is_ru else "tinglovchi")
 
-    safe_name = client_name or "Noma'lum"
     if api_key and get_setting("ai_enabled", "1") == "1":
+        if is_ru:
+            lang_inst = (
+                "🚨 ПРАВИЛО ЯЗЫКА: Диалог ведется на РУССКОМ языке! Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ! "
+                "Напишите вежливое, дружелюбное напоминание (1-2 предложения) с предложением продолжить общение и оставить номер телефона "
+                "для получения учебной программы."
+            )
+        else:
+            lang_inst = (
+                "Ushbu tinglovchiga suhbatni davom ettirish va telefon raqamini so'rash uchun 1-2 jumlali o'ta samimiy, "
+                "do'stona va muloyim 1 TA yaxlit eslatma (Follow-up) xabari yozing."
+            )
+
         prompt = (
             "Siz Xalqaro Turizm Akademiyasi Samarqand kampusining g'amxo'r va xushmuomala virtual yordamchisisiz.\n"
             "Tinglovchi Directda muloqot boshlagan, ammo telefon raqamini qoldirmasdan suhbat to'xtab qolgan.\n\n"
@@ -325,23 +410,23 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
             f"Ismi: {safe_name}\n"
             f"Qiziqqan yo'nalishi: {campaign}\n"
             f"{dialog_str}\n\n"
-            "VAZIFA: Ushbu tinglovchiga suhbatni davom ettirish va telefon raqamini so'rash uchun 1-2 jumlali o'ta samimiy, "
-            "do'stona va muloyim 1 TA yaxlit eslatma (Follow-up) xabari yozing.\n"
+            f"{lang_inst}\n\n"
             "QAT'IY QOIDA: Hech qanday 'Variantlar', sarlavha, izoh yoki tushuntirish yozmang! To'g'ridan-to'g'ri tinglovchiga yuboriladigan xabarning o'zini qaytaring."
         )
 
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 600,
-                "thinkingConfig": {"thinkingBudget": 0}
-            }
-        }
         headers = {"Content-Type": "application/json"}
 
         for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            gen_config = {"temperature": 0.3, "maxOutputTokens": 600}
+            if "gemini-3" in model_name:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": gen_config
+            }
+
             try:
                 response = requests.post(url, json=payload, headers=headers, timeout=8)
                 if response.status_code == 200:
@@ -358,35 +443,31 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
                 logger.error(f"AI Follow-up xatosi ({model_name}): {e}")
 
     # Fallback
-    name_str = f", {client_name}" if client_name else ""
+    if is_ru:
+        return (
+            f"Здравствуйте! Вы интересовались нашими программами обучения. "
+            f"Чтобы мы могли прислать вам расписание занятий и забронировать место, пожалуйста, оставьте ваш номер телефона 😊"
+        )
     return (
-        f"Salom{name_str}! 😊 Boya {campaign} bo'yicha ma'lumot so'ragan edingiz. "
-        f"Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? "
-        f"Sizga yordam berishdan mamnun bo'lamiz!"
+        f"Salom! Boya {campaign} haqida ma'lumot so'ragan edingiz. "
+        f"Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? Sizga yordam berishdan mamnun bo'lamiz! 😊"
     )
 
-def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", client_context: dict = None, chat_history: list = None) -> dict | None:
+def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", client_context: dict = None, chat_history: list = None) -> tuple[str | None, str | None]:
     """
-    Google Gemini Multimodal Audio orqali ovozli xabarni (Voice Message):
-    1. So'zma-so'z matnga aylantirish (Speech-to-Text / Transkripsiya)
-    2. Tinglovchining savoliga mos AI javob yaratish
-    3. Agar ovozda ism yoki telefon raqami aytilgan bo'lsa, ularni ajratib olish
-    4. Qiziqqan kurs yo'nalishini aniqlash
+    Gemini Multimodal Audio orqali Instagram Directdagi ovozli xabarni transkripsiya qilish va unga javob qaytarish.
+    Qaytaradi: (transkripsiya_matni, ai_javobi)
     """
     if get_setting("ai_enabled", "1") != "1":
-        logger.info("AI o'chirilgan, ovozli xabar qayta ishlanmadi.")
-        return None
+        return (None, None)
 
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
-    if not api_key:
-        logger.warning("Gemini API kalit yo'q, ovozli xabar qayta ishlanmadi.")
-        return None
+    if not api_key or not audio_bytes:
+        return (None, None)
 
-    if not client_context:
-        client_context = {}
-
+    client_context = client_context or {}
     client_name = client_context.get("full_name") or "Hali noma'lum"
-    phone_status = client_context.get("phone_number") or "Hali olinmagan"
+    phone_status = "Berilgan" if client_context.get("phone") else "Hali berilmagan"
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
     system_prompt = get_setting("ai_system_prompt", "")
 
@@ -399,98 +480,90 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
             if t:
                 history_lines.append(f"{r}: {t}")
         if history_lines:
-            history_section = f"\n--- OLDINGI SUHBAT TARIXI ---\n" + "\n".join(history_lines) + "\n"
+            history_section = f"\n--- AVVALGI SUHBAT TARIXI ---\n" + "\n".join(history_lines) + "\n"
 
-    instruction = (
+    audio_prompt = (
         f"{system_prompt}\n\n"
         f"--- HOZIRGI TINGLOVCHI HAQIDA ---\n"
         f"Ismi: {client_name}\n"
-        f"Telefon raqami holati: {phone_status}\n"
-        f"Kurs yo'nalishi: {campaign}\n"
-        f"{history_section}\n"
-        "--- SIZNING ASOSIY VAZIFANGIZ ---\n"
-        "Tinglovchi Instagram Direct orqali sizga OVOZLI XABAR (Audio / Voice Message) yubordi.\n"
-        "1. TRANSKRIPSIYA (transcription): Ovozli xabarni diqqat bilan eshiting va unda aytilgan barcha so'zlarni so'zma-so'z, aniq o'zbek yoki rus tilida matnga aylantiring (Transcribe).\n"
-        "2. JAVOB (reply): Tinglovchining ovozli xabardagi savoliga xushmuomala, do'stona, qisqa (2-3 jumla), Instagram chatiga mos professional javob yozing. Agar tinglovchi telefon raqamini aytmagan bo'lsa, javobingiz oxirida unga to'liq o'quv dasturi, qabul shartlari va jadvalni yuborishimiz uchun telefon raqamini qoldirishini muloyimlik bilan so'rang.\n"
-        "3. TELEFON RAQAM (extracted_phone): Agar tinglovchi ovozida o'z telefon raqamini aytgan bo'lsa, uni toza formatda (+998...) ko'rsating, aytmagan bo'lsa null.\n"
-        "4. ISM (extracted_name): Agar tinglovchi o'z ismini aytgan bo'lsa ko'rsating, aks holda null.\n"
-        "5. KURS YO'NALISHI (detected_course): Front Office (Mehmonxona) / Gidlik / Mehmonxona boshqaruvi / Restoran ishi / Turoperatorlik kurslaridan mosini ko'rsating.\n"
-        "6. TAHLIL (summary): Tinglovchining so'rovi va ehtiyoji haqida 1 jumlalik xulosa.\n\n"
-        "QAT'IY TALAB: Faqat va faqat quyidagi JSON formatida javob qaytaring:\n"
+        f"Telefon holati: {phone_status}\n"
+        f"Yo'nalishi: {campaign}\n"
+        f"{history_section}\n\n"
+        "VAZIFA:\n"
+        "1. Ilovadagi audio faylni tinglang va uning to'liq matnini (transkripsiyasini) aniqlang (o'zbek yoki rus tilida).\n"
+        "2. Ushbu savolga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, audio tili qaysi tilda bo'lsa xuddi shu tilda javob bering.\n"
+        "3. Agar tinglovchi hali telefon raqamini qoldirmagan bo'lsa, javobingiz oxirida muloyimlik bilan ism va telefon raqamini so'rang.\n\n"
+        "JAVOBNI FAQAT QUYIDAGI JSON FORMATDA QAYTARING:\n"
         "{\n"
-        '  "transcription": "Ovozli xabar matni...",\n'
-        '  "reply": "Tinglovchiga yuboriladigan javob matni...",\n'
-        '  "extracted_phone": null,\n'
-        '  "extracted_name": null,\n'
-        '  "detected_course": "...",\n'
-        '  "summary": "..."\n'
-        "}"
+        '  "transcription": "Tinglovchining audio fayldagi so\'zlari",\n'
+        '  "reply": "Tinglovchiga yuboriladigan samimiy javob matni"\n'
+        "}\n"
+        "Boshqa hech qanday izoh yoki belgi qo'shmang, faqat toza JSON qaytaring."
     )
 
     try:
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     except Exception as e:
         logger.error(f"Audio faylni base64 ga aylantirishda xatolik: {e}")
-        return None
+        return None, None
 
     clean_mime = mime_type.split(";")[0].strip() if ";" in mime_type else mime_type.strip()
     if not clean_mime or not clean_mime.startswith("audio/"):
         clean_mime = "audio/mp4"
 
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {
-                        "inline_data": {
-                            "mime_type": clean_mime,
-                            "data": audio_b64
-                        }
-                    },
-                    {
-                        "text": instruction
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "temperature": 0.2,
-            "maxOutputTokens": 1500
-        }
-    }
-
     headers = {"Content-Type": "application/json"}
 
     for model_name in [AUDIO_PRIMARY_MODEL, AUDIO_FALLBACK_MODEL]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        gen_config = {"temperature": 0.2, "maxOutputTokens": 800}
+        if "gemini-3" in model_name:
+            gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": audio_prompt},
+                        {
+                            "inlineData": {
+                                "mimeType": clean_mime,
+                                "data": audio_b64
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": gen_config
+        }
+
         try:
-            logger.info(f"Ovozli xabar Gemini ({model_name}) ga yuborilmoqda...")
-            response = requests.post(url, json=payload, headers=headers, timeout=25)
-            if response.status_code == 200:
-                data = response.json()
+            res = requests.post(url, json=payload, headers=headers, timeout=15)
+            if res.status_code == 200:
+                data = res.json()
                 candidates = data.get("candidates", [])
                 if candidates:
                     parts = candidates[0].get("content", {}).get("parts", [])
                     if parts:
-                        raw_json = parts[0].get("text", "").strip()
-                        if raw_json.startswith("```json"):
-                            raw_json = raw_json[7:]
-                        elif raw_json.startswith("```"):
-                            raw_json = raw_json[3:]
-                        if raw_json.endswith("```"):
-                            raw_json = raw_json[:-3]
-                        raw_json = raw_json.strip()
-                        try:
-                            parsed = json.loads(raw_json)
-                        except Exception:
-                            parsed = json.loads(raw_json, strict=False)
-                        logger.info(f"Gemini Audio ({model_name}) muvaffaqiyatli transkripsiya qildi: {parsed.get('transcription', '')[:60]}...")
-                        return parsed
-            else:
-                logger.error(f"Gemini Audio xatosi ({model_name}) [{response.status_code}]: {response.text[:200]}")
-        except Exception as e:
-            logger.error(f"Gemini Audio so'rovida xatolik ({model_name}): {e}")
+                        raw_text = clean_ai_output(parts[0].get("text", ""))
+                        if "```json" in raw_text:
+                            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                        elif "```" in raw_text:
+                            raw_text = raw_text.split("```")[1].split("```")[0].strip()
 
-    return None
+                        try:
+                            parsed = json.loads(raw_text)
+                            transcript = parsed.get("transcription", "").strip()
+                            reply = parsed.get("reply", "").strip()
+                            if transcript or reply:
+                                logger.info(f"Ovozli xabar transkripsiya qilindi: {transcript[:40]}...")
+                                return (transcript or "Ovozli xabar", reply)
+                        except Exception as json_err:
+                            logger.warning(f"Ovozli xabar JSON tahlil xatosi: {json_err}, xom matn: {raw_text[:80]}")
+                            return ("Ovozli xabar", raw_text)
+            else:
+                logger.warning(f"Audio Gemini API ({model_name}) javob kodi [{res.status_code}]: {res.text[:120]}")
+        except Exception as e:
+            logger.error(f"Audio Gemini API ({model_name}) so'rovida xatolik: {e}")
+
+    return None, None

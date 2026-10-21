@@ -12,7 +12,7 @@ from database import (
 )
 from services.instagram import send_message, send_link_button, get_user_profile
 from services.telegram import notify_admin_new_lead
-from services.ai_assistant import analyze_lead_need
+from services.ai_assistant import analyze_lead_need, is_russian_message
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +112,15 @@ def process_incoming_message(sender_id: str, user_text: str):
         source = client.get("source", "Direct")
         notify_admin_new_lead(client, source=source)
 
-        # Mijoz qaysi aksiyadan kelgan bo'lsa, uning maxsus havolasi beriladi
-        final_caption = get_setting(
-            "final_message",
-            "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:"
-        )
+        # Tilni aniqlash (mijoz ruscha yozganmi?)
+        chat_history_now = get_client_chat_history(sender_id)
+        is_client_ru = is_russian_message(text_clean) or is_russian_message(client.get("last_message", ""))
+        if not is_client_ru and chat_history_now:
+            for h in chat_history_now:
+                if is_russian_message(h.get("text", "")):
+                    is_client_ru = True
+                    break
+
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
 
         # Havolani aniqlash (aksiya yoki standart)
@@ -129,10 +133,24 @@ def process_incoming_message(sender_id: str, user_text: str):
                     send_link = c["promo_link"]
                     break
 
+        if is_client_ru:
+            final_caption = (
+                f"Спасибо, {client.get('full_name') or ''}! Ваша заявка успешно принята. 😊\n\n"
+                f"Наш специалист скоро свяжется с вами по указанному номеру и предоставит полную информацию.\n\n"
+                f"По ссылке ниже вы также можете подробно ознакомиться с нашими учебными программами:"
+            )
+            btn_title = "Открыть платформу 🌐"
+        else:
+            final_caption = get_setting(
+                "final_message",
+                "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:"
+            )
+            btn_title = "Ta'lim platformasini ochish 🚀"
+
         send_link_button(
             recipient_id=sender_id,
             text=final_caption,
-            button_title="Ta'lim platformasini ochish 🚀",
+            button_title=btn_title,
             url=send_link
         )
         append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {send_link}")
@@ -163,11 +181,25 @@ def process_incoming_message(sender_id: str, user_text: str):
             return
         else:
             # AI kutilmaganda javob bermay qolsa (masalan, tarmoq xatoligi bo'lsa):
-            # Quruq yoki sovuq xabar emas, samimiy va aloqa ma'lumotini oluvchi xabar yuboriladi
-            fallback_msg = (
-                "Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz. 😊\n\n"
-                "Sizni qiziqtirgan barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot, o'quv dasturi hamda narxlarni taqdim etishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:"
-            )
+            # Tinglovchi tiliga qarab rus yoki o'zbek tilida samimiy xabar yuboriladi
+            is_ru_req = is_russian_message(text_clean)
+            if not is_ru_req and chat_history:
+                for h in reversed(chat_history):
+                    if h.get("role") == "user" and is_russian_message(h.get("text", "")):
+                        is_ru_req = True
+                        break
+
+            if is_ru_req:
+                fallback_msg = (
+                    "Здравствуйте! Добро пожаловать в Самаркандский кампус Международной академии туризма. 😊\n\n"
+                    "Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона:"
+                )
+            else:
+                fallback_msg = (
+                    "Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz. 😊\n\n"
+                    "Sizni qiziqtirgan barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot, o'quv dasturi hamda narxlarni taqdim etishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:"
+                )
+
             res = send_message(sender_id, fallback_msg)
             if not res or not res.get("error"):
                 append_client_chat_history(sender_id, "assistant", fallback_msg)
@@ -178,20 +210,33 @@ def process_incoming_message(sender_id: str, user_text: str):
             return
 
     # 3. Faqat AI o'chiq bo'lsa (ai_enabled == 0) — Standart shablon bo'yicha ketadi:
+    is_user_ru = is_russian_message(text_clean)
     if step == "awaiting_phone":
         if len(digits) < 7:
-            send_message(
-                sender_id, 
-                "Iltimos, telefon raqamingizni to'g'ri formatda kiriting (masalan: +998901234567):"
-            )
+            if is_user_ru:
+                send_message(
+                    sender_id,
+                    "Пожалуйста, введите ваш номер телефона в правильном формате (например: +998901234567):"
+                )
+            else:
+                send_message(
+                    sender_id, 
+                    "Iltimos, telefon raqamingizni to'g'ri formatda kiriting (masalan: +998901234567):"
+                )
             return
 
     # 3.1. Boshlang'ich holat yoki kalit so'zlarni tutish
     if any(k in text_lower for k in TRIGGER_KEYWORDS) or step == "start":
-        welcome_msg = get_setting(
-            "direct_welcome",
-            "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan yo'nalishlar bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:"
-        )
+        if is_user_ru:
+            welcome_msg = (
+                "Здравствуйте! Добро пожаловать на официальную страницу Самаркандского кампуса Международной академии туризма. 😊\n\n"
+                "Чтобы получить подробную информацию об интересующих вас направлениях, пожалуйста, оставьте ваше имя:"
+            )
+        else:
+            welcome_msg = get_setting(
+                "direct_welcome",
+                "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan yo'nalishlar bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:"
+            )
         send_message(sender_id, welcome_msg)
         update_client(sender_id, step="awaiting_name")
         return
@@ -199,22 +244,32 @@ def process_incoming_message(sender_id: str, user_text: str):
     # 3.2. Ism qabul qilingan bosqich -> Telefon raqam so'rash
     if step == "awaiting_name":
         update_client(sender_id, full_name=text_clean, step="awaiting_phone")
-        ask_phone_template = get_setting(
-            "ask_phone",
-            "Rahmat, {name}! 🙌\n\nBatafsil ma'lumotlarni yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
-        )
-        response_msg = ask_phone_template.replace("{name}", text_clean)
+        if is_user_ru:
+            response_msg = f"Спасибо, {text_clean}! 🙌\n\nЧтобы мы могли отправить вам подробную информацию, пожалуйста, оставьте ваш номер телефона (например: +998901234567):"
+        else:
+            ask_phone_template = get_setting(
+                "ask_phone",
+                "Rahmat, {name}! 🙌\n\nBatafsil ma'lumotlarni yuborishimiz uchun telefon raqamingizni qoldiring (masalan: +998901234567):"
+            )
+            response_msg = ask_phone_template.replace("{name}", text_clean)
         send_message(sender_id, response_msg)
         return
 
     # 3.3. Mijoz allaqachon ro'yxatdan o'tgan bo'lsa
     if step == "completed":
         default_link = get_setting("default_promo_link", settings.PROMO_LINK)
-        send_message(
-            sender_id,
-            f"Sizning so'rovingiz qabul qilingan. Rasmiy saytimiz: {default_link}\n\n"
-            "Menejerimiz tez orada siz bilan bog'lanadi."
-        )
+        if is_user_ru:
+            send_message(
+                sender_id,
+                f"Ваша заявка уже принята. Наш официальный сайт: {default_link}\n\n"
+                "Наш специалист скоро свяжется с вами."
+            )
+        else:
+            send_message(
+                sender_id,
+                f"Sizning so'rovingiz qabul qilingan. Rasmiy saytimiz: {default_link}\n\n"
+                "Menejerimiz tez orada siz bilan bog'lanadi."
+            )
         return
 
 def process_incoming_comment(comment_id: str, media_id: str, user_id: str, username: str, comment_text: str):
