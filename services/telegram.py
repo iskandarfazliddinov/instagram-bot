@@ -110,9 +110,22 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
 
 def notify_admin_new_lead(client: dict, source: str = "Direct"):
     """
-    Yangi mijoz ma'lumot qoldirganda Telegram adminiga yoki guruhiga xabar yuborish
+    Yangi mijoz ma'lumot qoldirganda Telegram adminiga yoki guruhiga xabar yuborish.
+    MUHIM QOIDA: Telegram guruhga FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
+    Telefon raqami bo'lmagan xabarlar guruhga mutlaqo yuborilmaydi (operatorlar vaqtini tejash uchun).
     """
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
+        return
+
+    # 1. TELEFON RAQAM TEKSHIRUVI: Agar raqam kiritilmagan bo'lsa, guruhga yuborilmaydi!
+    phone = client.get("phone_number")
+    if not phone or str(phone).strip() in ["", "None", "—", "null"]:
+        logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] hali telefon raqamini kiritmagan. Telegram guruhga yuborilmadi.")
+        return
+
+    digits = re.sub(r"\D", "", str(phone))
+    if len(digits) < 9:
+        logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] telefon raqami noto'g'ri ({phone}). Telegram guruhga yuborilmadi.")
         return
 
     # Client ID, tg_message_id, oldingi holat va yo'nalishni aniqlash
