@@ -190,6 +190,10 @@ def process_incoming_message(sender_id: str, user_text: str):
             update_client(sender_id, campaign=new_course_found, lead_status="yangi")
             if client.get("phone_number"):
                 notify_admin_new_lead(client, source="Direct (Yangi kursga qiziqish 🔄)")
+        elif client.get("lead_status") in ["boglandi", "rad", "oylanyapti"] and client.get("phone_number"):
+            update_client(sender_id, lead_status="yangi")
+            client["lead_status"] = "yangi"
+            notify_admin_new_lead(client, source="Direct (Qayta murojaat 🔄)")
 
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
     # AI yoqilgan bo'lsa, u barcha savollarga bevosita javob beradi

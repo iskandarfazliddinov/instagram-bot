@@ -124,7 +124,14 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     system_prompt = get_setting("ai_system_prompt", "")
 
     client_name = client_context.get("full_name") or "Hali noma'lum"
-    phone_status = "Berilgan" if client_context.get("phone") else "Hali berilmagan"
+    phone_val = client_context.get("phone_number")
+    has_phone = bool(phone_val and str(phone_val).strip() not in ["", "None", "—", "null"])
+    phone_status = f"Berilgan ({phone_val})" if has_phone else "Hali berilmagan"
+    phone_rule = (
+        "✅ MUHIM: Tinglovchi ALLAQACHON telefon raqamini taqdim etgan. Undan HECH QACHON QAYTA TELEFON RAQAMINI SO'RAMANG! Savoliga to'g'ridan-to'g'ri, samimiy va to'liq javob bering."
+        if has_phone else
+        "⚠️ DIQQAT: Tinglovchi hali telefon raqamini qoldirmagan. Javobingiz oxirida unga batafsil ma'lumot va narxlarni yuborish uchun ism va telefon raqamini so'rang."
+    )
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
 
     # Tilni aniqlash
@@ -200,6 +207,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         f"{history_section}\n"
         f"{greeting_instruction}\n"
         f"{lang_rule}\n"
+        f"{phone_rule}\n"
         f"Javobingiz Instagram chatiga mos, qisqa (2-3 jumla), o'ta xushmuomala va samimiy bo'lsin. "
         f"Hech qanday ichki reja yoki sarlavhalarsiz, to'g'ridan-to'g'ri 1 ta yaxlit xabar qaytaring."
     )
