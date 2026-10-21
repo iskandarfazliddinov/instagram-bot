@@ -110,18 +110,38 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
         return
 
-    # Client ID ni aniqlash
+    # Client ID va tg_message_id ni aniqlash (takroriy xabar yuborishning oldini olish)
     client_id = client.get("id")
-    if not client_id and client.get("instagram_id"):
-        from database import get_connection
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM clients WHERE instagram_id = ?", (client["instagram_id"],))
+    ig_id = client.get("instagram_id")
+    existing_tg_mid = client.get("tg_message_id")
+
+    from database import get_connection
+    conn = get_connection()
+    cursor = conn.cursor()
+    if client_id:
+        cursor.execute("SELECT tg_message_id FROM clients WHERE id = ?", (client_id,))
         row = cursor.fetchone()
-        conn.close()
+        if row and row["tg_message_id"]:
+            existing_tg_mid = row["tg_message_id"]
+    elif ig_id:
+        cursor.execute("SELECT id, tg_message_id FROM clients WHERE instagram_id = ?", (ig_id,))
+        row = cursor.fetchone()
         if row:
             client_id = row["id"]
             client["id"] = client_id
+            if row["tg_message_id"]:
+                existing_tg_mid = row["tg_message_id"]
+    conn.close()
+
+    # AGAR TELEGRAMDA USHBU MIJOZ UCHUN ALLAQACHON XABAR BO'LSA - QAYTA YANGI XABAR YUBORILMAYDI!
+    # Faqat mavjud xabar joyida yangilanadi (editMessageText)
+    if existing_tg_mid and client_id:
+        try:
+            update_telegram_lead_message(client_id)
+            logger.info(f"Mijoz [{client_id}] Telegramda mavjud xabar tahrirlandi (takroriy yangi xabar yuborilmadi).")
+            return
+        except Exception as e:
+            logger.warning(f"Telegramdagi eski xabarni yangilab bo'lmadi, yangi yuboriladi: {e}")
 
     client["source"] = source
     text = build_lead_message_text(client, source=source)
