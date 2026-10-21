@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 PRIMARY_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODEL = "gemini-3.1-flash-lite"
 THIRD_MODEL = "gemini-3.5-flash-lite"
-AUDIO_PRIMARY_MODEL = "gemini-3.1-flash-lite"
-AUDIO_FALLBACK_MODEL = "gemini-flash-lite-latest"
+AUDIO_PRIMARY_MODEL = "gemini-flash-lite-latest"
+AUDIO_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 def detect_message_language(text: str) -> str:
     """
@@ -503,21 +503,29 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
         f"Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? Sizga yordam berishdan mamnun bo'lamiz! 😊"
     )
 
-def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", client_context: dict = None, chat_history: list = None) -> tuple[str | None, str | None]:
+def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", client_context: dict = None, chat_history: list = None) -> dict | None:
     """
     Gemini Multimodal Audio orqali Instagram Directdagi ovozli xabarni transkripsiya qilish va unga javob qaytarish.
-    Qaytaradi: (transkripsiya_matni, ai_javobi)
+    Qaytaradi lug'at (dict):
+    {
+        "transcription": "Tinglovchi aytgan gaplar",
+        "reply": "AI javob matni",
+        "extracted_phone": "Telefon raqami yoki None",
+        "extracted_name": "Ismi yoki None",
+        "detected_course": "Qiziqqan kursi yoki None",
+        "summary": "Qisqa xulosa"
+    }
     """
     if get_setting("ai_enabled", "1") != "1":
-        return (None, None)
+        return None
 
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     if not api_key or not audio_bytes:
-        return (None, None)
+        return None
 
     client_context = client_context or {}
     client_name = client_context.get("full_name") or "Hali noma'lum"
-    phone_status = "Berilgan" if client_context.get("phone") else "Hali berilmagan"
+    phone_status = "Berilgan" if client_context.get("phone_number") else "Hali berilmagan"
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
     system_prompt = get_setting("ai_system_prompt", "")
 
@@ -539,14 +547,20 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         f"Telefon holati: {phone_status}\n"
         f"Yo'nalishi: {campaign}\n"
         f"{history_section}\n\n"
-        "VAZIFA:\n"
-        "1. Ilovadagi audio faylni tinglang va uning to'liq matnini (transkripsiyasini) aniqlang (o'zbek, rus yoki ingliz tilida).\n"
-        "2. Ushbu savolga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, audio qaysi tilda bo'lsa xuddi shu tilda javob bering.\n"
-        "3. Agar tinglovchi hali telefon raqamini qoldirmagan bo'lsa, javobingiz oxirida muloyimlik bilan ism va telefon raqamini so'rang.\n\n"
-        "JAVOBNI FAQAT QUYIDAGI JSON FORMATDA QAYTARING:\n"
+        "MUHIM VAZIFA:\n"
+        "1. Ilovadagi audio faylni diqqat bilan tinglang va uning to'liq transkripsiyasini (tinglovchi aytgan barcha so'zlarni) yozing.\n"
+        "2. Audioda so'zlashilgan tilni aniqlang: O'zbek, Rus yoki Ingliz tili.\n"
+        "3. Tinglovchining savoliga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, do'stona va AYNAN AUDIOLAGI TILDA (100% bir xil tilda) javob bering.\n"
+        "4. Agar tinglovchi hali telefon raqamini aytmagan bo'lsa, javobingiz oxirida unga dars jadvali va narxlarni yuborish uchun ism va telefon raqamini so'rang (audio tilida).\n"
+        "5. Agar audioda telefon raqami, ismi yoki biron yo'nalish (Gid, Mehmonxona, Restoran, Turoperator va h.k.) aytilgan bo'lsa, ularni ajratib oling.\n\n"
+        "JAVOBNI FAQAT VA FAQAT QUYIDAGI TOZA JSON FORMATDA QAYTARING:\n"
         "{\n"
         '  "transcription": "Tinglovchining audio fayldagi so\'zlari",\n'
-        '  "reply": "Tinglovchiga yuboriladigan samimiy javob matni"\n'
+        '  "reply": "Tinglovchiga yuboriladigan samimiy javob matni",\n'
+        '  "extracted_phone": null,\n'
+        '  "extracted_name": null,\n'
+        '  "detected_course": null,\n'
+        '  "summary": "Mijoz maqsadi haqida 1 jumla qisqa xulosa"\n'
         "}\n"
         "Boshqa hech qanday izoh yoki belgi qo'shmang, faqat toza JSON qaytaring."
     )
@@ -555,7 +569,7 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     except Exception as e:
         logger.error(f"Audio faylni base64 ga aylantirishda xatolik: {e}")
-        return None, None
+        return None
 
     clean_mime = mime_type.split(";")[0].strip() if ";" in mime_type else mime_type.strip()
     if not clean_mime or not clean_mime.startswith("audio/"):
@@ -588,7 +602,7 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         }
 
         try:
-            res = requests.post(url, json=payload, headers=headers, timeout=15)
+            res = requests.post(url, json=payload, headers=headers, timeout=20)
             if res.status_code == 200:
                 data = res.json()
                 candidates = data.get("candidates", [])
@@ -603,17 +617,31 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
 
                         try:
                             parsed = json.loads(raw_text)
-                            transcript = parsed.get("transcription", "").strip()
-                            reply = parsed.get("reply", "").strip()
+                            transcript = (parsed.get("transcription") or "").strip()
+                            reply = (parsed.get("reply") or "").strip()
                             if transcript or reply:
-                                logger.info(f"Ovozli xabar transkripsiya qilindi: {transcript[:40]}...")
-                                return (transcript or "Ovozli xabar", reply)
+                                logger.info(f"Ovozli xabar muvaffaqiyatli transkripsiya qilindi: {transcript[:50]}...")
+                                return {
+                                    "transcription": transcript or "Ovozli xabar",
+                                    "reply": reply,
+                                    "extracted_phone": parsed.get("extracted_phone"),
+                                    "extracted_name": parsed.get("extracted_name"),
+                                    "detected_course": parsed.get("detected_course"),
+                                    "summary": parsed.get("summary", "")
+                                }
                         except Exception as json_err:
                             logger.warning(f"Ovozli xabar JSON tahlil xatosi: {json_err}, xom matn: {raw_text[:80]}")
-                            return ("Ovozli xabar", raw_text)
+                            return {
+                                "transcription": "Ovozli xabar",
+                                "reply": raw_text,
+                                "extracted_phone": None,
+                                "extracted_name": None,
+                                "detected_course": None,
+                                "summary": ""
+                            }
             else:
                 logger.warning(f"Audio Gemini API ({model_name}) javob kodi [{res.status_code}]: {res.text[:120]}")
         except Exception as e:
             logger.error(f"Audio Gemini API ({model_name}) so'rovida xatolik: {e}")
 
-    return None, None
+    return None

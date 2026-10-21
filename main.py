@@ -214,18 +214,24 @@ async def receive_instagram_events(request: Request):
                 if message.get("is_echo"):
                     continue
 
-                if "text" in message:
-                    user_text = message.get("text", "")
-                    logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
-                    process_incoming_message(sender_id, user_text)
-                elif "attachments" in message:
-                    for att in message.get("attachments", []):
-                        att_type = att.get("type")
-                        att_url = att.get("payload", {}).get("url")
-                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])):
+                attachments = message.get("attachments") or []
+                user_text = (message.get("text") or "").strip()
+
+                # A) Ovozli xabar yoki fayl biriktirilgan bo'lsa
+                if attachments:
+                    for att in attachments:
+                        att_type = att.get("type", "")
+                        att_url = att.get("payload", {}).get("url", "")
+                        logger.info(f"Yangi attachment qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
+                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type != "image"):
                             logger.info(f"Yangi Direct ovozli xabar keldi [{sender_id}]")
                             process_incoming_audio_message(sender_id, att_url)
-                elif "quick_reply" in message:
+                # B) Oddiy matnli xabar
+                elif user_text:
+                    logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
+                    process_incoming_message(sender_id, user_text)
+                # C) Quick reply tugmasi bosilgan bo'lsa
+                elif message.get("quick_reply"):
                     payload = message["quick_reply"].get("payload", "")
                     process_incoming_message(sender_id, payload)
 
@@ -242,17 +248,20 @@ async def receive_instagram_events(request: Request):
                     if message.get("is_echo"):
                         continue
 
-                    if "text" in message:
-                        user_text = message.get("text", "")
-                        logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
-                        process_incoming_message(sender_id, user_text)
-                    elif "attachments" in message:
-                        for att in message.get("attachments", []):
-                            att_type = att.get("type")
-                            att_url = att.get("payload", {}).get("url")
-                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])):
+                    attachments = message.get("attachments") or []
+                    user_text = (message.get("text") or "").strip()
+
+                    if attachments:
+                        for att in attachments:
+                            att_type = att.get("type", "")
+                            att_url = att.get("payload", {}).get("url", "")
+                            logger.info(f"Yangi attachment (v26.0) qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
+                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type != "image"):
                                 logger.info(f"Yangi Direct ovozli xabar (v26.0) keldi [{sender_id}]")
                                 process_incoming_audio_message(sender_id, att_url)
+                    elif user_text:
+                        logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
+                        process_incoming_message(sender_id, user_text)
 
                 # B) Video/Reels izohlari
                 elif field == "comments":

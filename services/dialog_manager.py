@@ -451,113 +451,147 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
             logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
 
     # 2. Audio faylni yuklab olish
+    audio_bytes = None
+    mime_type = "audio/mp4"
     try:
-        resp = requests.get(audio_url, timeout=20)
-        if resp.status_code != 200:
-            logger.error(f"Audio faylni yuklab bo'lmadi [status {resp.status_code}]")
-            send_message(sender_id, "Ovozli xabaringiz qabul qilindi! Mutaxassislarimiz siz bilan bog'lanishlari uchun, iltimos, telefon raqamingizni qoldiring 😊")
-            return
-        audio_bytes = resp.content
-        mime_type = resp.headers.get("Content-Type") or "audio/mp4"
-        if ";" in mime_type:
-            mime_type = mime_type.split(";")[0].strip()
-        if not mime_type.startswith("audio/"):
-            mime_type = "audio/mp4"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+        resp = requests.get(audio_url, headers=headers, timeout=25)
+        if resp.status_code == 200 and resp.content:
+            audio_bytes = resp.content
+            raw_mime = resp.headers.get("Content-Type") or "audio/mp4"
+            if ";" in raw_mime:
+                raw_mime = raw_mime.split(";")[0].strip()
+            mime_type = raw_mime if raw_mime.startswith("audio/") else "audio/mp4"
+            logger.info(f"Audio muvaffaqiyatli yuklab olindi [{sender_id}], hajmi: {len(audio_bytes)} bayt, mime: {mime_type}")
+        else:
+            logger.error(f"Audio faylni yuklab bo'lmadi [{sender_id}], status: {resp.status_code}")
     except Exception as e:
-        logger.error(f"Audio faylni yuklab olishda tarmoq xatoligi: {e}")
-        send_message(sender_id, "Ovozli xabaringiz uchun rahmat! Sizga to'liq ma'lumot yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni yozib qoldiring 😊")
-        return
+        logger.error(f"Audio faylni yuklab olishda tarmoq xatoligi [{sender_id}]: {e}")
 
-    # 3. Gemini Multimodal Audio orqali ovozni qayta ishlash
-    from services.ai_assistant import process_voice_message
-    chat_history = get_client_chat_history(sender_id)
-    result = process_voice_message(
-        audio_bytes=audio_bytes,
-        mime_type=mime_type,
-        client_context=client,
-        chat_history=chat_history
-    )
-
-    if not result:
-        fallback_msg = "Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:"
+    if not audio_bytes:
+        fallback_msg = "Ovozli xabaringiz qabul qilindi! 😊 Mutaxassislarimiz siz bilan tezda bog'lanishlari uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:"
         send_message(sender_id, fallback_msg)
         update_client(sender_id, last_message="🎙️ [Ovozli xabar]")
         append_client_chat_history(sender_id, "user", "[Ovozli xabar]")
         append_client_chat_history(sender_id, "assistant", fallback_msg)
         return
 
-    transcription = result.get("transcription", "").strip()
-    ai_reply = result.get("reply", "").strip()
-    extracted_phone = result.get("extracted_phone")
-    extracted_name = result.get("extracted_name")
-    detected_course = result.get("detected_course")
-    summary = result.get("summary", "")
+    # 3. Gemini Multimodal Audio orqali ovozni qayta ishlash
+    try:
+        from services.ai_assistant import process_voice_message
+        chat_history = get_client_chat_history(sender_id)
+        result = process_voice_message(
+            audio_bytes=audio_bytes,
+            mime_type=mime_type,
+            client_context=client,
+            chat_history=chat_history
+        )
 
-    logger.info(f"Ovozli xabar transkripsiyasi [{sender_id}]: «{transcription}»")
+        # Defensiv tekshirish: dict yoki tuple bo'lishi mumkin
+        if isinstance(result, dict):
+            transcription = (result.get("transcription") or "").strip()
+            ai_reply = (result.get("reply") or "").strip()
+            extracted_phone = result.get("extracted_phone")
+            extracted_name = result.get("extracted_name")
+            detected_course = result.get("detected_course")
+            summary = result.get("summary") or ""
+        elif isinstance(result, tuple):
+            transcription = (result[0] or "").strip()
+            ai_reply = (result[1] or "").strip()
+            extracted_phone = None
+            extracted_name = None
+            detected_course = None
+            summary = ""
+        else:
+            transcription = ""
+            ai_reply = ""
+            extracted_phone = None
+            extracted_name = None
+            detected_course = None
+            summary = ""
 
-    display_msg = f"🎙️ {transcription}" if transcription else "🎙️ [Ovozli xabar]"
-    updates = {"last_message": display_msg}
-    if summary:
-        updates["ai_summary"] = summary
-        client["ai_summary"] = summary
+        if not ai_reply:
+            fallback_msg = "Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:"
+            send_message(sender_id, fallback_msg)
+            update_client(sender_id, last_message="🎙️ [Ovozli xabar]")
+            append_client_chat_history(sender_id, "user", "[Ovozli xabar]")
+            append_client_chat_history(sender_id, "assistant", fallback_msg)
+            return
 
-    if extracted_name and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
-        updates["full_name"] = extracted_name
-        client["full_name"] = extracted_name
+        logger.info(f"Ovozli xabar transkripsiyasi [{sender_id}]: «{transcription}»")
 
-    if detected_course and detected_course not in ["Umumiy", "", None] and client.get("campaign") in ["Umumiy", "", None]:
-        updates["campaign"] = detected_course
-        client["campaign"] = detected_course
+        display_msg = f"🎙️ {transcription}" if transcription else "🎙️ [Ovozli xabar]"
+        updates = {"last_message": display_msg}
+        if summary:
+            updates["ai_summary"] = summary
+            client["ai_summary"] = summary
 
-    append_client_chat_history(sender_id, "user", f"[Ovozli xabar]: {transcription}" if transcription else "[Ovozli xabar]")
+        if extracted_name and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+            updates["full_name"] = extracted_name
+            client["full_name"] = extracted_name
 
-    # 4. Agar ovozda telefon raqami aytilgan bo'lsa -> To'liq Lid yaratiladi
-    if extracted_phone:
-        digits = re.sub(r"\D", "", str(extracted_phone))
-        if len(digits) >= 9:
-            clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
-            updates["phone_number"] = clean_phone
-            updates["step"] = "completed"
-            updates["lead_status"] = "yangi"
-            client["phone_number"] = clean_phone
-            client["step"] = "completed"
-            client["lead_status"] = "yangi"
+        if detected_course and detected_course not in ["Umumiy", "", None] and client.get("campaign") in ["Umumiy", "", None]:
+            updates["campaign"] = detected_course
+            client["campaign"] = detected_course
 
-            update_client(sender_id, **updates)
+        append_client_chat_history(sender_id, "user", f"[Ovozli xabar]: {transcription}" if transcription else "[Ovozli xabar]")
 
-            # Telegram guruhiga to'liq lid xabarini yuborish
-            notify_admin_new_lead(client, source="Direct (Ovozli xabar 🎙️)")
+        # 4. Agar ovozda telefon raqami aytilgan bo'lsa -> To'liq Lid yaratiladi
+        if extracted_phone:
+            digits = re.sub(r"\D", "", str(extracted_phone))
+            if len(digits) >= 9:
+                clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
+                updates["phone_number"] = clean_phone
+                updates["step"] = "completed"
+                updates["lead_status"] = "yangi"
+                client["phone_number"] = clean_phone
+                client["step"] = "completed"
+                client["lead_status"] = "yangi"
 
-            # Mijozga javob va platforma havolasini yuborish
-            if ai_reply:
+                update_client(sender_id, **updates)
+
+                # Telegram guruhiga to'liq lid xabarini yuborish
+                notify_admin_new_lead(client, source="Direct (Ovozli xabar 🎙️)")
+
+                # Mijozga javob va platforma havolasini yuborish
                 send_message(sender_id, ai_reply)
                 append_client_chat_history(sender_id, "assistant", ai_reply)
 
-            final_caption = get_setting(
-                "final_message",
-                "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan tanishishingiz mumkin:"
-            )
-            default_link = get_setting("default_promo_link", settings.PROMO_LINK)
-            send_link_button(
-                recipient_id=sender_id,
-                text=final_caption,
-                button_title="Ta'lim platformasini ochish 🚀",
-                url=default_link
-            )
-            append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {default_link}")
-            return
+                final_caption = get_setting(
+                    "final_message",
+                    "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan tanishishingiz mumkin:"
+                )
+                default_link = get_setting("default_promo_link", settings.PROMO_LINK)
+                send_link_button(
+                    recipient_id=sender_id,
+                    text=final_caption,
+                    button_title="Ta'lim platformasini ochish 🚀",
+                    url=default_link
+                )
+                append_client_chat_history(sender_id, "assistant", f"[Havola tugmasi yuborildi]: {default_link}")
+                return
 
-    # 5. Agar telefon raqam hali aytilmagan bo'lsa
-    update_client(sender_id, **updates)
+        # 5. Agar telefon raqam hali aytilmagan bo'lsa
+        update_client(sender_id, **updates)
 
-    # Telegram guruhga ovozli xabar kelgani haqida xabarnoma yuborish
-    from services.telegram import notify_admin_voice_message
-    notify_admin_voice_message(client, transcription=transcription or "Ovoz eshitilmadi", reply=ai_reply or "—")
+        # Telegram guruhga ovozli xabar kelgani haqida xabarnoma yuborish
+        from services.telegram import notify_admin_voice_message
+        notify_admin_voice_message(client, transcription=transcription or "Ovoz eshitilmadi", reply=ai_reply or "—")
 
-    # Instagram Directga AI javobini yuborish
-    if ai_reply:
+        # Instagram Directga AI javobini yuborish
         send_message(sender_id, ai_reply)
         append_client_chat_history(sender_id, "assistant", ai_reply)
+
+    except Exception as err:
+        logger.exception(f"Ovozli xabarni qayta ishlashda kutilmagan xatolik [{sender_id}]: {err}")
+        try:
+            fallback_msg = "Ovozli xabaringiz qabul qilindi! 😊 Kurslarimiz bo'yicha to'liq ma'lumot va dars jadvalini yuborishimiz uchun, iltimos, telefon raqamingizni qoldiring:"
+            send_message(sender_id, fallback_msg)
+            append_client_chat_history(sender_id, "assistant", fallback_msg)
+        except Exception:
+            pass
 
 
 
