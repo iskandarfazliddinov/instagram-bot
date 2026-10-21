@@ -205,13 +205,19 @@ async def receive_instagram_events(request: Request):
             return {"status": "ok"}
 
         for entry in body.get("entry", []):
+            entry_id = str(entry.get("id", ""))
+            
+            # Sahifamizning o'z ID lari (echo va o'zimizdan chiqqan xabarlarni filtrlash uchun)
+            PAGE_IDS = {entry_id, "2036629730372506", "39179052008410053", "17841468109131133"}
+            PAGE_IDS.discard("")
+
             # 1. Standart Messenger API formati (entry -> messaging)
             for messaging_event in entry.get("messaging", []):
-                sender_id = messaging_event.get("sender", {}).get("id")
+                sender_id = str(messaging_event.get("sender", {}).get("id", ""))
                 message = messaging_event.get("message", {})
 
-                # Bot o'zi yuborgan xabarning aks sadosi (echo) bo'lsa e'tiborsiz qoldiramiz
-                if message.get("is_echo"):
+                # Bot o'zi yuborgan xabarning aks sadosi (echo) yoki sahifamiz nomidan chiqqan xabarlar
+                if message.get("is_echo") or (sender_id in PAGE_IDS):
                     continue
 
                 attachments = message.get("attachments") or []
@@ -242,10 +248,10 @@ async def receive_instagram_events(request: Request):
 
                 # A) Direct xabarlar (Instagram API v26.0)
                 if field == "messages":
-                    sender_id = value.get("sender", {}).get("id")
+                    sender_id = str(value.get("sender", {}).get("id", ""))
                     message = value.get("message", {})
 
-                    if message.get("is_echo"):
+                    if message.get("is_echo") or (sender_id in PAGE_IDS):
                         continue
 
                     attachments = message.get("attachments") or []
