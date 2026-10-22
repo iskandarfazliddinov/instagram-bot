@@ -69,12 +69,17 @@ def process_incoming_message(sender_id: str, user_text: str):
         detected_course = "Turoperatorlik kursi"
     elif "gid" in history_text or "ekskurs" in history_text:
         detected_course = "Gid-ekskursiyachi kursi"
+    elif "housekeeping" in history_text or "xona tozalash" in history_text:
+        detected_course = "Housekeeping (Onlayn)"
     elif "frontoffice" in history_text or "front office" in history_text:
-        detected_course = "Front Office (Mehmonxona)"
+        detected_course = "Front Office (Onlayn)"
     elif "hotel" in history_text or "mehmonxona" in history_text:
         detected_course = "Mehmonxona boshqaruvi"
     elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
         detected_course = "Restoran ishi va servis"
+    elif "online" in history_text or "onlayn" in history_text or "masofa" in history_text or "platforma" in history_text:
+        if client.get("campaign") in ["Umumiy", "", None]:
+            detected_course = "Onlayn ta'lim platformasi"
 
     if detected_course:
         if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course)):
@@ -188,8 +193,11 @@ def process_incoming_message(sender_id: str, user_text: str):
             ("turoperator", "Turoperatorlik kursi"),
             ("gid", "Gid-ekskursiyachi kursi"),
             ("ekskurs", "Gid-ekskursiyachi kursi"),
-            ("frontoffice", "Front Office (Mehmonxona)"),
-            ("front office", "Front Office (Mehmonxona)"),
+            ("housekeeping", "Housekeeping (Onlayn)"),
+            ("frontoffice", "Front Office (Onlayn)"),
+            ("front office", "Front Office (Onlayn)"),
+            ("online", "Onlayn ta'lim platformasi"),
+            ("onlayn", "Onlayn ta'lim platformasi"),
             ("hotel", "Mehmonxona boshqaruvi"),
             ("mehmonxona", "Mehmonxona boshqaruvi"),
             ("restoran", "Restoran ishi va servis"),
@@ -509,12 +517,16 @@ def process_incoming_video_message(sender_id: str, video_title: str = "", video_
         detected_course = "Turoperatorlik kursi"
     elif "gid" in v_text or "ekskurs" in v_text:
         detected_course = "Gid-ekskursiyachi kursi"
+    elif "housekeeping" in v_text:
+        detected_course = "Housekeeping (Onlayn)"
     elif "frontoffice" in v_text or "front office" in v_text:
-        detected_course = "Front Office (Mehmonxona)"
+        detected_course = "Front Office (Onlayn)"
     elif "hotel" in v_text or "mehmonxona" in v_text:
         detected_course = "Mehmonxona boshqaruvi"
     elif "restoran" in v_text or "servis" in v_text or "f&b" in v_text:
         detected_course = "Restoran ishi va servis"
+    elif "online" in v_text or "onlayn" in v_text or "masofa" in v_text or "platforma" in v_text:
+        detected_course = "Onlayn ta'lim platformasi"
 
     if detected_course:
         client["campaign"] = detected_course
