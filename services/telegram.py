@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     full_name = client.get('full_name') or 'Noma\'lum'
     username = client.get('username') or ''
-    phone = client.get('phone_number') or 'Noma\'lum'
+    phone = client.get('phone_number') or ''
     ig_id = client.get('instagram_id', '')
     last_msg = client.get('last_message', '')
     campaign = client.get('campaign', 'Umumiy')
@@ -20,6 +20,9 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     is_fol = client.get('is_follower')
     ai_summary = client.get('ai_summary') or ''
     manager_comment = client.get('manager_comment') or ''
+
+    digits = re.sub(r"\D", "", str(phone or ""))
+    has_phone = len(digits) >= 9
 
     status_icon = "⚪"
     status_label = "Yangi (Bog'lanish kutilmoqda ⏳)"
@@ -47,11 +50,24 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     comment_line = f"📝 <b>Mutaxassis izohi:</b>\n<i>«{manager_comment}»</i>\n" if manager_comment else ""
 
     if client.get("is_reengagement"):
-        header_title = "🔄 <b>MIJOZDAN QAYTA MUROJAAT (YANGI SO'ROV)!</b>\n⚠️ <i>Ushbu mijoz avval ham murojaat qilgan va yana yangi kursga qiziqmoqda!</i>\n"
+        if client.get("phone_updated_note") and "kiritildi" in client.get("phone_updated_note"):
+            header_title = "🎉 <b>AVVAL RAQAM QOLDIRMAGAN LID TELEFON RAQAMINI YUBORDI!</b>\n"
+        else:
+            header_title = "🔄 <b>MIJOZDAN QAYTA MUROJAAT (YANGI SO'ROV)!</b>\n⚠️ <i>Ushbu mijoz avval ham murojaat qilgan va yana yangi kursga qiziqmoqda!</i>\n"
+    elif not has_phone:
+        header_title = (
+            "⚠️ <b>QIZIQISH BILDIRGAN, LEKIN RAQAM QOLDIRMAGAN LID!</b>\n"
+            "<i>(Mijoz savol bergan va unga eslatma (follow-up) ham yuborildi, ammo raqam qoldirmadi. "
+            "Operator Direct orqali yozib ko'rishi tavsiya etiladi!)</i>\n"
+        )
     else:
         header_title = "🔥 <b>INSTAGRAMDAN YANGI LID!</b>\n"
 
-    phone_note = f" <i>{client.get('phone_updated_note')}</i>" if client.get("phone_updated_note") else ""
+    if not has_phone:
+        phone_line = "📞 <b>Telefon:</b> <i>⚠️ Raqam qoldirmadi (Faqat Direct orqali bog'lanish)</i>\n"
+    else:
+        phone_note = f" <i>{client.get('phone_updated_note')}</i>" if client.get("phone_updated_note") else ""
+        phone_line = f"📞 <b>Telefon:</b> <code>{phone}</code>{phone_note}\n"
 
     text = (
         f"{header_title}"
@@ -59,7 +75,7 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
         f"👤 <b>Mijoz:</b> {full_name}\n"
         f"{ig_line}"
         f"{fol_line}"
-        f"📞 <b>Telefon:</b> <code>{phone}</code>{phone_note}\n"
+        f"{phone_line}"
         f"🎯 <b>Yo'nalish / Kurs:</b> <b>{campaign}</b>\n"
         f"📍 <b>Manba:</b> {source}\n"
         f"🆔 <b>Instagram ID:</b> <code>{ig_id}</code>\n"
@@ -110,24 +126,23 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
 
     return keyboard
 
-def notify_admin_new_lead(client: dict, source: str = "Direct"):
+def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: bool = False):
     """
     Yangi mijoz ma'lumot qoldirganda Telegram adminiga yoki guruhiga xabar yuborish.
-    MUHIM QOIDA: Telegram guruhga FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
-    Telefon raqami bo'lmagan xabarlar guruhga mutlaqo yuborilmaydi (operatorlar vaqtini tejash uchun).
+    MUHIM QOIDA: Telegram guruhga odatda FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
+    Agar mijozga eslatma (follow-up) yuborilib, shunda ham raqam qoldirmasa,
+    operatorlar Direct orqali bog'lanishi uchun allow_no_phone=True orqali yuboriladi.
     """
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
         return
 
-    # 1. TELEFON RAQAM TEKSHIRUVI: Agar raqam kiritilmagan bo'lsa, guruhga yuborilmaydi!
+    # 1. TELEFON RAQAM TEKSHIRUVI:
     phone = client.get("phone_number")
-    if not phone or str(phone).strip() in ["", "None", "—", "null"]:
-        logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] hali telefon raqamini kiritmagan. Telegram guruhga yuborilmadi.")
-        return
+    digits = re.sub(r"\D", "", str(phone or ""))
+    has_valid_phone = len(digits) >= 9
 
-    digits = re.sub(r"\D", "", str(phone))
-    if len(digits) < 9:
-        logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] telefon raqami noto'g'ri ({phone}). Telegram guruhga yuborilmadi.")
+    if not has_valid_phone and not allow_no_phone:
+        logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] hali telefon raqamini kiritmagan. Telegram guruhga yuborilmadi.")
         return
 
     # Client ID, tg_message_id, oldingi holat, yo'nalish va avvalgi raqamni aniqlash
@@ -166,10 +181,16 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
             prev_phone = row["phone_number"]
     conn.close()
 
+    if "prev_phone" in client:
+        prev_phone = client.get("prev_phone")
+
     # Telefon raqami yangilanganligini tekshirish
     phone_changed = bool(prev_phone and phone and re.sub(r"\D", "", str(prev_phone)) != re.sub(r"\D", "", str(phone)))
+    phone_added = bool((not prev_phone or str(prev_phone).strip() in ["", "None", "—", "null"]) and phone and len(re.sub(r"\D", "", str(phone))) >= 9)
     if phone_changed:
         client["phone_updated_note"] = f"🆕 (Yangi raqam! Avvalgi: {prev_phone})"
+    elif phone_added and existing_tg_mid:
+        client["phone_updated_note"] = f"🆕 (Telefon raqami kiritildi! 🎉)"
 
     # RE-ENGAGEMENT (Qayta murojaat, yangi raqam yoki yangi kursga qiziqish) shartlari:
     is_reengagement = False
@@ -187,14 +208,14 @@ def notify_admin_new_lead(client: dict, source: str = "Direct"):
         status_handled = (prev_status in ["boglandi", "rad", "oylanyapti"])
         campaign_changed = (prev_campaign and current_campaign and prev_campaign != current_campaign and current_campaign != "Umumiy")
 
-        if phone_changed or status_handled or campaign_changed or time_diff_hours >= 4:
+        if phone_changed or phone_added or status_handled or campaign_changed or time_diff_hours >= 4:
             is_reengagement = True
             client["is_reengagement"] = True
             client["lead_status"] = "yangi"
             from database import update_client
             if ig_id:
                 update_client(ig_id, lead_status="yangi")
-            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (phone_changed={phone_changed}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
+            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (phone_changed={phone_changed}, phone_added={phone_added}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
 
     # Agar 1-2 soat ichidagi bir xil takroriy xabar bo'lsa -> faqat mavjud xabarni yangilaymiz (spam qilmaymiz)
     if existing_tg_mid and client_id and not is_reengagement:

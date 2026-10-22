@@ -112,6 +112,9 @@ def process_incoming_message(sender_id: str, user_text: str):
         lead_summary = analyze_lead_need(chat_history, client)
         client["ai_summary"] = lead_summary
 
+        old_phone = client.get("phone_number")
+        client["prev_phone"] = old_phone
+
         update_client(
             sender_id, 
             phone_number=clean_phone, 
@@ -240,6 +243,28 @@ def process_incoming_message(sender_id: str, user_text: str):
                 logger.error(f"Xabar yuborilmadi (Meta rad etdi): {res}")
             if step == "start":
                 update_client(sender_id, step="in_dialog")
+
+            # Agar mijozga avval eslatma (follow-up) yuborilgan bo'lsa va u yana yozganda ham telefon raqamini kiritmasa:
+            # Ushbu lid Telegram guruhga operatorlar Direct orqali yozishi uchun darhol uzatiladi!
+            client_phone = client.get("phone_number")
+            digits_phone = re.sub(r"\D", "", str(client_phone or ""))
+            has_valid_num = len(digits_phone) >= 9
+            if not has_valid_num and (client.get("followup_count") or 0) >= 1 and not client.get("tg_message_id"):
+                try:
+                    curr_hist = get_client_chat_history(sender_id)
+                    need_summary = analyze_lead_need(curr_hist)
+                    if need_summary:
+                        client["ai_summary"] = need_summary
+                        update_client(sender_id, ai_summary=need_summary)
+                except Exception as e:
+                    logger.warning(f"Lead need summary xatoligi: {e}")
+
+                logger.info(f"Mijoz [{sender_id}] eslatmadan keyin ham raqam qoldirmadi. Telegramga uzatilmoqda.")
+                notify_admin_new_lead(
+                    client, 
+                    source="Direct (Eslatmadan so'ng raqamsiz yozdi ⚠️)", 
+                    allow_no_phone=True
+                )
             return
         else:
             # AI kutilmaganda javob bermay qolsa (masalan, tarmoq xatoligi bo'lsa):
@@ -731,6 +756,8 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
             digits = re.sub(r"\D", "", str(extracted_phone))
             if len(digits) >= 9:
                 clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
+                old_phone = client.get("phone_number")
+                client["prev_phone"] = old_phone
                 updates["phone_number"] = clean_phone
                 updates["step"] = "completed"
                 updates["lead_status"] = "yangi"

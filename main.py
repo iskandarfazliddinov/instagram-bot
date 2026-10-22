@@ -58,13 +58,17 @@ async def follow_up_background_worker():
 
                 from database import (
                     get_abandoned_clients,
+                    get_unresponsive_followup_clients,
                     mark_client_followup_sent,
                     get_client_chat_history,
-                    append_client_chat_history
+                    append_client_chat_history,
+                    update_client
                 )
-                from services.ai_assistant import generate_ai_followup
+                from services.ai_assistant import generate_ai_followup, analyze_lead_need
                 from services.instagram import send_message
+                from services.telegram import notify_admin_new_lead
 
+                # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish
                 abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
                 for client in abandoned_clients:
                     ig_id = client.get("instagram_id")
@@ -79,6 +83,29 @@ async def follow_up_background_worker():
                         append_client_chat_history(ig_id, "assistant", followup_msg)
                         mark_client_followup_sent(client["id"])
                         await asyncio.sleep(2)
+
+                # 2. Eslatma yuborilganidan so'ng ham raqam qoldirmagan mijozlarni Telegram guruhga uzatish
+                unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=24)
+                for u_client in unresponsive_leads:
+                    try:
+                        ig_id = u_client.get("instagram_id")
+                        if not u_client.get("ai_summary") and ig_id:
+                            hist = get_client_chat_history(ig_id)
+                            if hist:
+                                summary = analyze_lead_need(hist)
+                                if summary:
+                                    u_client["ai_summary"] = summary
+                                    update_client(ig_id, ai_summary=summary)
+
+                        logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{u_client.get('id')}] @{u_client.get('username')}")
+                        notify_admin_new_lead(
+                            u_client, 
+                            source="Direct (Eslatmadan so'ng javobsiz ⚠️)", 
+                            allow_no_phone=True
+                        )
+                        await asyncio.sleep(1)
+                    except Exception as u_err:
+                        logger.error(f"Eslatmadan so'ng javobsiz lidni Telegramga yuborishda xatolik: {u_err}")
         except Exception as e:
             logger.error(f"Follow-up fon xizmati xatoligi: {e}")
 

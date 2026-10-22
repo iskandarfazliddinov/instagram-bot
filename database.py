@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import sqlite3
 from datetime import datetime
@@ -543,6 +544,48 @@ def mark_client_followup_sent(client_id: int):
     conn.commit()
     conn.close()
     sync_leads_backup()
+
+def get_unresponsive_followup_clients(min_minutes_after_followup: int = 30, max_hours: int = 24) -> list:
+    """
+    Eslatma (Follow-up) yuborilgan, lekin shunda ham raqam qoldirmagan va Telegram guruhiga
+    hali yuborilmagan mijozlarni olish (operatorlar Direct orqali yozishi uchun).
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM clients 
+        WHERE (phone_number IS NULL OR phone_number = '' OR LENGTH(phone_number) < 9)
+          AND instagram_id IS NOT NULL 
+          AND instagram_id != ''
+          AND (followup_count IS NOT NULL AND followup_count >= 1)
+          AND (last_followup_at IS NOT NULL AND last_followup_at != '')
+          AND (tg_message_id IS NULL OR tg_message_id = 0)
+        ORDER BY last_followup_at ASC
+    """)
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    eligible = []
+    now = datetime.now()
+    for c in rows:
+        phone = c.get("phone_number")
+        digits = re.sub(r"\D", "", str(phone or ""))
+        if len(digits) >= 9:
+            continue
+
+        fol_str = c.get("last_followup_at")
+        if not fol_str:
+            continue
+        try:
+            fol_time = datetime.fromisoformat(fol_str)
+            diff_seconds = (now - fol_time).total_seconds()
+            diff_minutes = diff_seconds / 60
+            diff_hours = diff_seconds / 3600
+            if diff_minutes >= min_minutes_after_followup and diff_hours <= max_hours:
+                eligible.append(c)
+        except Exception:
+            continue
+    return eligible
 
 # ----------------- SOZLAMALAR (SETTINGS) -----------------
 
