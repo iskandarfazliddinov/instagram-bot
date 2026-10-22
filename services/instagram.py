@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 
 def get_graph_base_url(token: str = None) -> str:
     """
-    Agar token EAA... bilan boshlansa (Meta System User / Page token) -> graph.facebook.com
+    Agar token EAA... yoki EAB... bilan boshlansa (Meta System User / Page token) -> graph.facebook.com
     Agar token IGAA... bilan boshlansa (Instagram User token) -> graph.instagram.com
     """
     tok = (token or get_access_token() or "").strip()
-    if tok.startswith("EAA"):
+    if tok.startswith("EAA") or tok.startswith("EAB"):
         return f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}"
     return f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}"
 
@@ -20,15 +20,58 @@ def get_graph_messages_url(token: str = None) -> str:
     return f"{get_graph_base_url(token)}/me/messages"
 
 _last_token_alert_time = 0
+_cached_raw_token = ""
+_cached_resolved_token = ""
+
+def resolve_page_token(tok: str) -> str:
+    """
+    Agar System User token (EAA/EAB) kiritilgan bo'lsa,
+    u orqali Facebook Page Access Tokenini avtomatik olish.
+    """
+    cleaned = (tok or "").strip()
+    if not cleaned.startswith("EAA") and not cleaned.startswith("EAB"):
+        return cleaned
+
+    # Avval bevosita Page token ekanligini tekshiramiz
+    try:
+        url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me"
+        r = requests.get(url, params={"fields": "id,name,instagram_business_account", "access_token": cleaned}, timeout=5)
+        if r.status_code == 200 and r.json().get("instagram_business_account"):
+            return cleaned
+    except Exception:
+        pass
+
+    # Agar System User token bo'lsa -> me/accounts dan sahifa tokenini olamiz
+    try:
+        url_acc = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/accounts"
+        r_acc = requests.get(url_acc, params={"access_token": cleaned}, timeout=6)
+        if r_acc.status_code == 200:
+            pages = r_acc.json().get("data", [])
+            for page in pages:
+                p_tok = page.get("access_token")
+                if p_tok:
+                    logger.info(f"System User token orqali Page Token muvaffaqiyatli olindi: {page.get('name')}")
+                    return p_tok
+    except Exception as e:
+        logger.warning(f"Page token olishda xatolik: {e}")
+    return cleaned
 
 def get_access_token() -> str:
     """
     Ma'lumotlar bazasidagi (CRM sozlamalari) yoki .env / render.yaml dagi tokenni olish
     """
+    global _cached_raw_token, _cached_resolved_token
     db_token = get_setting("page_access_token", "").strip()
-    if db_token:
-        return db_token
-    return settings.PAGE_ACCESS_TOKEN.strip()
+    raw = db_token if db_token else settings.PAGE_ACCESS_TOKEN.strip()
+    if not raw or raw == "YOUR_PAGE_ACCESS_TOKEN_HERE":
+        return ""
+
+    if raw == _cached_raw_token and _cached_resolved_token:
+        return _cached_resolved_token
+
+    _cached_raw_token = raw
+    _cached_resolved_token = resolve_page_token(raw)
+    return _cached_resolved_token
 
 def notify_admin_token_error(error_details: str):
     """
@@ -73,11 +116,49 @@ def check_meta_response_for_errors(data: dict):
 def check_instagram_token(token: str = None) -> dict:
     """
     Token faolligini va qaysi Instagram akkauntiga tegishli ekanligini tekshirish
+    (Ham Instagram User tokenlari, ham Meta System User / Page tokenlarini qo'llab-quvvatlaydi)
     """
     tok = token.strip() if token else get_access_token()
     if not tok or tok == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return {"ok": False, "error": "Token kiritilmagan"}
 
+    # 1. Meta System User / Page Token (EAA... / EAB...)
+    if tok.startswith("EAA") or tok.startswith("EAB"):
+        try:
+            # A) Agar bevosita Page Token bo'lsa
+            url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me"
+            r = requests.get(url, params={"fields": "id,name,username,instagram_business_account{id,username,name}", "access_token": tok}, timeout=8)
+            if r.status_code == 200:
+                data = r.json()
+                ig = data.get("instagram_business_account") or {}
+                return {
+                    "ok": True,
+                    "id": ig.get("id") or data.get("id"),
+                    "username": ig.get("username") or data.get("name"),
+                    "name": ig.get("name") or data.get("name"),
+                    "account_type": "BUSINESS (Muddatsiz Meta Page Token)"
+                }
+            # B) Agar System User Token bo'lsa -> me/accounts orqali tekshiramiz
+            url_acc = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/accounts"
+            r_acc = requests.get(url_acc, params={"fields": "id,name,instagram_business_account{id,username,name}", "access_token": tok}, timeout=8)
+            if r_acc.status_code == 200:
+                pages = r_acc.json().get("data", [])
+                if pages:
+                    p = pages[0]
+                    ig = p.get("instagram_business_account") or {}
+                    return {
+                        "ok": True,
+                        "id": ig.get("id") or p.get("id"),
+                        "username": ig.get("username") or p.get("name"),
+                        "name": ig.get("name") or p.get("name"),
+                        "account_type": "BUSINESS (Muddatsiz System User Token)"
+                    }
+            err_msg = r.json().get("error", {}).get("message") if r.status_code != 200 else "Instagram akkaunt topilmadi"
+            return {"ok": False, "error": err_msg, "raw": r.text}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # 2. Standart Instagram User Token (IGAA...)
     url = f"{get_graph_base_url(tok)}/me"
     params = {
         "fields": "id,username,name,account_type",

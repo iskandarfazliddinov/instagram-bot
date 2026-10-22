@@ -262,7 +262,7 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
             entry_id = str(entry.get("id", ""))
             
             # Sahifamizning o'z ID lari (echo va o'zimizdan chiqqan xabarlarni filtrlash uchun)
-            PAGE_IDS = {entry_id, "2036629730372506", "39179052008410053", "17841468109131133"}
+            PAGE_IDS = {entry_id, "2036629730372506", "39179052008410053", "17841468109131133", "1314546795084427"}
             PAGE_IDS.discard("")
 
             # 1. Standart Messenger API formati (entry -> messaging)
