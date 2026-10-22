@@ -130,7 +130,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     phone_rule = (
         "✅ MUHIM: Tinglovchi ALLAQACHON telefon raqamini taqdim etgan. Undan HECH QACHON QAYTA TELEFON RAQAMINI SO'RAMANG! Savoliga to'g'ridan-to'g'ri, samimiy va to'liq javob bering."
         if has_phone else
-        "⚠️ DIQQAT: Tinglovchi hali telefon raqamini qoldirmagan. Javobingiz oxirida unga batafsil ma'lumot va narxlarni yuborish uchun ism va telefon raqamini so'rang."
+        "⚠️ DIQQAT: Tinglovchi hali telefon raqamini qoldirmagan. Tinglovchi bergan savolga (kurs narxi, davomiyligi, diplom/beyjik, qabul shartlari va b.) to'g'ridan-to'g'ri va aniq javob bering, so'ng javobingiz oxirida unga kursga ro'yxatdan o'tish yoki batafsil o'quv dasturini yuborish uchun ism va telefon raqamini so'rang."
     )
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
 
@@ -165,21 +165,21 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         lang_rule = (
             "🚨 CRITICAL LANGUAGE RULE: The user wrote in ENGLISH! "
             "Your response MUST be 100% in natural, fluent, professional ENGLISH! Not a single word in Uzbek or Russian! "
-            "If the client hasn't provided a phone number yet, politely request contact details in English: "
-            "«To send you the detailed curriculum, schedule, and tuition fees, please leave your name and phone number 😊»"
+            "If the client hasn't provided a phone number yet, politely request contact details in English at the end: "
+            "«To register or receive the detailed curriculum and schedule, please leave your name and phone number 😊»"
         )
     elif lang == "ru":
         lang_rule = (
             "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
             "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского слова! "
             "Если клиент еще не оставил номер телефона, в конце ответа вежливо запросите контактные данные на русском: "
-            "«Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона 😊»"
+            "«Чтобы зарегистрироваться на курс или получить подробную программу и расписание, пожалуйста, оставьте ваше имя и номер телефона 😊»"
         )
     else:
         lang_rule = (
             "QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni o'zbek tilida, muloyim va samimiy bering. "
             "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida: "
-            "«Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
+            "«Kursga ro'yxatdan o'tish yoki batafsil o'quv dasturini yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
         )
 
     # Suhbat tarixini kontekstga kiritish
@@ -230,7 +230,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         }
 
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=8)
+            response = requests.post(url, json=payload, headers=headers, timeout=12)
             if response.status_code == 200:
                 data = response.json()
                 candidates = data.get("candidates", [])
@@ -301,7 +301,7 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
                 "generationConfig": gen_config
             }
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                response = requests.post(url, json=payload, headers=headers, timeout=12)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -323,8 +323,8 @@ def analyze_lead_need(chat_history: list, client_context: dict) -> str:
         lm_lower = last_msg.lower()
         if any(w in lm_lower for w in ["narx", "qancha", "nechpul", "стоит", "цена", "how much", "cost", "price", "fee"]):
             summary_parts.append("Kurs narxi va to'lov shartlarini so'ragan.")
-        elif any(w in lm_lower for w in ["sertifikat", "diplom", "диплом", "certificate"]):
-            summary_parts.append("Sertifikat berilishi va maqomi bilan qiziqqan.")
+        elif any(w in lm_lower for w in ["sertifikat", "diplom", "диплом", "certificate", "beyjik", "бейджик", "badge"]):
+            summary_parts.append("Diplom, sertifikat yoki beyjik berilishi bilan qiziqqan.")
         elif any(w in lm_lower for w in ["vaqt", "boshlan", "jadval", "когда", "schedule", "when"]):
             summary_parts.append("Darslar boshlanish sanasi va vaqti kerak.")
         else:
@@ -386,7 +386,7 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
             }
 
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                response = requests.post(url, json=payload, headers=headers, timeout=12)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -481,7 +481,7 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
             }
 
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                response = requests.post(url, json=payload, headers=headers, timeout=12)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])

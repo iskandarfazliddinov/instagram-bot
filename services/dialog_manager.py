@@ -56,6 +56,31 @@ def process_incoming_message(sender_id: str, user_text: str):
     update_client(sender_id, last_message=text_clean)
     append_client_chat_history(sender_id, "user", text_clean)
 
+    # Qiziqqan kurs yo'nalishini aniqlash (Gid qayta tayyorlash, Gid malaka oshirish, Turagentlik, Turoperatorlik va h.k.)
+    history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
+    detected_course = None
+    if "malaka" in history_text or "72 soat" in history_text:
+        detected_course = "Gid malaka oshirish"
+    elif "qayta tayyorla" in history_text or "4 oy" in history_text or "beyjik" in history_text:
+        detected_course = "Gid qayta tayyorlash"
+    elif "turagent" in history_text:
+        detected_course = "Turagentlik kursi"
+    elif "turoperator" in history_text:
+        detected_course = "Turoperatorlik kursi"
+    elif "gid" in history_text or "ekskurs" in history_text:
+        detected_course = "Gid-ekskursiyachi kursi"
+    elif "frontoffice" in history_text or "front office" in history_text:
+        detected_course = "Front Office (Mehmonxona)"
+    elif "hotel" in history_text or "mehmonxona" in history_text:
+        detected_course = "Mehmonxona boshqaruvi"
+    elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
+        detected_course = "Restoran ishi va servis"
+
+    if detected_course:
+        if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course)):
+            client["campaign"] = detected_course
+            update_client(sender_id, campaign=detected_course)
+
     # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
     digits = re.sub(r"\D", "", text_clean)
     has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
@@ -76,21 +101,6 @@ def process_incoming_message(sender_id: str, user_text: str):
         if (not current_name or current_name in ["None", "Noma'lum"]) and len(potential_name) >= 2:
             client["full_name"] = potential_name
             update_client(sender_id, full_name=potential_name)
-
-        # Qiziqqan kurs yo'nalishini aniqlash
-        history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
-        if client.get("campaign") in ["Umumiy", "", None]:
-            if "frontoffice" in history_text or "front office" in history_text:
-                client["campaign"] = "Front Office (Mehmonxona)"
-            elif "gid" in history_text or "ekskurs" in history_text:
-                client["campaign"] = "Gid-hamrohlik / Ekskursovod"
-            elif "hotel" in history_text or "mehmonxona" in history_text:
-                client["campaign"] = "Mehmonxona boshqaruvi"
-            elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
-                client["campaign"] = "Restoran ishi va servis"
-            elif "turoperator" in history_text or "turagent" in history_text:
-                client["campaign"] = "Turoperatorlik va agentlik"
-            update_client(sender_id, campaign=client["campaign"])
 
         # AI tahlili orqali mijozning nimalarga qiziqqani va unga nima kerakligini aniqlash
         chat_history = get_client_chat_history(sender_id)
@@ -169,17 +179,22 @@ def process_incoming_message(sender_id: str, user_text: str):
     if step == "completed":
         new_course_found = None
         for k, c_name in [
+            ("malaka", "Gid malaka oshirish"),
+            ("72 soat", "Gid malaka oshirish"),
+            ("qayta tayyorla", "Gid qayta tayyorlash"),
+            ("4 oy", "Gid qayta tayyorlash"),
+            ("beyjik", "Gid qayta tayyorlash"),
+            ("turagent", "Turagentlik kursi"),
+            ("turoperator", "Turoperatorlik kursi"),
+            ("gid", "Gid-ekskursiyachi kursi"),
+            ("ekskurs", "Gid-ekskursiyachi kursi"),
             ("frontoffice", "Front Office (Mehmonxona)"),
             ("front office", "Front Office (Mehmonxona)"),
-            ("gid", "Gid-hamrohlik / Ekskursovod"),
-            ("ekskurs", "Gid-hamrohlik / Ekskursovod"),
             ("hotel", "Mehmonxona boshqaruvi"),
             ("mehmonxona", "Mehmonxona boshqaruvi"),
             ("restoran", "Restoran ishi va servis"),
             ("servis", "Restoran ishi va servis"),
-            ("f&b", "Restoran ishi va servis"),
-            ("turoperator", "Turoperatorlik va agentlik"),
-            ("turagent", "Turoperatorlik va agentlik")
+            ("f&b", "Restoran ishi va servis")
         ]:
             if k in text_clean.lower():
                 new_course_found = c_name
