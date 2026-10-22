@@ -6,8 +6,18 @@ from database import get_setting
 
 logger = logging.getLogger(__name__)
 
-GRAPH_API_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}/me/messages"
-GRAPH_BASE_URL = f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}"
+def get_graph_base_url(token: str = None) -> str:
+    """
+    Agar token EAA... bilan boshlansa (Meta System User / Page token) -> graph.facebook.com
+    Agar token IGAA... bilan boshlansa (Instagram User token) -> graph.instagram.com
+    """
+    tok = (token or get_access_token() or "").strip()
+    if tok.startswith("EAA"):
+        return f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}"
+    return f"https://graph.instagram.com/{settings.GRAPH_API_VERSION}"
+
+def get_graph_messages_url(token: str = None) -> str:
+    return f"{get_graph_base_url(token)}/me/messages"
 
 _last_token_alert_time = 0
 
@@ -68,7 +78,7 @@ def check_instagram_token(token: str = None) -> dict:
     if not tok or tok == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return {"ok": False, "error": "Token kiritilmagan"}
 
-    url = f"{GRAPH_BASE_URL}/me"
+    url = f"{get_graph_base_url(tok)}/me"
     params = {
         "fields": "id,username,name,account_type",
         "access_token": tok
@@ -98,7 +108,7 @@ def refresh_long_lived_token() -> bool:
     if not current_token or not current_token.startswith("IGAA"):
         return False
 
-    url = f"{GRAPH_BASE_URL}/refresh_access_token"
+    url = f"{get_graph_base_url(current_token)}/refresh_access_token"
     params = {
         "grant_type": "ig_refresh_token",
         "access_token": current_token
@@ -138,7 +148,7 @@ def send_message(recipient_id: str, text: str) -> dict:
     }
 
     try:
-        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(get_graph_messages_url(token), json=payload, headers=headers, timeout=10)
         data = response.json()
         if response.status_code != 200:
             logger.error(f"Meta API xatoligi ({response.status_code}): {data}")
@@ -181,7 +191,7 @@ def send_link_button(recipient_id: str, text: str, button_title: str, url: str) 
     }
 
     try:
-        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(get_graph_messages_url(token), json=payload, headers=headers, timeout=10)
         data = response.json()
         if response.status_code != 200:
             check_meta_response_for_errors(data)
@@ -209,7 +219,7 @@ def send_private_reply_to_comment(comment_id: str, text: str) -> dict:
     }
 
     try:
-        response = requests.post(GRAPH_API_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(get_graph_messages_url(token), json=payload, headers=headers, timeout=10)
         data = response.json()
         if response.status_code != 200:
             logger.error(f"Izohga Direct javob yuborishda xatolik: {data}")
@@ -227,7 +237,7 @@ def reply_public_comment(comment_id: str, text: str) -> dict:
     if not token:
         return {"error": "No token"}
 
-    url = f"{GRAPH_BASE_URL}/{comment_id}/replies"
+    url = f"{get_graph_base_url(token)}/{comment_id}/replies"
     payload = {"message": text}
     headers = {
         "Authorization": f"Bearer {token}",
@@ -252,7 +262,7 @@ def get_recent_media(limit: int = 25) -> list:
     if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return []
 
-    url = f"{GRAPH_BASE_URL}/me/media"
+    url = f"{get_graph_base_url(token)}/me/media"
     params = {
         "fields": "id,caption,permalink,media_type,thumbnail_url,timestamp",
         "access_token": token,
@@ -301,7 +311,7 @@ def get_user_profile(instagram_id: str) -> dict:
     if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return {}
 
-    url = f"{GRAPH_BASE_URL}/{instagram_id}"
+    url = f"{get_graph_base_url(token)}/{instagram_id}"
     params = {
         "fields": "name,username,profile_pic,is_user_follow_business",
         "access_token": token
@@ -325,7 +335,7 @@ def get_media_details(media_id: str) -> dict:
     if not media_id or not token:
         return {}
 
-    url = f"{GRAPH_BASE_URL}/{media_id}"
+    url = f"{get_graph_base_url(token)}/{media_id}"
     params = {
         "fields": "id,caption,permalink,media_type,timestamp",
         "access_token": token
