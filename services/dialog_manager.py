@@ -593,12 +593,6 @@ def process_incoming_video_message(sender_id: str, video_title: str = "", video_
     append_client_chat_history(sender_id, "user", video_label)
     append_client_chat_history(sender_id, "assistant", reply)
 
-    try:
-        from services.telegram import notify_admin_video_message
-        notify_admin_video_message(client, video_title=video_title, reply=reply)
-    except Exception as e:
-        logger.error(f"Telegram video bildirishnoma xatosi: {e}")
-
 def process_incoming_audio_message(sender_id: str, audio_url: str):
     """
     Mijoz Instagram Direct orqali Ovozli xabar (Voice message) yuborganda:
@@ -758,11 +752,7 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
         # 5. Agar telefon raqam hali aytilmagan bo'lsa
         update_client(sender_id, **updates)
 
-        # Telegram guruhga ovozli xabar kelgani haqida xabarnoma yuborish
-        from services.telegram import notify_admin_voice_message
-        notify_admin_voice_message(client, transcription=transcription or "Ovoz eshitilmadi", reply=ai_reply or "—")
-
-        # Instagram Directga AI javobini yuborish
+        # Instagram Directga AI javobini yuborish (raqam olinmaguncha Telegram guruh bezovta qilinmaydi)
         send_message(sender_id, ai_reply)
         append_client_chat_history(sender_id, "assistant", ai_reply)
 
