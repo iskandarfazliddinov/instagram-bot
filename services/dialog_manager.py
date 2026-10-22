@@ -463,6 +463,142 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     append_client_chat_history(user_id, "user", f"[Video izohi]: {comment_text}")
     append_client_chat_history(user_id, "assistant", dm_welcome_text)
 
+def process_incoming_video_message(sender_id: str, video_title: str = "", video_url: str = "", user_text: str = ""):
+    """
+    Mijoz Instagram Direct orqali Video yuborganda, Reels ulashganda yoki reklama videosi orqali yozganda:
+    1. Hech qachon ovozli xabar deb qabul qilmaydi.
+    2. Agar mijoz videoga qo'shib matn yozgan bo'lsa (masalan: "Расскажите подробнее" yoki "Narxi qancha?"):
+       Ushbu matnni video sarlavhasi bilan birga AI orqali qayta ishlaydi va to'g'ridan-to'g'ri javob beradi.
+    3. Agar mijoz shunchaki video/reels yuborgan bo'lsa (matnsiz):
+       Mijoz bilan xushmuomala salomlashib, video bo'yicha qanday yordam bera olishimizni va nima ma'lumot kerakligini so'raydi.
+    """
+    logger.info(f"Yangi Video/Reels xabari keldi [{sender_id}]: title='{video_title}', user_text='{user_text}'")
+    client = get_or_create_client(sender_id)
+
+    # 1. Instagram profil ma'lumotlarini olish (agar mavjud bo'lmasa)
+    if not client.get("username") or not client.get("full_name") or client.get("is_follower") is None:
+        try:
+            profile = get_user_profile(sender_id)
+            if profile:
+                prof_updates = {}
+                if profile.get("username"):
+                    prof_updates["username"] = profile["username"]
+                    client["username"] = profile["username"]
+                if profile.get("name") and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
+                    prof_updates["full_name"] = profile["name"]
+                    client["full_name"] = profile["name"]
+                if "is_user_follow_business" in profile:
+                    is_fol = 1 if profile["is_user_follow_business"] else 0
+                    prof_updates["is_follower"] = is_fol
+                    client["is_follower"] = is_fol
+                if prof_updates:
+                    update_client(sender_id, **prof_updates)
+        except Exception as e:
+            logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
+
+    # 2. Agar video sarlavhasida ma'lum bir kurs ko'rsatilgan bo'lsa, qiziqish yo'nalishini belgilash
+    v_text = (video_title or "").lower()
+    detected_course = None
+    if "malaka" in v_text or "72 soat" in v_text:
+        detected_course = "Gid malaka oshirish"
+    elif "qayta tayyorla" in v_text or "4 oy" in v_text or "beyjik" in v_text:
+        detected_course = "Gid qayta tayyorlash"
+    elif "turagent" in v_text:
+        detected_course = "Turagentlik kursi"
+    elif "turoperator" in v_text:
+        detected_course = "Turoperatorlik kursi"
+    elif "gid" in v_text or "ekskurs" in v_text:
+        detected_course = "Gid-ekskursiyachi kursi"
+    elif "frontoffice" in v_text or "front office" in v_text:
+        detected_course = "Front Office (Mehmonxona)"
+    elif "hotel" in v_text or "mehmonxona" in v_text:
+        detected_course = "Mehmonxona boshqaruvi"
+    elif "restoran" in v_text or "servis" in v_text or "f&b" in v_text:
+        detected_course = "Restoran ishi va servis"
+
+    if detected_course:
+        client["campaign"] = detected_course
+        update_client(sender_id, campaign=detected_course)
+
+    # 3. Agar mijoz videoga qo'shib matn ham yozgan bo'lsa (masalan: "Расскажите подробнее о вашей компании.")
+    clean_text = (user_text or "").strip()
+    if clean_text:
+        if video_title and video_title.lower() not in clean_text.lower():
+            combined_text = f"[{video_title}] {clean_text}"
+        else:
+            combined_text = clean_text
+        process_incoming_message(sender_id, combined_text)
+        return
+
+    # 4. Agar foydalanuvchi shunchaki video/reels yuborgan bo'lsa (hech qanday matnsiz):
+    # Salomlashib, ushbu video bo'yicha qanday yordam bera olishimizni va nima xohlashini so'raymiz
+    client_name = client.get("full_name") or ""
+    if client_name in ["None", "Kiritilmagan", "Noma'lum"]:
+        client_name = ""
+    name_str = f", {client_name}" if client_name else ""
+
+    # Tilni aniqlash (avvalgi suhbat yoki video sarlavhasidan)
+    lang = "uz"
+    chat_hist = get_client_chat_history(sender_id)
+    if chat_hist:
+        for h in reversed(chat_hist):
+            if h.get("role") == "user":
+                l_h = detect_message_language(h.get("text", ""))
+                if l_h in ["ru", "en"]:
+                    lang = l_h
+                    break
+    if lang == "uz" and video_title:
+        l_v = detect_message_language(video_title)
+        if l_v in ["ru", "en"]:
+            lang = l_v
+
+    if lang == "ru":
+        if video_title:
+            reply = (
+                f"Здравствуйте{name_str}! Мы получили ваше видео «{video_title}». 😊\n\n"
+                f"Чем мы можем вам помочь по этому направлению? Какая информация вас интересует (стоимость, длительность обучения или программа)?"
+            )
+        else:
+            reply = (
+                f"Здравствуйте{name_str}! Мы получили ваше видео. 😊\n\n"
+                f"Чем мы можем вам помочь по нашим учебным программам? Какая информация вас интересует?"
+            )
+    elif lang == "en":
+        if video_title:
+            reply = (
+                f"Hello{name_str}! We have received your video regarding \"{video_title}\". 😊\n\n"
+                f"How can we assist you with this program? What information would you like to know (course fees, duration, or curriculum)?"
+            )
+        else:
+            reply = (
+                f"Hello{name_str}! We have received your video. 😊\n\n"
+                f"How can we assist you regarding our training programs? What information would you like to know?"
+            )
+    else:
+        if video_title:
+            reply = (
+                f"Assalomu alaykum{name_str}! «{video_title}» videosi bo'yicha murojaatingizni qabul qildik. 😊\n\n"
+                f"Ushbu yo'nalish bo'yicha sizga qanday yordam bera olamiz? Sizni qanday ma'lumotlar qiziqtiryapti (kurs narxi, davomiyligi yoki dars jadvali)?"
+            )
+        else:
+            reply = (
+                f"Assalomu alaykum{name_str}! Yuborgan videongizni qabul qildik. 😊\n\n"
+                f"Akademiyamiz kurslari bo'yicha sizga qanday yordam bera olamiz? Sizni qaysi ta'lim yo'nalishi va ma'lumotlar qiziqtiryapti?"
+            )
+
+    send_message(sender_id, reply)
+
+    video_label = f"🎬 [Yuborilgan video]: {video_title}" if video_title else "🎬 [Yuborilgan video / Reels]"
+    update_client(sender_id, last_message=video_label, step="in_dialog")
+    append_client_chat_history(sender_id, "user", video_label)
+    append_client_chat_history(sender_id, "assistant", reply)
+
+    try:
+        from services.telegram import notify_admin_video_message
+        notify_admin_video_message(client, video_title=video_title, reply=reply)
+    except Exception as e:
+        logger.error(f"Telegram video bildirishnoma xatosi: {e}")
+
 def process_incoming_audio_message(sender_id: str, audio_url: str):
     """
     Mijoz Instagram Direct orqali Ovozli xabar (Voice message) yuborganda:

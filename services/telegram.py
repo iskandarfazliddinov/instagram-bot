@@ -517,6 +517,56 @@ def notify_admin_voice_message(client: dict, transcription: str, reply: str, aud
     except Exception as e:
         logger.error(f"Telegram ovozli xabar bildirishnomasida xatolik: {e}")
 
+def notify_admin_video_message(client: dict, video_title: str = "", reply: str = ""):
+    """
+    Mijoz Instagram Direct orqali Video/Reels yuborganda Telegram guruhiga bildirishnoma yuborish
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
+        return
+
+    full_name = client.get('full_name') or 'Noma\'lum'
+    username = client.get('username') or ''
+    phone = client.get('phone_number') or 'Hali olinmagan'
+    ig_id = client.get('instagram_id', '')
+    campaign = client.get('campaign', 'Umumiy')
+
+    ig_line = f"📸 <b>Instagram:</b> <a href='https://instagram.com/{username}'>@{username}</a>\n" if username else ""
+    phone_line = f"📞 <b>Telefon:</b> <code>{phone}</code>\n" if phone and phone != "Hali olinmagan" else ""
+    title_line = f"🎬 <b>Video mavzusi:</b> {video_title}\n" if video_title else "🎬 <b>Video:</b> Instagram Reels / Video\n"
+
+    text = (
+        "🎬 <b>INSTAGRAMDAN VIDEO / REELS ULASHILDI!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Mijoz:</b> {full_name}\n"
+        f"{ig_line}"
+        f"{phone_line}"
+        f"{title_line}"
+        f"🎯 <b>Yo'nalish:</b> {campaign}\n"
+        f"🆔 <b>Instagram ID:</b> <code>{ig_id}</code>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Bot yuborgan salomlashish / javob:</b>\n"
+        f"<i>«{reply}»</i>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+    )
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    if username:
+        payload["reply_markup"] = {
+            "inline_keyboard": [[
+                {"text": f"📸 Directda @{username} ga ochish", "url": f"https://instagram.com/{username}"}
+            ]]
+        }
+
+    try:
+        requests.post(url, json=payload, timeout=6)
+    except Exception as e:
+        logger.error(f"Telegram video bildirishnomasida xatolik: {e}")
+
 def setup_telegram_webhook(host_url: str):
     """Render domenini Telegram Webhook sifatida ro'yxatdan o'tkazish"""
     if not settings.TELEGRAM_BOT_TOKEN:

@@ -26,7 +26,8 @@ from database import (
 from services.dialog_manager import (
     process_incoming_message,
     process_incoming_comment,
-    process_incoming_audio_message
+    process_incoming_audio_message,
+    process_incoming_video_message
 )
 from services.instagram import get_recent_media, resolve_media_id_from_url
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
@@ -253,24 +254,71 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
                 attachments = message.get("attachments") or []
                 user_text = (message.get("text") or "").strip()
+                quick_reply = message.get("quick_reply", {}).get("payload", "") if message.get("quick_reply") else ""
 
-                # A) Ovozli xabar yoki fayl biriktirilgan bo'lsa
+                # Referral (Instagram Ad orqali kelgan bo'lsa)
+                referral = messaging_event.get("referral") or message.get("referral") or {}
+                ad_title = ""
+                if referral:
+                    ad_title = referral.get("ads_context_data", {}).get("ad_title", "") or referral.get("ref", "")
+
+                is_voice = False
+                voice_url = ""
+                is_video = False
+                video_url = ""
+                video_title = ad_title
+
                 if attachments:
                     for att in attachments:
                         att_type = att.get("type", "")
-                        att_url = att.get("payload", {}).get("url", "")
-                        logger.info(f"Yangi attachment qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
-                        if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type not in ["image", "video"]):
-                            logger.info(f"Yangi Direct ovozli xabar keldi [{sender_id}]")
-                            background_tasks.add_task(process_incoming_audio_message, sender_id, att_url)
-                # B) Oddiy matnli xabar
+                        payload = att.get("payload", {})
+                        att_url = payload.get("url", "")
+                        att_title = payload.get("title", "")
+                        if att_title and not video_title:
+                            video_title = att_title
+
+                        logger.info(f"Yangi attachment qabul qilindi [{sender_id}]: type='{att_type}', title='{att_title}', url={att_url[:60] if att_url else 'None'}")
+
+                        # A) Haqiqiy Ovozli xabar (Voice message)
+                        # DIQQAT: Faqat va faqat type='audio' yoki type='voice' bo'lganda!
+                        # Video, share, reels yoki rasm HECH QACHON ovozli xabar deb hisoblanmaydi!
+                        if att_type in ["audio", "voice"]:
+                            is_voice = True
+                            voice_url = att_url
+                            break
+                        # B) Video, Reels yoki Ulashilgan video/post (Shared post / video)
+                        elif att_type in ["video", "share", "ig_reel"] or (att_url and any(v_ext in att_url.lower() for v_ext in [".mp4", ".mov", ".webm", ".avi"])):
+                            is_video = True
+                            if not video_url:
+                                video_url = att_url
+
+                # Xabarni mos handlerga yo'naltirish:
+                # 1. Haqiqiy ovozli xabar
+                if is_voice and voice_url:
+                    logger.info(f"Yangi Direct OVOZLI xabar keldi [{sender_id}]")
+                    background_tasks.add_task(process_incoming_audio_message, sender_id, voice_url)
+
+                # 2. Video yoki Reels yuborilgan / ulashilgan bo'lsa
+                elif is_video:
+                    logger.info(f"Yangi Direct VIDEO / REELS keldi [{sender_id}]: title='{video_title}', user_text='{user_text}'")
+                    background_tasks.add_task(process_incoming_video_message, sender_id, video_title, video_url, user_text)
+
+                # 3. Quick reply tugmasi bosilgan bo'lsa
+                elif quick_reply:
+                    logger.info(f"Yangi Direct Quick reply keldi [{sender_id}]: {quick_reply}")
+                    background_tasks.add_task(process_incoming_message, sender_id, quick_reply)
+
+                # 4. Oddiy matnli xabar
                 elif user_text:
                     logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
                     background_tasks.add_task(process_incoming_message, sender_id, user_text)
-                # C) Quick reply tugmasi bosilgan bo'lsa
-                elif message.get("quick_reply"):
-                    payload = message["quick_reply"].get("payload", "")
-                    background_tasks.add_task(process_incoming_message, sender_id, payload)
+
+                # 5. Rasm yoki boshqa fayl biriktirilgan bo'lsa
+                elif attachments:
+                    att_type = attachments[0].get("type", "")
+                    if att_type == "image":
+                        logger.info(f"Yangi Direct RASM keldi [{sender_id}]")
+                        background_tasks.add_task(process_incoming_message, sender_id, "[Rasm yuborildi]")
 
             # 2. Yangi Instagram API formati (entry -> changes)
             for change in entry.get("changes", []):
@@ -292,18 +340,57 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
                     attachments = message.get("attachments") or []
                     user_text = (message.get("text") or "").strip()
+                    quick_reply = message.get("quick_reply", {}).get("payload", "") if message.get("quick_reply") else ""
+
+                    # Referral
+                    referral = value.get("referral") or message.get("referral") or {}
+                    ad_title = ""
+                    if referral:
+                        ad_title = referral.get("ads_context_data", {}).get("ad_title", "") or referral.get("ref", "")
+
+                    is_voice = False
+                    voice_url = ""
+                    is_video = False
+                    video_url = ""
+                    video_title = ad_title
 
                     if attachments:
                         for att in attachments:
                             att_type = att.get("type", "")
-                            att_url = att.get("payload", {}).get("url", "")
-                            logger.info(f"Yangi attachment (v26.0) qabul qilindi [{sender_id}]: type='{att_type}', url={att_url[:60] if att_url else 'None'}")
-                            if att_type in ["audio", "voice"] or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".m4a", ".mp3", ".ogg", ".aac", ".wav"])) or ("lookaside.fbsbx.com" in att_url and att_type not in ["image", "video"]):
-                                logger.info(f"Yangi Direct ovozli xabar (v26.0) keldi [{sender_id}]")
-                                background_tasks.add_task(process_incoming_audio_message, sender_id, att_url)
+                            payload = att.get("payload", {})
+                            att_url = payload.get("url", "")
+                            att_title = payload.get("title", "")
+                            if att_title and not video_title:
+                                video_title = att_title
+
+                            logger.info(f"Yangi attachment (v26.0) qabul qilindi [{sender_id}]: type='{att_type}', title='{att_title}', url={att_url[:60] if att_url else 'None'}")
+
+                            if att_type in ["audio", "voice"]:
+                                is_voice = True
+                                voice_url = att_url
+                                break
+                            elif att_type in ["video", "share", "ig_reel"] or (att_url and any(v_ext in att_url.lower() for v_ext in [".mp4", ".mov", ".webm", ".avi"])):
+                                is_video = True
+                                if not video_url:
+                                    video_url = att_url
+
+                    if is_voice and voice_url:
+                        logger.info(f"Yangi Direct OVOZLI xabar (v26.0) keldi [{sender_id}]")
+                        background_tasks.add_task(process_incoming_audio_message, sender_id, voice_url)
+                    elif is_video:
+                        logger.info(f"Yangi Direct VIDEO / REELS (v26.0) keldi [{sender_id}]: title='{video_title}', user_text='{user_text}'")
+                        background_tasks.add_task(process_incoming_video_message, sender_id, video_title, video_url, user_text)
+                    elif quick_reply:
+                        logger.info(f"Yangi Direct Quick reply (v26.0) keldi [{sender_id}]: {quick_reply}")
+                        background_tasks.add_task(process_incoming_message, sender_id, quick_reply)
                     elif user_text:
                         logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
                         background_tasks.add_task(process_incoming_message, sender_id, user_text)
+                    elif attachments:
+                        att_type = attachments[0].get("type", "")
+                        if att_type == "image":
+                            logger.info(f"Yangi Direct RASM (v26.0) keldi [{sender_id}]")
+                            background_tasks.add_task(process_incoming_message, sender_id, "[Rasm yuborildi]")
 
                 # B) Video/Reels izohlari
                 elif field == "comments":
