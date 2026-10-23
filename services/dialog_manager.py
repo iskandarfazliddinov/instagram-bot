@@ -236,6 +236,46 @@ def process_incoming_message(sender_id: str, user_text: str):
             chat_history=chat_history
         )
         if ai_reply:
+            # Agar foydalanuvchi PDF, reja yoki o'quv dasturi haqida so'ragan bo'lsa, havolalarning mavjudligini kafolatlash
+            is_pdf_inquiry = any(k in text_clean.lower() for k in ["pdf", "dastur", "silabus", "syllabus", "reja", "modul", "fayl", "broshyura"])
+            is_hotel_context = (
+                client.get("campaign") == "Hotel Operations and Innovation" or 
+                any(k in text_clean.lower() for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"]) or
+                any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"])
+            )
+
+            if is_pdf_inquiry or (is_hotel_context and any(k in text_clean.lower() for k in ["kurs", "dastur", "haqida", "ma'lumot", "malumot", "pdf", "reja"])):
+                if "t.me/MyMarketingAndPrBot" not in ai_reply and "hotel_operations.pdf" not in ai_reply:
+                    lang_msg = detect_message_language(text_clean)
+                    if lang_msg == "ru":
+                        links_text = (
+                            "\n\n📄 Полную программу курса (PDF, 27 страниц) вы можете скачать в Telegram:\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                            "📥 Прямая ссылка на PDF:\n"
+                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                            "📝 Форма регистрации (Zoho):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    elif lang_msg == "en":
+                        links_text = (
+                            "\n\n📄 You can download the full curriculum (PDF, 27 pages) via Telegram:\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                            "📥 Direct PDF download link:\n"
+                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                            "📝 Application form (Zoho):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    else:
+                        links_text = (
+                            "\n\n📄 Dasturning to'liq PDF faylini (27 sahifalik o'quv rejasi) Telegram orqali yuklab olishingiz mumkin:\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                            "📥 Brauzerda to'g'ridan-to'g'ri yuklab olish:\n"
+                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                            "📝 Ro'yxatdan o'tish (Zoho ariza):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    ai_reply = ai_reply.strip() + links_text
+
             res = send_message(sender_id, ai_reply)
             if not res or not res.get("error"):
                 append_client_chat_history(sender_id, "assistant", ai_reply)
@@ -256,7 +296,48 @@ def process_incoming_message(sender_id: str, user_text: str):
                             lang_req = l_h
                             break
 
-            if lang_req == "en":
+            is_pdf_inquiry = any(k in text_clean.lower() for k in ["pdf", "dastur", "silabus", "syllabus", "reja", "modul", "fayl", "broshyura"])
+            is_hotel_context = (
+                client.get("campaign") == "Hotel Operations and Innovation" or 
+                any(k in text_clean.lower() for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"]) or
+                any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"])
+            )
+
+            if is_pdf_inquiry or is_hotel_context:
+                if lang_req == "ru":
+                    fallback_msg = (
+                        "Здравствуйте! «Hotel Operations and Innovation 2026–2027» — официальная международная программа переподготовки руководителей гостиничной сферы от UN Tourism и Самаркандского кампуса Международной академии туризма.\n\n"
+                        "📄 Программу курса (PDF, 27 страниц) вы можете скачать в Telegram:\n"
+                        "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                        "📥 Прямая ссылка на PDF:\n"
+                        "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                        "📝 Форма регистрации (Zoho):\n"
+                        "https://survey.zohopublic.com/zs/jQCZao\n\n"
+                        "Чтобы забронировать за вами место, пожалуйста, оставьте ваше имя и контактный номер телефона 😊"
+                    )
+                elif lang_req == "en":
+                    fallback_msg = (
+                        "Hello! «Hotel Operations and Innovation 2026–2027» is an official executive retraining program in collaboration with UN Tourism.\n\n"
+                        "📄 Download the full curriculum (PDF, 27 pages) via Telegram:\n"
+                        "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                        "📥 Direct PDF download link:\n"
+                        "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                        "📝 Application form (Zoho):\n"
+                        "https://survey.zohopublic.com/zs/jQCZao\n\n"
+                        "To secure your spot, please leave your name and phone number 😊"
+                    )
+                else:
+                    fallback_msg = (
+                        "Assalomu alaykum! «Hotel Operations and Innovation 2026–2027» — UN Tourism va Xalqaro Turizm Akademiyasi Samarqand kampusining rasmiy qayta tayyorlash dasturidir.\n\n"
+                        "📄 Dasturning to'liq PDF faylini (27 sahifalik o'quv rejasi) Telegram orqali yuklab olishingiz mumkin:\n"
+                        "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
+                        "📥 Brauzerda to'g'ridan-to'g'ri yuklab olish:\n"
+                        "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
+                        "📝 Ro'yxatdan o'tish (Zoho ariza):\n"
+                        "https://survey.zohopublic.com/zs/jQCZao\n\n"
+                        "Qabul koordinatori siz bilan bog'lanishi va joyingizni band qilish uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊"
+                    )
+            elif lang_req == "en":
                 fallback_msg = (
                     "Hello! Welcome to the International Tourism Academy (Samarkand Campus). 😊\n\n"
                     "To receive full details on our training programs, curriculum, and tuition fees, please leave your name and phone number:"

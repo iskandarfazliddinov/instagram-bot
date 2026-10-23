@@ -24,7 +24,15 @@ def detect_message_language(text: str) -> str:
         return "uz"
     t = text.lower().strip()
 
-    # 1. Rus tili tekshiruvi (Kirill va ruscha kalit so'zlar)
+    # 1. O'zbek tili aniq belgilari (so'zlar va affikslar)
+    uz_indicators = [
+        r"\b(?:qancha|kerak|bormi|haqida|uchun|salom|qachon|qatnash|edim|man|men|biz|siz|iltimos|boladimi|bo'ladimi|o'quv|oquv|dastur|dasturi|reja|rejasi|narx|narxi|o'qish|oqish|malaka|qayta|tayyorlash|rahmat|yuboring|bering|aytvorin|aytvorilar|aloqa|bog'lan|boglan|kursi|kursichi|haqidachi|narxichi)\b",
+        r"\w+(?:chi|mi|da|dan|ga|ni|ning|lar|miz|siz)\b"
+    ]
+    if any(re.search(u, t) for u in uz_indicators):
+        return "uz"
+
+    # 2. Rus tili tekshiruvi (Kirill va ruscha kalit so'zlar)
     ru_markers = [
         "сколько", "стоит", "цена", "обучение", "курс", "курсы", "здравствуйте",
         "привет", "добрый", "день", "вечер", "можно", "информация", "расскажите",
@@ -40,25 +48,18 @@ def detect_message_language(text: str) -> str:
         if not any(k in t for k in uz_cyrillic):
             return "ru"
 
-    # 2. Ingliz tili tekshiruvi (So'z chegaralari bilan xatosiz qidirish)
+    # 3. Ingliz tili tekshiruvi (faqat haqiqiy inglizcha gap/savol konstruksiyalari)
     en_patterns = [
         r"\b(?:hello|hi|hey|good\s+(?:morning|afternoon|evening))\b",
         r"\b(?:how\s+much|cost|price|tuition|fees?)\b",
-        r"\b(?:training|courses?|program(?:me)?s?|admission|apply|register|registration)\b",
-        r"\b(?:hotel|tourism|hospitality|management)\b",
-        r"\b(?:information|details|requirements|schedule)\b",
-        r"\b(?:can\s+i|i\s+want|i\s+would\s+like|tell\s+me|where\s+is|when\s+does)\b",
+        r"\b(?:course|courses|program|programs|admission|apply|register|registration)\b",
+        r"\b(?:information|details|requirements|schedule|syllabus|curriculum)\b",
+        r"\b(?:can\s+i|i\s+want|i\s+would\s+like|tell\s+me|where\s+is|when\s+does|is\s+there|could\s+you|please\s+send)\b",
         r"\b(?:thank\s+you|thanks|please|interested)\b"
     ]
     for pat in en_patterns:
         if re.search(pat, t):
-            uz_indicators = [
-                r"\bqancha\b", r"\bkerak\b", r"\bbormi\b", r"\bhaqida\b", r"\buchun\b", 
-                r"\bsalom\b", r"\bqachon\b", r"\bqatnash\b", r"\bedim\b", r"\bman\b", 
-                r"\bsiz\b", r"\biltimos\b", r"\bboladimi\b", r"\bo‘quv\b", r"\bo'quv\b"
-            ]
-            if not any(re.search(u, t) for u in uz_indicators):
-                return "en"
+            return "en"
 
     return "uz"
 
@@ -165,21 +166,24 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         lang_rule = (
             "🚨 CRITICAL LANGUAGE RULE: The user wrote in ENGLISH! "
             "Your response MUST be 100% in natural, fluent, professional ENGLISH! Not a single word in Uzbek or Russian! "
-            "If the client hasn't provided a phone number yet, politely request contact details in English at the end: "
-            "«To register or receive the detailed curriculum and schedule, please leave your name and phone number 😊»"
+            "IMPORTANT: If the user asks about the course program, curriculum, or PDF, ALWAYS provide the Telegram bot link (https://t.me/MyMarketingAndPrBot?start=hotel), the direct PDF link (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf), and the Zoho form (https://survey.zohopublic.com/zs/jQCZao). NEVER withhold them! "
+            "If the client hasn't provided a phone number yet, politely request contact details at the very end: "
+            "«To register or secure your spot, please leave your name and phone number 😊»"
         )
     elif lang == "ru":
         lang_rule = (
             "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
             "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского слова! "
-            "Если клиент еще не оставил номер телефона, в конце ответа вежливо запросите контактные данные на русском: "
-            "«Чтобы зарегистрироваться на курс или получить подробную программу и расписание, пожалуйста, оставьте ваше имя и номер телефона 😊»"
+            "ВАЖНО: Если пользователь спрашивает о программе курса, учебном плане или PDF, ОБЯЗАТЕЛЬНО предоставьте ссылку на Telegram (https://t.me/MyMarketingAndPrBot?start=hotel), прямую ссылку на PDF (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) и форму Zoho (https://survey.zohopublic.com/zs/jQCZao). НИКОГДА не требуйте номер телефона перед отправкой материалов! "
+            "Если клиент еще не оставил номер телефона, в конце ответа вежливо запросите: "
+            "«Чтобы зарегистрироваться на курс или забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊»"
         )
     else:
         lang_rule = (
             "QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni o'zbek tilida, muloyim va samimiy bering. "
+            "MUHIM: Agar tinglovchi kurs dasturi, reja, modul, silabus yoki PDF haqida so'rasa, DARHOL Telegram havolasini (https://t.me/MyMarketingAndPrBot?start=hotel), to'g'ridan-to'g'ri PDF havolasini (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) va Zoho ariza shaklini (https://survey.zohopublic.com/zs/jQCZao) bering! Havolalarni HECH QACHON telefon raqam berilishini kutib ushlab turmang! "
             "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida: "
-            "«Kursga ro'yxatdan o'tish yoki batafsil o'quv dasturini yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
+            "«Kursga ro'yxatdan o'tish yoki mutaxassisimiz bog'lanishi uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
         )
 
     # Suhbat tarixini kontekstga kiritish

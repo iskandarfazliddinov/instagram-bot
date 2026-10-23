@@ -345,6 +345,15 @@ def init_db():
         except Exception:
             pass
 
+    # Sozlamalar zaxirasini yangilab qo'yish
+    try:
+        cursor.execute("SELECT key, value FROM settings")
+        all_s = {r[0]: r[1] for r in cursor.fetchall()}
+        with open(SETTINGS_BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_s, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
