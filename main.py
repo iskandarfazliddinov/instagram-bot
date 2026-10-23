@@ -61,7 +61,8 @@ async def run_followup_and_unresponsive_check():
                 mark_client_followup_sent,
                 get_client_chat_history,
                 append_client_chat_history,
-                update_client
+                update_client,
+                update_client_by_id
             )
             from services.ai_assistant import generate_ai_followup, analyze_lead_need
             from services.instagram import send_message
@@ -92,7 +93,15 @@ async def run_followup_and_unresponsive_check():
             for u_client in unresponsive_leads:
                 try:
                     ig_id = u_client.get("instagram_id")
-                    if not u_client.get("ai_summary") and ig_id:
+                    if not ig_id:
+                        continue
+
+                    # Takroriy yuborilishining oldini olish uchun bazada darhol belgilash (lock)
+                    update_client(ig_id, tg_message_id=-1)
+                    if u_client.get("id"):
+                        update_client_by_id(u_client["id"], tg_message_id=-1)
+
+                    if not u_client.get("ai_summary"):
                         hist = get_client_chat_history(ig_id)
                         if hist:
                             summary = analyze_lead_need(hist, u_client)

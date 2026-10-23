@@ -239,7 +239,7 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     }
 
     try:
-        response = requests.post(url, json=payload, timeout=6)
+        response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
             res_data = response.json()
             msg_id = res_data.get("result", {}).get("message_id")
