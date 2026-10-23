@@ -42,76 +42,86 @@ from services.telegram import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+async def run_followup_and_unresponsive_check():
+    """
+    Suhbati to'xtab qolganlarga eslatma yuborish va javobsiz qolgan lidlarni Telegram guruhga uzatish
+    """
+    sent_followups = 0
+    sent_unresponsive = 0
+    try:
+        if get_setting("ai_followup_enabled", "1") == "1":
+            try:
+                delay_mins = int(get_setting("ai_followup_delay_minutes", "30"))
+            except ValueError:
+                delay_mins = 30
+
+            from database import (
+                get_abandoned_clients,
+                get_unresponsive_followup_clients,
+                mark_client_followup_sent,
+                get_client_chat_history,
+                append_client_chat_history,
+                update_client
+            )
+            from services.ai_assistant import generate_ai_followup, analyze_lead_need
+            from services.instagram import send_message
+            from services.telegram import notify_admin_new_lead
+
+            # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish
+            abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
+            for client in abandoned_clients:
+                try:
+                    ig_id = client.get("instagram_id")
+                    if not ig_id:
+                        continue
+
+                    history = get_client_chat_history(ig_id)
+                    followup_msg = generate_ai_followup(history, client)
+                    if followup_msg:
+                        logger.info(f"AI Follow-up yuborilmoqda [{ig_id}]: {followup_msg[:45]}...")
+                        send_message(ig_id, followup_msg)
+                        append_client_chat_history(ig_id, "assistant", followup_msg)
+                        mark_client_followup_sent(client["id"])
+                        sent_followups += 1
+                        await asyncio.sleep(2)
+                except Exception as ab_err:
+                    logger.error(f"Mijoz [{client.get('id')}] ga follow-up yuborishda xatolik: {ab_err}")
+
+            # 2. Eslatma yuborilganidan so'ng ham raqam qoldirmagan mijozlarni Telegram guruhga uzatish
+            unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=168)
+            for u_client in unresponsive_leads:
+                try:
+                    ig_id = u_client.get("instagram_id")
+                    if not u_client.get("ai_summary") and ig_id:
+                        hist = get_client_chat_history(ig_id)
+                        if hist:
+                            summary = analyze_lead_need(hist, u_client)
+                            if summary:
+                                u_client["ai_summary"] = summary
+                                update_client(ig_id, ai_summary=summary)
+
+                    logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{u_client.get('id')}] @{u_client.get('username')}")
+                    notify_admin_new_lead(
+                        u_client, 
+                        source="Direct (Eslatmadan so'ng javobsiz ⚠️)", 
+                        allow_no_phone=True
+                    )
+                    sent_unresponsive += 1
+                    await asyncio.sleep(1)
+                except Exception as u_err:
+                    logger.error(f"Eslatmadan so'ng javobsiz lidni Telegramga yuborishda xatolik: {u_err}")
+    except Exception as e:
+        logger.error(f"Follow-up fon xizmati xatoligi: {e}")
+    return {"sent_followups": sent_followups, "sent_unresponsive": sent_unresponsive}
+
 async def follow_up_background_worker():
     """
     Suhbati yakunlanmagan (telefon raqamini qoldirmagan) mijozlarga
     AI orqali avtomatik aqlli eslatma (Follow-up) yuboruvchi xizmat
     """
-    await asyncio.sleep(60)  # Server ishga tushgandan so'ng 1 daqiqa kutish
+    await asyncio.sleep(5)  # Server ishga tushgandan so'ng 5 soniya kutish
     while True:
-        try:
-            if get_setting("ai_followup_enabled", "1") == "1":
-                try:
-                    delay_mins = int(get_setting("ai_followup_delay_minutes", "30"))
-                except ValueError:
-                    delay_mins = 30
-
-                from database import (
-                    get_abandoned_clients,
-                    get_unresponsive_followup_clients,
-                    mark_client_followup_sent,
-                    get_client_chat_history,
-                    append_client_chat_history,
-                    update_client
-                )
-                from services.ai_assistant import generate_ai_followup, analyze_lead_need
-                from services.instagram import send_message
-                from services.telegram import notify_admin_new_lead
-
-                # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish
-                abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
-                for client in abandoned_clients:
-                    try:
-                        ig_id = client.get("instagram_id")
-                        if not ig_id:
-                            continue
-
-                        history = get_client_chat_history(ig_id)
-                        followup_msg = generate_ai_followup(history, client)
-                        if followup_msg:
-                            logger.info(f"AI Follow-up yuborilmoqda [{ig_id}]: {followup_msg[:45]}...")
-                            send_message(ig_id, followup_msg)
-                            append_client_chat_history(ig_id, "assistant", followup_msg)
-                            mark_client_followup_sent(client["id"])
-                            await asyncio.sleep(2)
-                    except Exception as ab_err:
-                        logger.error(f"Mijoz [{client.get('id')}] ga follow-up yuborishda xatolik: {ab_err}")
-
-                # 2. Eslatma yuborilganidan so'ng ham raqam qoldirmagan mijozlarni Telegram guruhga uzatish
-                unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=168)
-                for u_client in unresponsive_leads:
-                    try:
-                        ig_id = u_client.get("instagram_id")
-                        if not u_client.get("ai_summary") and ig_id:
-                            hist = get_client_chat_history(ig_id)
-                            if hist:
-                                summary = analyze_lead_need(hist, u_client)
-                                if summary:
-                                    u_client["ai_summary"] = summary
-                                    update_client(ig_id, ai_summary=summary)
-
-                        logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{u_client.get('id')}] @{u_client.get('username')}")
-                        notify_admin_new_lead(
-                            u_client, 
-                            source="Direct (Eslatmadan so'ng javobsiz ⚠️)", 
-                            allow_no_phone=True
-                        )
-                        await asyncio.sleep(1)
-                    except Exception as u_err:
-                        logger.error(f"Eslatmadan so'ng javobsiz lidni Telegramga yuborishda xatolik: {u_err}")
-        except Exception as e:
-            logger.error(f"Follow-up fon xizmati xatoligi: {e}")
-
+        await run_followup_and_unresponsive_check()
         # Har 5 daqiqada tekshirish
         await asyncio.sleep(300)
 
@@ -815,6 +825,11 @@ def sync_backup_route():
     from database import init_db, get_all_clients
     init_db()
     return {"ok": True, "total": len(get_all_clients())}
+
+@app.get("/api/trigger-followup")
+async def trigger_followup_route():
+    result = await run_followup_and_unresponsive_check()
+    return {"ok": True, **result}
 
 @app.get("/api/clients")
 def list_clients():
