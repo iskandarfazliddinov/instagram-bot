@@ -96,11 +96,6 @@ async def run_followup_and_unresponsive_check():
                     if not ig_id:
                         continue
 
-                    # Takroriy yuborilishining oldini olish uchun bazada darhol belgilash (lock)
-                    update_client(ig_id, tg_message_id=-1)
-                    if u_client.get("id"):
-                        update_client_by_id(u_client["id"], tg_message_id=-1)
-
                     if not u_client.get("ai_summary"):
                         hist = get_client_chat_history(ig_id)
                         if hist:

@@ -312,7 +312,7 @@ def init_db():
                             UPDATE clients SET 
                                 followup_count = COALESCE(?, followup_count),
                                 last_followup_at = CASE WHEN (last_followup_at = '' OR last_followup_at IS NULL) THEN ? ELSE last_followup_at END,
-                                tg_message_id = COALESCE(?, tg_message_id)
+                                tg_message_id = ?
                             WHERE instagram_id = ?
                         """, (b.get("followup_count"), b.get("last_followup_at", ""), b.get("tg_message_id"), ig_id))
         except Exception:
@@ -577,7 +577,7 @@ def get_unresponsive_followup_clients(min_minutes_after_followup: int = 30, max_
           AND instagram_id != ''
           AND (followup_count IS NOT NULL AND followup_count >= 1)
           AND (last_followup_at IS NOT NULL AND last_followup_at != '')
-          AND (tg_message_id IS NULL OR tg_message_id = 0)
+          AND (tg_message_id IS NULL OR tg_message_id <= 0)
         ORDER BY last_followup_at ASC
     """)
     rows = [dict(r) for r in cursor.fetchall()]

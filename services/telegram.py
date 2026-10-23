@@ -184,18 +184,20 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     if "prev_phone" in client:
         prev_phone = client.get("prev_phone")
 
+    has_existing_msg = bool(existing_tg_mid and isinstance(existing_tg_mid, int) and existing_tg_mid > 0)
+
     # Telefon raqami yangilanganligini tekshirish
     phone_changed = bool(prev_phone and phone and re.sub(r"\D", "", str(prev_phone)) != re.sub(r"\D", "", str(phone)))
     phone_added = bool((not prev_phone or str(prev_phone).strip() in ["", "None", "—", "null"]) and phone and len(re.sub(r"\D", "", str(phone))) >= 9)
     if phone_changed:
         client["phone_updated_note"] = f"🆕 (Yangi raqam! Avvalgi: {prev_phone})"
-    elif phone_added and existing_tg_mid:
+    elif phone_added and has_existing_msg:
         client["phone_updated_note"] = f"🆕 (Telefon raqami kiritildi! 🎉)"
 
     # RE-ENGAGEMENT (Qayta murojaat, yangi raqam yoki yangi kursga qiziqish) shartlari:
     is_reengagement = False
     current_campaign = client.get("campaign", "Umumiy")
-    if existing_tg_mid:
+    if has_existing_msg:
         time_diff_hours = 0
         if prev_updated:
             try:
@@ -218,11 +220,14 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
             logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (phone_changed={phone_changed}, phone_added={phone_added}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
 
     # Agar 1-2 soat ichidagi bir xil takroriy xabar bo'lsa -> faqat mavjud xabarni yangilaymiz (spam qilmaymiz)
-    if existing_tg_mid and client_id and not is_reengagement:
+    if has_existing_msg and client_id and not is_reengagement:
         try:
-            update_telegram_lead_message(client_id)
-            logger.info(f"Mijoz [{client_id}] mavjud Telegram xabari yangilandi (takroriy yangi xabar yuborilmadi).")
-            return
+            success = update_telegram_lead_message(client_id)
+            if success:
+                logger.info(f"Mijoz [{client_id}] mavjud Telegram xabari yangilandi (takroriy yangi xabar yuborilmadi).")
+                return
+            else:
+                logger.warning(f"Telegramdagi eski xabar yangilanmadi (topilmadi yoki o'chirilgan), yangi yuboriladi.")
         except Exception as e:
             logger.warning(f"Telegramdagi eski xabarni yangilab bo'lmadi, yangi yuboriladi: {e}")
 
@@ -465,15 +470,16 @@ def handle_telegram_reply_comment(update: dict):
         "parse_mode": "HTML"
     }, timeout=5)
 
-def update_telegram_lead_message(client_id: int):
+def update_telegram_lead_message(client_id: int) -> bool:
     """
     CRM dan izoh yoki holat yangilanganda Telegramdagi xabarni ham sinxronlashtirish
     """
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
-        return
+        return False
     client = get_client_by_id(client_id)
-    if not client or not client.get("tg_message_id"):
-        return
+    tg_mid = client.get("tg_message_id") if client else None
+    if not client or not tg_mid or not isinstance(tg_mid, int) or tg_mid <= 0:
+        return False
     try:
         new_text = build_lead_message_text(client, source=client.get("source", "Direct"))
         new_keyboard = build_inline_keyboard(
@@ -483,15 +489,17 @@ def update_telegram_lead_message(client_id: int):
             username=client.get("username", "")
         )
         edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
-        requests.post(edit_url, json={
+        resp = requests.post(edit_url, json={
             "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
-            "message_id": client["tg_message_id"],
+            "message_id": tg_mid,
             "text": new_text,
             "parse_mode": "HTML",
             "reply_markup": {"inline_keyboard": new_keyboard}
-        }, timeout=5)
+        }, timeout=8)
+        return resp.status_code == 200
     except Exception as e:
         logger.error(f"Telegram xabarni CRM dan yangilashda xato: {e}")
+        return False
 
 def notify_admin_voice_message(client: dict, transcription: str, reply: str, audio_url: str = None):
     """
