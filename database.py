@@ -246,7 +246,7 @@ def init_db():
                     if k == "ai_system_prompt":
                         if "tourism-academy.uz" in v:
                             v = v.replace("https://tourism-academy.uz", "https://tourism-edu.uz").replace("info@tourism-academy.uz", "info@tourism-edu.uz")
-                        if "5 500 000" not in v or "QAYTA TAYYORLASH" not in v or "ONLAYN TA'LIM PLATFORMASI" not in v:
+                        if "5 500 000" not in v or "QAYTA TAYYORLASH" not in v or "ONLAYN TA'LIM PLATFORMASI" not in v or "HOTEL OPERATIONS" not in v:
                             v = default_settings["ai_system_prompt"]
                     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
         except Exception:
