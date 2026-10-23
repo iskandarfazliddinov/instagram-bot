@@ -69,7 +69,7 @@ async def run_followup_and_unresponsive_check():
             from services.instagram import send_message
             from services.telegram import notify_admin_new_lead
 
-            # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish
+            # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish (Faqat Direct ichida)
             abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
             for client in abandoned_clients:
                 try:
@@ -89,36 +89,8 @@ async def run_followup_and_unresponsive_check():
                 except Exception as ab_err:
                     logger.error(f"Mijoz [{client.get('id')}] ga follow-up yuborishda xatolik: {ab_err}")
 
-            # 2. Eslatma yuborilganidan so'ng ham raqam qoldirmagan mijozlarni Telegram guruhga uzatish
-            unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=168)
-            for u_client in unresponsive_leads:
-                try:
-                    cid = u_client.get("id")
-                    ig_id = u_client.get("instagram_id")
-                    if not ig_id or not cid:
-                        continue
-
-                    # Qayta va takroran yuborilishini to'xtatish uchun darhol bazada muhrlash
-                    mark_client_unresponsive_notified(cid, tg_mid=999999)
-
-                    if not u_client.get("ai_summary"):
-                        hist = get_client_chat_history(ig_id)
-                        if hist:
-                            summary = analyze_lead_need(hist, u_client)
-                            if summary:
-                                u_client["ai_summary"] = summary
-                                update_client(ig_id, ai_summary=summary)
-
-                    logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{cid}] @{u_client.get('username')}")
-                    notify_admin_new_lead(
-                        u_client, 
-                        source="Direct (Eslatmadan so'ng javobsiz ⚠️)", 
-                        allow_no_phone=True
-                    )
-                    sent_unresponsive += 1
-                    await asyncio.sleep(2)
-                except Exception as u_err:
-                    logger.error(f"Eslatmadan so'ng javobsiz lidni Telegramga yuborishda xatolik: {u_err}")
+            # 2. Qat'iy qoida: Telefon raqamini qoldirmagan mijozlar Telegram guruhga UMUMAN yuborilmaydi!
+            # Ular faqat CRM jadvalida turadi, guruhga esa faqat raqamini yozgan real lidlar tushadi.
     except Exception as e:
         logger.error(f"Follow-up fon xizmati xatoligi: {e}")
     return {"sent_followups": sent_followups, "sent_unresponsive": sent_unresponsive}

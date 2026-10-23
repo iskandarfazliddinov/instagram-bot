@@ -136,12 +136,13 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
         return
 
-    # 1. TELEFON RAQAM TEKSHIRUVI:
+    # 1. QAT'IY TELEFON RAQAM TEKSHIRUVI:
+    # Guruhga FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
     phone = client.get("phone_number")
     digits = re.sub(r"\D", "", str(phone or ""))
     has_valid_phone = len(digits) >= 9
 
-    if not has_valid_phone and not allow_no_phone:
+    if not has_valid_phone:
         logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] hali telefon raqamini kiritmagan. Telegram guruhga yuborilmadi.")
         return
 
