@@ -20,8 +20,8 @@ class Settings:
     PUBLIC_COMMENT_REPLY: str = "Directingizga to'liq ma'lumot va havolani yubordik! 📩"
 
     # Telegram bildirishnomalari
-    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_ADMIN_CHAT_ID: str = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "8001530861:AAGHL-4RO3uMnE3ASwWinGP0akLEuUFSGgc")
+    TELEGRAM_ADMIN_CHAT_ID: str = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "-5105674941")
 
     # Sun'iy intellekt (Gemini API)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", _DEFAULT_GK)
