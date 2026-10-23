@@ -545,7 +545,7 @@ def mark_client_followup_sent(client_id: int):
     conn.close()
     sync_leads_backup()
 
-def get_unresponsive_followup_clients(min_minutes_after_followup: int = 30, max_hours: int = 24) -> list:
+def get_unresponsive_followup_clients(min_minutes_after_followup: int = 30, max_hours: int = 168) -> list:
     """
     Eslatma (Follow-up) yuborilgan, lekin shunda ham raqam qoldirmagan va Telegram guruhiga
     hali yuborilmagan mijozlarni olish (operatorlar Direct orqali yozishi uchun).

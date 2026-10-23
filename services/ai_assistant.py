@@ -249,11 +249,13 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
 
     return None
 
-def analyze_lead_need(chat_history: list, client_context: dict) -> str:
+def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
     """
     Mijoz nimalarga qiziqqanini va unga aynan nima kerakligini Gemini AI orqali aniqlash.
     Ushbu xulosa Telegram guruhiga yangi lid xabarida va CRM jadvalida ko'rinadi.
     """
+    if client_context is None:
+        client_context = {}
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
     last_msg = client_context.get("last_message") or ""

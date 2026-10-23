@@ -243,8 +243,12 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
         if response.status_code == 200:
             res_data = response.json()
             msg_id = res_data.get("result", {}).get("message_id")
-            if msg_id and client.get("instagram_id"):
-                update_client(client["instagram_id"], tg_message_id=msg_id)
+            if msg_id:
+                client["tg_message_id"] = msg_id
+                if client.get("instagram_id"):
+                    update_client(client["instagram_id"], tg_message_id=msg_id)
+                if client.get("id"):
+                    update_client_by_id(client["id"], tg_message_id=msg_id)
         else:
             logger.error(f"Telegram API javobi: {response.text}")
     except Exception as e:

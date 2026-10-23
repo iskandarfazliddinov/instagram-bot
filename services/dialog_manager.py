@@ -252,7 +252,7 @@ def process_incoming_message(sender_id: str, user_text: str):
             if not has_valid_num and (client.get("followup_count") or 0) >= 1 and not client.get("tg_message_id"):
                 try:
                     curr_hist = get_client_chat_history(sender_id)
-                    need_summary = analyze_lead_need(curr_hist)
+                    need_summary = analyze_lead_need(curr_hist, client)
                     if need_summary:
                         client["ai_summary"] = need_summary
                         update_client(sender_id, ai_summary=need_summary)

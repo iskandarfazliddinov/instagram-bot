@@ -71,28 +71,31 @@ async def follow_up_background_worker():
                 # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish
                 abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
                 for client in abandoned_clients:
-                    ig_id = client.get("instagram_id")
-                    if not ig_id:
-                        continue
+                    try:
+                        ig_id = client.get("instagram_id")
+                        if not ig_id:
+                            continue
 
-                    history = get_client_chat_history(ig_id)
-                    followup_msg = generate_ai_followup(history, client)
-                    if followup_msg:
-                        logger.info(f"AI Follow-up yuborilmoqda [{ig_id}]: {followup_msg[:45]}...")
-                        send_message(ig_id, followup_msg)
-                        append_client_chat_history(ig_id, "assistant", followup_msg)
-                        mark_client_followup_sent(client["id"])
-                        await asyncio.sleep(2)
+                        history = get_client_chat_history(ig_id)
+                        followup_msg = generate_ai_followup(history, client)
+                        if followup_msg:
+                            logger.info(f"AI Follow-up yuborilmoqda [{ig_id}]: {followup_msg[:45]}...")
+                            send_message(ig_id, followup_msg)
+                            append_client_chat_history(ig_id, "assistant", followup_msg)
+                            mark_client_followup_sent(client["id"])
+                            await asyncio.sleep(2)
+                    except Exception as ab_err:
+                        logger.error(f"Mijoz [{client.get('id')}] ga follow-up yuborishda xatolik: {ab_err}")
 
                 # 2. Eslatma yuborilganidan so'ng ham raqam qoldirmagan mijozlarni Telegram guruhga uzatish
-                unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=24)
+                unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=168)
                 for u_client in unresponsive_leads:
                     try:
                         ig_id = u_client.get("instagram_id")
                         if not u_client.get("ai_summary") and ig_id:
                             hist = get_client_chat_history(ig_id)
                             if hist:
-                                summary = analyze_lead_need(hist)
+                                summary = analyze_lead_need(hist, u_client)
                                 if summary:
                                     u_client["ai_summary"] = summary
                                     update_client(ig_id, ai_summary=summary)
