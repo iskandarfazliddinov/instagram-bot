@@ -1,6 +1,7 @@
 import asyncio
 import io
 import csv
+import os
 import logging
 import hashlib
 import urllib.parse
@@ -8,6 +9,7 @@ import time
 from collections import OrderedDict
 from fastapi import FastAPI, Request, Response, Form, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from starlette.staticfiles import StaticFiles
 from config import settings
 from database import (
     init_db,
@@ -34,6 +36,7 @@ from services.admin_view import get_admin_dashboard_html, get_login_page_html
 from services.telegram import (
     handle_telegram_callback,
     handle_telegram_reply_comment,
+    handle_telegram_private_message,
     update_telegram_lead_message,
     setup_telegram_webhook
 )
@@ -125,6 +128,10 @@ app = FastAPI(
     description="Instagram Direct va Video izohlari orqali avtomatik javob berish, havola ulashish va Telegramga lidlarni uzatish tizimi",
     version="1.1.0"
 )
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.on_event("startup")
 async def on_startup():
@@ -796,7 +803,11 @@ async def telegram_webhook(request: Request):
         if "callback_query" in data:
             handle_telegram_callback(data)
         elif "message" in data:
-            handle_telegram_reply_comment(data)
+            msg = data.get("message", {})
+            if msg.get("chat", {}).get("type") == "private":
+                handle_telegram_private_message(msg)
+            else:
+                handle_telegram_reply_comment(data)
     except Exception as e:
         logger.error(f"Telegram webhook callback xatoligi: {e}")
     return {"ok": True}

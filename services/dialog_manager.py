@@ -69,12 +69,12 @@ def process_incoming_message(sender_id: str, user_text: str):
         detected_course = "Turoperatorlik kursi"
     elif "gid" in history_text or "ekskurs" in history_text:
         detected_course = "Gid-ekskursiyachi kursi"
+    elif "hotel" in history_text or "operations" in history_text or "innovat" in history_text or "inavation" in history_text or "mehmonxona" in history_text:
+        detected_course = "Hotel Operations and Innovation"
     elif "housekeeping" in history_text or "xona tozalash" in history_text:
         detected_course = "Housekeeping (Onlayn)"
     elif "frontoffice" in history_text or "front office" in history_text:
         detected_course = "Front Office (Onlayn)"
-    elif "hotel" in history_text or "mehmonxona" in history_text:
-        detected_course = "Mehmonxona boshqaruvi"
     elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
         detected_course = "Restoran ishi va servis"
     elif "online" in history_text or "onlayn" in history_text or "masofa" in history_text or "platforma" in history_text:
@@ -82,7 +82,7 @@ def process_incoming_message(sender_id: str, user_text: str):
             detected_course = "Onlayn ta'lim platformasi"
 
     if detected_course:
-        if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course)):
+        if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course or "Hotel" in detected_course)):
             client["campaign"] = detected_course
             update_client(sender_id, campaign=detected_course)
 

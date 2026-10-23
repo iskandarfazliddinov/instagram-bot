@@ -1,3 +1,5 @@
+import os
+import json
 import logging
 import re
 from datetime import datetime
@@ -296,6 +298,15 @@ def handle_telegram_callback(update: dict):
     chat_id = msg.get("chat", {}).get("id")
     msg_id = msg.get("message_id")
     ans_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+
+    # Maxsus action: Hotel Operations PDF so'ralganda
+    if cq_data == "get_hotel_pdf":
+        try:
+            requests.post(ans_url, json={"callback_query_id": cq_id, "text": "Hotel Operations PDF fayli yuborilmoqda... 📄", "show_alert": False}, timeout=3)
+        except Exception:
+            pass
+        send_hotel_curriculum_pdf(chat_id)
+        return
 
     # Action va client_id ni ajratib olish
     parts = cq_data.split("_")
@@ -614,4 +625,104 @@ def setup_telegram_webhook(host_url: str):
     except Exception as e:
         logger.error(f"Telegram webhook o'rnatishda xatolik: {e}")
         return False
+
+def send_hotel_curriculum_pdf(chat_id: int) -> bool:
+    """
+    Hotel Operations and Innovation 2026-2027 PDF faylini Telegram foydalanuvchisiga yuborish
+    """
+    if not settings.TELEGRAM_BOT_TOKEN:
+        return False
+
+    pdf_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "hotel_operations.pdf")
+    if not os.path.exists(pdf_path):
+        pdf_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "Hotel-Operations-and-Innovation_1-noyabr.pdf")
+
+    caption = (
+        "🏨 <b>Hotel Operations and Innovation 2026–2027</b>\n"
+        "<i>UN Tourism shafeligidagi Xalqaro Turizm Akademiyasi Samarqand kampusining rasmiy qayta tayyorlash dasturi.</i>\n\n"
+        "📄 <b>Dastur tarkibi (7 ta modul):</b>\n"
+        "1. Tadbirlar va banket xizmati (Events & Banqueting)\n"
+        "2. Qabul va joylashtirish (Front Office Operations)\n"
+        "3. Xauskiping va mehmonlar qulayligi (Modern Housekeeping)\n"
+        "4. Restoran va taomlar xizmati (Food & Beverage)\n"
+        "5. Mehmonxona muhandisligi va barqarorlik (Maintenance)\n"
+        "6. Xavfsizlik, oziq-ovqat gigiyenasi va inqiroz (Safety & Crisis)\n"
+        "7. Daromadlarni boshqarish (Revenue Management)\n\n"
+        "📅 <b>Ro'yxatdan o'tish muddati:</b> 26-sentyabr — 1-noyabr 2026\n"
+        "👥 <b>Ishtirokchilar soni:</b> Cheklangan (30 nafar tinglovchi)\n\n"
+        "👇 <b>Rasmiy ariza topshirish:</b>\n"
+        "https://survey.zohopublic.com/zs/jQCZao\n\n"
+        "📞 Savollar bo'lsa: +998 (90) 103 30 00"
+    )
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendDocument"
+    try:
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                files = {"document": ("Hotel_Operations_and_Innovation_Curriculum.pdf", f, "application/pdf")}
+                data = {
+                    "chat_id": chat_id,
+                    "caption": caption,
+                    "parse_mode": "HTML",
+                    "reply_markup": json.dumps({
+                        "inline_keyboard": [
+                            [{"text": "📝 Ro'yxatdan o'tish (Zoho Form)", "url": "https://survey.zohopublic.com/zs/jQCZao"}],
+                            [{"text": "🌐 Rasmiy saytimiz", "url": "https://tourism-edu.uz"}]
+                        ]
+                    })
+                }
+                res = requests.post(url, data=data, files=files, timeout=30)
+                logger.info(f"Telegram PDF yuborildi [Chat: {chat_id}], status: {res.status_code}")
+                return res.status_code == 200
+        else:
+            msg_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+            requests.post(msg_url, json={
+                "chat_id": chat_id,
+                "text": caption + "\n\n📥 <b>PDF yuklab olish:</b> https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf",
+                "parse_mode": "HTML"
+            }, timeout=10)
+            return True
+    except Exception as e:
+        logger.error(f"Telegram orqali PDF yuborishda xatolik: {e}")
+        return False
+
+def handle_telegram_private_message(message: dict):
+    """
+    Foydalanuvchi Telegram botning shaxsiy lichkasiga yozganda yoki /start bosganda
+    """
+    chat = message.get("chat", {})
+    chat_type = chat.get("type", "")
+    if chat_type != "private":
+        return
+
+    chat_id = chat.get("id")
+    text = (message.get("text") or "").strip()
+    logger.info(f"Telegram botga shaxsiy xabar keldi [Chat: {chat_id}]: {text}")
+
+    # Agar /start hotel yoki hotel, dastur, pdf so'ralgan bo'lsa
+    if "/start" in text.lower() or "hotel" in text.lower() or "dastur" in text.lower() or "pdf" in text.lower() or "reja" in text.lower():
+        send_hotel_curriculum_pdf(chat_id)
+    else:
+        # Standart xush kelibsiz xabari va PDF tugmasi
+        msg_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        welcome_text = (
+            f"Assalomu alaykum, {chat.get('first_name', '')}! 😊\n"
+            f"Xalqaro Turizm Akademiyasi Samarqand kampusining rasmiy botiga xush kelibsiz.\n\n"
+            f"Quyidagi tugma orqali <b>«Hotel Operations and Innovation 2026–2027»</b> xalqaro o'quv dasturining to'liq PDF faylini yuklab olishingiz mumkin:"
+        )
+        try:
+            requests.post(msg_url, json={
+                "chat_id": chat_id,
+                "text": welcome_text,
+                "parse_mode": "HTML",
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": "🏨 O'quv dasturini (PDF) olish", "callback_data": "get_hotel_pdf"}],
+                        [{"text": "📝 Ro'yxatdan o'tish (Zoho)", "url": "https://survey.zohopublic.com/zs/jQCZao"}],
+                        [{"text": "🌐 Rasmiy sayt", "url": "https://tourism-edu.uz"}]
+                    ]
+                }
+            }, timeout=10)
+        except Exception as e:
+            logger.error(f"Telegram shaxsiy xabar yuborishda xatolik: {e}")
 

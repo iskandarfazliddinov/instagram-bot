@@ -195,8 +195,17 @@ def init_db():
             "   - Ruscha yozsa — to'liq rus tilida ('Курс переподготовки гидов: 4 месяца, диплом и бейдж гида по всему Узбекистану, стоимость 5 500 000 сум...', 'Повышение квалификации: 1 месяц (72 ч), 2 350 000 сум...', 'Турагентство / Туроператор: 1 месяц, сертификат, 2 350 000 сум...').\n"
             "   - O'zbekcha yozsa — to'liq o'zbek tilida.\n"
             "   - Inglizcha yozsa — to'liq ingliz tilida.\n"
-            "6. SALOMLASHISH QOIDASI: Faqat birinchi xabarda salomlashing. Keyingi har bir xabarda qayta-qayta salomlashmang. Darhol to'g'ridan-to'g'ri savolga javob bering.\n"
-            "7. Rasmiy veb-saytimiz yoki onlayn ta'lim platformamiz havolasi: https://tourism-edu.uz"
+            "6. 🏨 «HOTEL OPERATIONS AND INNOVATION 2026–2027» DASTURI:\n"
+            "• Tashkilotchi: UN Tourism va Xalqaro Turizm Akademiyasi Samarqand kampusi.\n"
+            "• Kimlar uchun: Mehmonxona sohasi rahbarlari (menejerlar, bo'lim boshliqlari, supervayzerlar).\n"
+            "• Dastur: 7 ta moduldan iborat nufuzli xalqaro qayta tayyorlash dasturi (Banqueting, Front Office, Housekeeping, F&B, Maintenance, Safety & Crisis, Revenue Management).\n"
+            "• Muddat: 26-sentyabr — 1-noyabr 2026 gacha ro'yxatga olinadi. 30 nafar tinglovchi uchun joy cheklangan.\n"
+            "• Onlayn ariza: https://survey.zohopublic.com/zs/jQCZao\n"
+            "• Dasturni PDF formatda Telegramda yuklab olish: https://t.me/MyMarketingAndPrBot?start=hotel\n"
+            "• Dasturni to'g'ridan-to'g'ri PDF yuklab olish: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n"
+            "• QOIDA: Agar tinglovchi Hotel Operations, mehmonxona kursi, dastur yoki PDF haqida so'rasa, 7 ta modul va xalqaro UN Tourism sertifikati haqida ma'lumot berib, PDF dasturni olish uchun Telegram havolamizni (https://t.me/MyMarketingAndPrBot?start=hotel) hamda ariza formasini (https://survey.zohopublic.com/zs/jQCZao) bering!\n\n"
+            "7. SALOMLASHISH QOIDASI: Faqat birinchi xabarda salomlashing. Keyingi har bir xabarda qayta-qayta salomlashmang. Darhol to'g'ridan-to'g'ri savolga javob bering.\n"
+            "8. Rasmiy veb-saytimiz yoki onlayn ta'lim platformamiz havolasi: https://tourism-edu.uz"
         )
     }
     for k, v in default_settings.items():
@@ -206,6 +215,24 @@ def init_db():
     cursor.execute("UPDATE settings SET value = 'https://tourism-edu.uz' WHERE key = 'default_promo_link'")
     cursor.execute("UPDATE settings SET value = ? WHERE key = 'final_message'", (default_settings["final_message"],))
     cursor.execute("UPDATE settings SET value = ? WHERE key = 'ai_system_prompt'", (default_settings["ai_system_prompt"],))
+
+    # Hotel Operations kampaniyasini kiritish
+    cursor.execute("""
+        INSERT OR REPLACE INTO campaigns (
+            id, name, trigger_keyword, media_id, media_url, public_reply, dm_welcome, promo_link, is_active, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        1,
+        "Hotel Operations and Innovation 2026–2027",
+        "hotel, operations, inavation, innovation, mehmonxona, dastur, pdf, narx, reja",
+        "18122374856317012",
+        "https://www.instagram.com/reel/DerPZSNNS0F/",
+        "Directingizga Hotel Operations dasturi va to'liq PDF rejani yubordik! 📩",
+        "Assalomu alaykum! UN Tourism shafeligidagi \"Hotel Operations and Innovation 2026–2027\" xalqaro qayta tayyorlash dasturiga xush kelibsiz. 🏨✨\n\nTo'liq 27 sahifalik o'quv rejasini (PDF) Telegram orqali yuklab olishingiz mumkin:\n👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\nYoki brauzerda yuklab oling:\n📥 https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\nSavollaringiz bo'lsa, qaysi modul qiziqtirayotganini yozing yoki mutaxassisimiz bog'lanishi uchun ismingiz va raqamingizni qoldiring 😊",
+        "https://survey.zohopublic.com/zs/jQCZao",
+        1,
+        datetime.now().isoformat()
+    ))
 
     # Agar zaxiradagi sozlamalar mavjud bo'lsa tiklash
     if os.path.exists(SETTINGS_BACKUP_FILE):
