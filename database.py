@@ -248,8 +248,9 @@ def init_db():
                                     id, instagram_id, username, full_name, phone_number, source,
                                     campaign, step, last_message, lead_status, is_follower,
                                     ai_summary, manager_comment, chat_history,
-                                    manager_name, manager_time, created_at, updated_at
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    manager_name, manager_time, created_at, updated_at,
+                                    followup_count, last_followup_at, tg_message_id, profile_pic
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, (
                                 b.get("id"),
                                 ig_id,
@@ -268,7 +269,11 @@ def init_db():
                                 b.get("manager_name", ""),
                                 b.get("manager_time", ""),
                                 b.get("created_at", datetime.now().isoformat()),
-                                b.get("updated_at", datetime.now().isoformat())
+                                b.get("updated_at", datetime.now().isoformat()),
+                                b.get("followup_count", 0),
+                                b.get("last_followup_at", ""),
+                                b.get("tg_message_id"),
+                                b.get("profile_pic", "")
                             ))
                         else:
                             cursor.execute("""
@@ -276,8 +281,9 @@ def init_db():
                                     instagram_id, username, full_name, phone_number, source,
                                     campaign, step, last_message, lead_status, is_follower,
                                     ai_summary, manager_comment, chat_history,
-                                    manager_name, manager_time, created_at, updated_at
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    manager_name, manager_time, created_at, updated_at,
+                                    followup_count, last_followup_at, tg_message_id, profile_pic
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, (
                                 ig_id,
                                 b.get("username", ""),
@@ -295,8 +301,20 @@ def init_db():
                                 b.get("manager_name", ""),
                                 b.get("manager_time", ""),
                                 b.get("created_at", datetime.now().isoformat()),
-                                b.get("updated_at", datetime.now().isoformat())
+                                b.get("updated_at", datetime.now().isoformat()),
+                                b.get("followup_count", 0),
+                                b.get("last_followup_at", ""),
+                                b.get("tg_message_id"),
+                                b.get("profile_pic", "")
                             ))
+                    else:
+                        cursor.execute("""
+                            UPDATE clients SET 
+                                followup_count = COALESCE(?, followup_count),
+                                last_followup_at = CASE WHEN (last_followup_at = '' OR last_followup_at IS NULL) THEN ? ELSE last_followup_at END,
+                                tg_message_id = COALESCE(?, tg_message_id)
+                            WHERE instagram_id = ?
+                        """, (b.get("followup_count"), b.get("last_followup_at", ""), b.get("tg_message_id"), ig_id))
         except Exception:
             pass
 
