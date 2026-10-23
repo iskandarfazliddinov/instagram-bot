@@ -59,6 +59,7 @@ async def run_followup_and_unresponsive_check():
                 get_abandoned_clients,
                 get_unresponsive_followup_clients,
                 mark_client_followup_sent,
+                mark_client_unresponsive_notified,
                 get_client_chat_history,
                 append_client_chat_history,
                 update_client,
@@ -92,9 +93,13 @@ async def run_followup_and_unresponsive_check():
             unresponsive_leads = get_unresponsive_followup_clients(min_minutes_after_followup=delay_mins, max_hours=168)
             for u_client in unresponsive_leads:
                 try:
+                    cid = u_client.get("id")
                     ig_id = u_client.get("instagram_id")
-                    if not ig_id:
+                    if not ig_id or not cid:
                         continue
+
+                    # Qayta va takroran yuborilishini to'xtatish uchun darhol bazada muhrlash
+                    mark_client_unresponsive_notified(cid, tg_mid=999999)
 
                     if not u_client.get("ai_summary"):
                         hist = get_client_chat_history(ig_id)
@@ -104,14 +109,14 @@ async def run_followup_and_unresponsive_check():
                                 u_client["ai_summary"] = summary
                                 update_client(ig_id, ai_summary=summary)
 
-                    logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{u_client.get('id')}] @{u_client.get('username')}")
+                    logger.info(f"Eslatmadan so'ng javob bermagan lid Telegramga uzatilmoqda [{cid}] @{u_client.get('username')}")
                     notify_admin_new_lead(
                         u_client, 
                         source="Direct (Eslatmadan so'ng javobsiz ⚠️)", 
                         allow_no_phone=True
                     )
                     sent_unresponsive += 1
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
                 except Exception as u_err:
                     logger.error(f"Eslatmadan so'ng javobsiz lidni Telegramga yuborishda xatolik: {u_err}")
     except Exception as e:

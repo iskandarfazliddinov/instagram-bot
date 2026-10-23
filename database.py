@@ -563,6 +563,21 @@ def mark_client_followup_sent(client_id: int):
     conn.close()
     sync_leads_backup()
 
+def mark_client_unresponsive_notified(client_id: int, tg_mid: int = 999999):
+    """Javobsiz qolgan lid guruhga yuborilganini belgilash (qayta-qayta takrorlanishining oldini olish uchun)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_iso = datetime.now().isoformat()
+    cursor.execute("""
+        UPDATE clients SET 
+            tg_message_id = COALESCE(?, 999999),
+            updated_at = ?
+        WHERE id = ?
+    """, (tg_mid, now_iso, client_id))
+    conn.commit()
+    conn.close()
+    sync_leads_backup()
+
 def get_unresponsive_followup_clients(min_minutes_after_followup: int = 30, max_hours: int = 168) -> list:
     """
     Eslatma (Follow-up) yuborilgan, lekin shunda ham raqam qoldirmagan va Telegram guruhiga
