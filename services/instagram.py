@@ -62,15 +62,18 @@ def get_access_token() -> str:
     """
     global _cached_raw_token, _cached_resolved_token
     db_token = get_setting("page_access_token", "").strip()
-    raw = db_token if db_token else settings.PAGE_ACCESS_TOKEN.strip()
+    raw = db_token if (db_token and len(db_token) > 20) else settings.PAGE_ACCESS_TOKEN.strip()
     if not raw or raw == "YOUR_PAGE_ACCESS_TOKEN_HERE":
-        return ""
+        raw = settings.PAGE_ACCESS_TOKEN.strip()
 
     if raw == _cached_raw_token and _cached_resolved_token:
         return _cached_resolved_token
 
     _cached_raw_token = raw
-    _cached_resolved_token = resolve_page_token(raw)
+    resolved = resolve_page_token(raw)
+    if (not resolved or not resolved.startswith("EA")) and settings.PAGE_ACCESS_TOKEN.strip() != raw:
+        resolved = resolve_page_token(settings.PAGE_ACCESS_TOKEN.strip())
+    _cached_resolved_token = resolved
     return _cached_resolved_token
 
 def notify_admin_token_error(error_details: str):
