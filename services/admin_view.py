@@ -307,6 +307,26 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         """
 
     # ---------------- 6. MIJOZLAR JADVALI QATORLARI ----------------
+    clients_for_export = []
+    for idx, c in enumerate(clients, start=1):
+        clients_for_export.append({
+            "id": c.get("id") or idx,
+            "username": c.get("username") or "",
+            "full_name": c.get("full_name") or "",
+            "phone_number": c.get("phone_number") or "",
+            "campaign": c.get("campaign") or "Umumiy",
+            "source": c.get("source") or "Direct",
+            "lead_status": c.get("lead_status") or "yangi",
+            "is_follower": 1 if c.get("is_follower") else 0,
+            "ai_summary": c.get("ai_summary") or "",
+            "last_message": c.get("last_message") or "",
+            "manager_name": c.get("manager_name") or "",
+            "manager_comment": c.get("manager_comment") or "",
+            "created_at": (c.get("created_at") or "")[:16].replace("T", " "),
+            "instagram_id": str(c.get("instagram_id") or "")
+        })
+    clients_json_data = json.dumps(clients_for_export, ensure_ascii=False).replace("</script>", "<\\/script>")
+
     clients_html = ""
     colspan_num = 8 if is_operator else 9
     if not clients:
@@ -1710,28 +1730,26 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }});
         }}
 
+        const LEADS_DATA = {clients_json_data};
+
         // Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish (Brauzer xatoliksiz)
-        async function exportLeadsToExcel(btn) {{
+        function exportLeadsToExcel(btn) {{
             const originalText = btn ? btn.innerHTML : '';
             if (btn) {{
-                btn.innerHTML = '⏳ Tayyorlanmoqda...';
+                btn.innerHTML = '⏳ Yuklanmoqda...';
                 btn.disabled = true;
             }}
 
             try {{
-                const res = await fetch('/api/clients');
-                const json = await res.json();
-                const clients = json.clients || [];
-
                 const statusMap = {{
-                    'yangi': '⚪ Yangi',
-                    'jarayonda': '🟡 Jarayonda',
-                    'boglandi': '🟢 Bog\'lanildi',
-                    'oylanyapti': '💭 O\'ylayapti',
-                    'rad': '🔴 Rad / Ko\'tarmadi'
+                    "yangi": "⚪ Yangi",
+                    "jarayonda": "🟡 Jarayonda",
+                    "boglandi": "🟢 Bog'lanildi",
+                    "oylanyapti": "💭 O'ylayapti",
+                    "rad": "🔴 Rad / Ko'tarmadi"
                 }};
 
-                const rows = clients.map((c, i) => ({{
+                const rows = LEADS_DATA.map((c, i) => ({{
                     "№": c.id || (i + 1),
                     "Instagram Username": c.username ? '@' + c.username : '—',
                     "Mijoz Ismi": c.full_name || 'Kiritilmagan',
@@ -1744,7 +1762,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     "Oxirgi Xabar / So'rov": (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
                     "Mas'ul Xodim": c.manager_name || '—',
                     "Mutaxassis Izohi": (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
-                    "Yaratilgan Vaqt": (c.created_at || '').substring(0, 16).replace('T', ' '),
+                    "Yaratilgan Vaqt": c.created_at || '—',
                     "Instagram ID": String(c.instagram_id || ''),
                     "Profil Havolasi": c.username ? 'https://instagram.com/' + c.username : ''
                 }}));
@@ -1777,11 +1795,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     const nowStr = new Date().toISOString().slice(0, 10);
                     XLSX.writeFile(wb, `instagram_lidlar_${{nowStr}}.xlsx`);
                 }} else {{
-                    window.location.href = '/api/clients/excel';
+                    downloadCSVDirectly();
                 }}
             }} catch (err) {{
                 console.error("Excel eksport xatoligi:", err);
-                window.location.href = '/api/clients/excel';
+                downloadCSVDirectly();
             }} finally {{
                 if (btn) {{
                     btn.innerHTML = originalText;
@@ -1791,63 +1809,61 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         // CSV formatida yuklab olish (UTF-8 BOM va regional ajratuvchilar bilan)
-        async function exportLeadsToCSV(btn) {{
+        function downloadCSVDirectly() {{
+            const statusMap = {{
+                "yangi": "⚪ Yangi",
+                "jarayonda": "🟡 Jarayonda",
+                "boglandi": "🟢 Bog'lanildi",
+                "oylanyapti": "💭 O'ylayapti",
+                "rad": "🔴 Rad / Ko'tarmadi"
+            }};
+
+            let csv = '\\ufeff'; // UTF-8 BOM Excel uchun
+            const headers = ["ID", "Username", "Mijoz Ismi", "Telefon Raqami", "Yo'nalish / Kurs", "Manba", "Holati", "Obuna", "💡 AI Ehtiyoj Tahlili", "Oxirgi Xabar / So'rov", "Mas'ul Xodim", "Mutaxassis Izohi", "Yaratilgan Vaqt", "Instagram ID", "Profil Havolasi"];
+            csv += headers.map(h => `"${{h}}"`).join(';') + '\\r\\n';
+
+            LEADS_DATA.forEach((c, idx) => {{
+                const row = [
+                    c.id || (idx + 1),
+                    c.username ? '@' + c.username : '—',
+                    c.full_name || 'Kiritilmagan',
+                    c.phone_number ? `="${{c.phone_number}}"` : '—',
+                    c.campaign || 'Umumiy',
+                    c.source || 'Direct',
+                    statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
+                    c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
+                    (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
+                    (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
+                    c.manager_name || '—',
+                    (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
+                    c.created_at || '—',
+                    String(c.instagram_id || ''),
+                    c.username ? 'https://instagram.com/' + c.username : ''
+                ];
+                csv += row.map(val => `"${{String(val).replace(/"/g, '""')}}"`).join(';') + '\\r\\n';
+            }});
+
+            const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `instagram_lidlar_${{new Date().toISOString().slice(0, 10)}}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }}
+
+        function exportLeadsToCSV(btn) {{
             const originalText = btn ? btn.innerHTML : '';
             if (btn) {{
                 btn.innerHTML = '⏳ Yuklanmoqda...';
                 btn.disabled = true;
             }}
-
             try {{
-                const res = await fetch('/api/clients');
-                const json = await res.json();
-                const clients = json.clients || [];
-
-                const statusMap = {{
-                    'yangi': '⚪ Yangi',
-                    'jarayonda': '🟡 Jarayonda',
-                    'boglandi': '🟢 Bog\'lanildi',
-                    'oylanyapti': '💭 O\'ylayapti',
-                    'rad': '🔴 Rad / Ko\'tarmadi'
-                }};
-
-                let csv = '\\ufeff'; // UTF-8 BOM Excel uchun
-                const headers = ["ID", "Username", "Mijoz Ismi", "Telefon Raqami", "Yo'nalish / Kurs", "Manba", "Holati", "Obuna", "💡 AI Ehtiyoj Tahlili", "Oxirgi Xabar / So'rov", "Mas'ul Xodim", "Mutaxassis Izohi", "Yaratilgan Vaqt", "Instagram ID", "Profil Havolasi"];
-                csv += headers.map(h => `"${{h}}"`).join(';') + '\\r\\n';
-
-                clients.forEach((c, idx) => {{
-                    const row = [
-                        c.id || (idx + 1),
-                        c.username ? '@' + c.username : '—',
-                        c.full_name || 'Kiritilmagan',
-                        c.phone_number ? `="${{c.phone_number}}"` : '—',
-                        c.campaign || 'Umumiy',
-                        c.source || 'Direct',
-                        statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
-                        c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
-                        (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
-                        (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
-                        c.manager_name || '—',
-                        (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
-                        (c.created_at || '').substring(0, 16).replace('T', ' '),
-                        String(c.instagram_id || ''),
-                        c.username ? 'https://instagram.com/' + c.username : ''
-                    ];
-                    csv += row.map(val => `"${{String(val).replace(/"/g, '""')}}"`).join(';') + '\\r\\n';
-                }});
-
-                const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `instagram_lidlar_${{new Date().toISOString().slice(0, 10)}}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }} catch (err) {{
+                downloadCSVDirectly();
+            }} catch(err) {{
                 console.error("CSV eksport xatoligi:", err);
-                window.location.href = '/api/clients/csv';
             }} finally {{
                 if (btn) {{
                     btn.innerHTML = originalText;
