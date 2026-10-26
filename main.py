@@ -870,47 +870,187 @@ def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""
     return {"clients": get_all_clients()}
 
+@app.get("/api/clients/excel")
+@app.get("/api/clients/xlsx")
+def export_clients_excel():
+    """Yig'ilgan mijozlar bazasini Microsoft Excel (.xlsx) formatida formatlangan holda yuklab olish"""
+    clients = get_all_clients()
+    
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Instagram Lidlar"
+        ws.views.sheetView[0].showGridLines = True
+
+        headers = [
+            "№", "Instagram Username", "Mijoz Ismi", "Telefon Raqami",
+            "Yo'nalish / Kurs", "Manba (Video / Direct)", "Holati", "Obuna",
+            "💡 AI Ehtiyoj Tahlili", "Oxirgi Xabar / So'rov", "Mas'ul Xodim",
+            "Mutaxassis Izohi", "Sana va Vaqt", "Instagram ID", "Instagram Profil Havolasi"
+        ]
+        ws.append(headers)
+
+        header_fill = PatternFill(start_color="4338CA", end_color="4338CA", fill_type="solid")
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        thin_border = Border(
+            left=Side(style="thin", color="CBD5E1"),
+            right=Side(style="thin", color="CBD5E1"),
+            top=Side(style="thin", color="CBD5E1"),
+            bottom=Side(style="thin", color="CBD5E1")
+        )
+
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = thin_border
+
+        ws.row_dimensions[1].height = 28
+
+        status_map = {
+            "yangi": "⚪ Yangi",
+            "jarayonda": "🟡 Jarayonda",
+            "boglandi": "🟢 Bog'lanildi",
+            "oylanyapti": "💭 O'ylayapti",
+            "rad": "🔴 Rad / Ko'tarmadi"
+        }
+
+        alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+
+        for r_idx, c in enumerate(clients, start=2):
+            uname = c.get("username") or ""
+            phone = c.get("phone_number") or ""
+            status_raw = c.get("lead_status", "yangi")
+            status_str = status_map.get(status_raw, status_raw)
+            is_fol_str = "⭐ Obunachi" if c.get("is_follower") else "Obuna emas"
+            ig_url = f"https://instagram.com/{uname}" if uname else ""
+            created_at = (c.get("created_at") or "")[:16].replace("T", " ")
+
+            row_data = [
+                c.get("id"),
+                f"@{uname}" if uname else "—",
+                c.get("full_name") or "Kiritilmagan",
+                phone if phone else "—",
+                c.get("campaign", "Umumiy"),
+                c.get("source", "Direct"),
+                status_str,
+                is_fol_str,
+                c.get("ai_summary") or "—",
+                c.get("last_message") or "—",
+                c.get("manager_name") or "—",
+                c.get("manager_comment") or "—",
+                created_at,
+                str(c.get("instagram_id") or ""),
+                ig_url
+            ]
+            ws.append(row_data)
+
+            row_fill = alt_fill if r_idx % 2 == 1 else white_fill
+            ws.row_dimensions[r_idx].height = 22
+
+            for c_idx in range(1, len(row_data) + 1):
+                cell = ws.cell(row=r_idx, column=c_idx)
+                cell.fill = row_fill
+                cell.border = thin_border
+                cell.font = Font(name="Calibri", size=10)
+
+                if c_idx in [1, 4, 7, 8, 13]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif c_idx in [9, 10, 12]:
+                    cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+                # Telefon raqamini TEXT (@) sifatida belgilash
+                if c_idx == 4:
+                    cell.number_format = "@"
+
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+
+        for col in ws.columns:
+            col_letter = get_column_letter(col[0].column)
+            max_len = max(len(str(cell.value or "")) for cell in col)
+            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 40)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"instagram_lidlar_{time.strftime('%Y%m%d_%H%M')}.xlsx"
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"Excel yaratishda xatolik: {e}, CSV ga o'tilmoqda")
+        return export_clients_csv()
+
 @app.get("/api/clients/csv")
 def export_clients_csv():
-    """Yig'ilgan mijozlar bazasini Excel / CSV formatida yuklab olish"""
+    """Yig'ilgan mijozlar bazasini Excel / CSV formatida (UTF-8 BOM bilan) yuklab olish"""
     clients = get_all_clients()
     
     output = io.StringIO()
-    writer = csv.writer(output)
+    # Excel uchun UTF-8 BOM qo'shish (harflar va belgilar buzilmasligi uchun)
+    output.write('\ufeff')
+    writer = csv.writer(output, delimiter=';')
     
     # Sarlavhalar
     writer.writerow([
-        "ID", "Instagram ID", "Instagram Username", "Instagram Profil Havolasi", "Obuna Holati",
-        "Mijoz Ismi", "Telefon raqami", "Yo'nalish", 
-        "Manba", "Holati", "Mas'ul xodim", "Mutaxassis Izohi", "💡 AI Ehtiyoj Tahlili",
-        "Oxirgi xabar / So'rov", "Yaratilgan vaqti"
+        "ID", "Instagram Username", "Mijoz Ismi", "Telefon raqami", 
+        "Yo'nalish / Kurs", "Manba", "Holati", "Obuna Holati", 
+        "💡 AI Ehtiyoj Tahlili", "Oxirgi xabar / So'rov", "Mas'ul xodim", 
+        "Mutaxassis Izohi", "Yaratilgan vaqti", "Instagram ID", "Instagram Profil Havolasi"
     ])
     
+    status_map = {
+        "yangi": "⚪ Yangi",
+        "jarayonda": "🟡 Jarayonda",
+        "boglandi": "🟢 Bog'lanildi",
+        "oylanyapti": "💭 O'ylayapti",
+        "rad": "🔴 Rad / Ko'tarmadi"
+    }
+
     for c in clients:
         uname = c.get("username") or ""
+        phone = c.get("phone_number") or ""
+        # Excelda telefon raqami eksponentsial songa aylanib ketmasligi uchun formatlash
+        phone_formatted = f'="{phone}"' if phone else "—"
         ig_url = f"https://instagram.com/{uname}" if uname else ""
-        is_fol_str = "Obunachi" if c.get("is_follower") else "Obuna emas"
+        is_fol_str = "⭐ Obunachi" if c.get("is_follower") else "Obuna emas"
+        status_str = status_map.get(c.get("lead_status", "yangi"), c.get("lead_status", "yangi"))
+        created_at = (c.get("created_at") or "")[:16].replace("T", " ")
+
         writer.writerow([
             c.get("id"),
-            c.get("instagram_id"),
-            f"@{uname}" if uname else "",
-            ig_url,
-            is_fol_str,
-            c.get("full_name"),
-            c.get("phone_number"),
+            f"@{uname}" if uname else "—",
+            c.get("full_name") or "Kiritilmagan",
+            phone_formatted,
             c.get("campaign", "Umumiy"),
             c.get("source", "Direct"),
-            c.get("lead_status", "yangi"),
+            status_str,
+            is_fol_str,
+            (c.get("ai_summary") or "").replace("\n", " "),
+            (c.get("last_message") or "").replace("\n", " "),
             c.get("manager_name", ""),
-            c.get("manager_comment", ""),
-            c.get("ai_summary", ""),
-            c.get("last_message"),
-            c.get("created_at")
+            (c.get("manager_comment") or "").replace("\n", " "),
+            created_at,
+            c.get("instagram_id"),
+            ig_url
         ])
     
     output.seek(0)
+    filename = f"instagram_lidlar_{time.strftime('%Y%m%d_%H%M')}.csv"
     return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=instagram_mijozlar.csv"}
+        iter([output.getvalue().encode('utf-8-sig')]),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
