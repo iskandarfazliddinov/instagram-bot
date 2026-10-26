@@ -472,3 +472,147 @@ def get_media_details(media_id: str) -> dict:
     except Exception as e:
         logger.error(f"Instagram media tafsilotlarini olishda xatolik ({media_id}): {e}")
     return {}
+
+def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
+    """
+    Instagram Direct'dagi barcha yozishmalarni Meta Graph API orqali olib,
+    CRM bazasidagi lidlarni yangilash va tiklash (Auto-recovery from Instagram)
+    """
+    raw_token = get_setting("page_access_token", "").strip() or settings.PAGE_ACCESS_TOKEN.strip()
+    if not raw_token:
+        return {"ok": False, "error": "Token topilmadi"}
+
+    page_id = "1314546795084427"
+    page_token = get_access_token()
+    try:
+        url_acc = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/accounts"
+        r_acc = requests.get(url_acc, params={"fields": "id,access_token", "access_token": raw_token}, timeout=8)
+        if r_acc.status_code == 200:
+            pages = r_acc.json().get("data", [])
+            if pages:
+                page_id = pages[0].get("id", page_id)
+                page_token = pages[0].get("access_token", page_token)
+    except Exception as e:
+        logger.warning(f"Page ID olishda xatolik: {e}")
+
+    conv_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/{page_id}/conversations"
+    params = {
+        "platform": "instagram",
+        "fields": "id,updated_time,participants",
+        "limit": limit,
+        "access_token": page_token
+    }
+
+    try:
+        r_conv = requests.get(conv_url, params=params, timeout=12)
+        if r_conv.status_code != 200:
+            logger.error(f"Instagram conversations xatoligi: {r_conv.text}")
+            return {"ok": False, "error": r_conv.text}
+        
+        threads = r_conv.json().get("data", [])
+    except Exception as e:
+        logger.error(f"Instagram yozishmalarni yuklashda xatolik: {e}")
+        return {"ok": False, "error": str(e)}
+
+    recovered_count = 0
+    from database import (
+        get_connection, update_client, get_or_create_client, 
+        sync_leads_backup
+    )
+
+    for th in threads:
+        cid = th.get("id")
+        parts = th.get("participants", {}).get("data", [])
+        user_part = [p for p in parts if p.get("username") != "xalqaro_turizm_akademiyasi"]
+        if not user_part:
+            continue
+        user = user_part[0]
+        username = user.get("username", "")
+        ig_id = str(user.get("id", ""))
+        if not ig_id:
+            continue
+
+        m_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/{cid}/messages"
+        try:
+            r_msg = requests.get(
+                m_url, 
+                params={"fields": "id,created_time,from,message", "limit": 25, "access_token": page_token}, 
+                timeout=6
+            )
+            if r_msg.status_code != 200:
+                continue
+            msgs = r_msg.json().get("data", [])
+        except Exception:
+            continue
+
+        msgs.reverse()
+        chat_history = []
+        phone = None
+        full_name = username
+        last_msg = ""
+        course = "Umumiy"
+        source = "Direct"
+
+        for m in msgs:
+            sender_un = m.get("from", {}).get("username", "")
+            text = m.get("message", "")
+            if not text:
+                continue
+            role = "assistant" if sender_un == "xalqaro_turizm_akademiyasi" else "user"
+            chat_history.append({"role": role, "text": text, "time": m.get("created_time", "")[11:16]})
+
+            if role == "user":
+                last_msg = text
+                clean_digits = re.sub(r"\D", "", text)
+                if len(clean_digits) == 9 or (len(clean_digits) == 12 and clean_digits.startswith("998")):
+                    phone = f"+998{clean_digits}" if len(clean_digits) == 9 else f"+{clean_digits}"
+                    name_cand = re.sub(r"[\d\+\(\)\-\.,]", " ", text).strip()
+                    if len(name_cand) >= 2 and not any(k in name_cand.lower() for k in ["salom", "rahmat", "assalomu"]):
+                        full_name = name_cand
+
+                t_lower = text.lower()
+                if any(k in t_lower for k in ["hotel", "operations", "mehmonxona", "inavation", "innovation"]):
+                    course = "Hotel Operations and Innovation"
+                elif any(k in t_lower for k in ["gid", "ekskurs", "beyjik", "qayta tayyorlash"]):
+                    course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+                elif any(k in t_lower for k in ["malaka oshirish", "malaka"]):
+                    course = "Gid-ekskursiyachi (Malaka oshirish)"
+                elif any(k in t_lower for k in ["turagent"]):
+                    course = "Turagentlik kursi"
+                elif any(k in t_lower for k in ["turoperator"]):
+                    course = "Turoperatorlik kursi"
+
+        if ig_id == "1773167100618269":
+            full_name = "Temirova Iroda"
+            phone = "+998956672200"
+            course = "Hotel Operations and Innovation"
+            source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
+        elif ig_id == "1448672499922524":
+            phone = "+998904517877"
+            source = "Direct"
+
+        client = get_or_create_client(ig_id)
+        updates = {}
+        if username and (not client.get("username") or client.get("username") == ""):
+            updates["username"] = username
+        if full_name and full_name != username and (not client.get("full_name") or client.get("full_name") in ["Noma'lum", "None", username]):
+            updates["full_name"] = full_name
+        if phone and (not client.get("phone_number") or client.get("phone_number") == ""):
+            updates["phone_number"] = phone
+            updates["lead_status"] = "yangi"
+            updates["step"] = "completed"
+        if course != "Umumiy" and (client.get("campaign") in ["Umumiy", "", None]):
+            updates["campaign"] = course
+        if source != "Direct" and (client.get("source") in ["Direct", "", None]):
+            updates["source"] = source
+        if last_msg:
+            updates["last_message"] = last_msg
+        if chat_history:
+            updates["chat_history"] = json.dumps(chat_history, ensure_ascii=False)
+            
+        if updates:
+            update_client(ig_id, **updates)
+            recovered_count += 1
+
+    sync_leads_backup()
+    return {"ok": True, "recovered_count": recovered_count, "total_threads": len(threads)}

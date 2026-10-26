@@ -142,6 +142,18 @@ async def on_startup():
         logger.error(f"Telegram webhook ulashda xatolik: {e}")
     asyncio.create_task(follow_up_background_worker())
     asyncio.create_task(token_auto_refresh_worker())
+
+    # Server ishga tushganda Instagram Direct'dagi lidlarni avtomatik bazaga sinxronlash
+    async def initial_leads_sync():
+        await asyncio.sleep(15)
+        try:
+            from services.instagram import sync_leads_from_instagram_inbox
+            sync_leads_from_instagram_inbox(limit=50)
+            logger.info("Instagram Direct yozishmalari bazaga muvaffaqiyatli sinxronlandi.")
+        except Exception as e:
+            logger.error(f"Dastlabki Instagram sinxronlashda xatolik: {e}")
+
+    asyncio.create_task(initial_leads_sync())
     logger.info("Ma'lumotlar bazasi, AI Follow-up va Token Auto-Refresh xizmati ishga tushirildi.")
 
 @app.get("/")
@@ -817,6 +829,24 @@ def sync_backup_route():
     from database import init_db, get_all_clients
     init_db()
     return {"ok": True, "total": len(get_all_clients())}
+
+@app.get("/api/sync-instagram")
+def sync_instagram_route():
+    from services.instagram import sync_leads_from_instagram_inbox
+    from database import get_all_clients
+    res = sync_leads_from_instagram_inbox(limit=50)
+    return {"ok": True, "result": res, "total": len(get_all_clients())}
+
+@app.post("/admin/sync-instagram")
+def sync_instagram_admin_action(request: Request):
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    from services.instagram import sync_leads_from_instagram_inbox
+    sync_leads_from_instagram_inbox(limit=50)
+    return RedirectResponse(
+        url="/admin?notice=Instagram+Direct+yozishmalaridan+barcha+lidlar+muvaffaqiyatli+yangilandi!#leads",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
 
 @app.get("/api/trigger-followup")
 async def trigger_followup_route():

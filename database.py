@@ -337,11 +337,26 @@ def init_db():
                     else:
                         cursor.execute("""
                             UPDATE clients SET 
+                                phone_number = CASE WHEN (phone_number = '' OR phone_number IS NULL) THEN COALESCE(?, phone_number) ELSE phone_number END,
+                                full_name = CASE WHEN (full_name = '' OR full_name IS NULL OR full_name = 'Noma\'lum') THEN COALESCE(?, full_name) ELSE full_name END,
+                                campaign = CASE WHEN (campaign = '' OR campaign IS NULL OR campaign = 'Umumiy') THEN COALESCE(?, campaign) ELSE campaign END,
+                                lead_status = CASE WHEN (lead_status = '' OR lead_status IS NULL OR lead_status = 'boshlangich') AND ? != '' THEN ? ELSE lead_status END,
+                                step = CASE WHEN (step = '' OR step IS NULL OR step = 'new') AND ? != '' THEN 'completed' ELSE step END,
                                 followup_count = COALESCE(?, followup_count),
                                 last_followup_at = CASE WHEN (last_followup_at = '' OR last_followup_at IS NULL) THEN ? ELSE last_followup_at END,
-                                tg_message_id = ?
+                                tg_message_id = COALESCE(?, tg_message_id)
                             WHERE instagram_id = ?
-                        """, (b.get("followup_count"), b.get("last_followup_at", ""), b.get("tg_message_id"), ig_id))
+                        """, (
+                            b.get("phone_number"),
+                            b.get("full_name"),
+                            b.get("campaign"),
+                            b.get("phone_number", "") or "", b.get("lead_status", "yangi"),
+                            b.get("phone_number", "") or "",
+                            b.get("followup_count"),
+                            b.get("last_followup_at", ""),
+                            b.get("tg_message_id"),
+                            ig_id
+                        ))
         except Exception:
             pass
 
@@ -349,6 +364,7 @@ def init_db():
     try:
         cursor.execute("SELECT key, value FROM settings")
         all_s = {r[0]: r[1] for r in cursor.fetchall()}
+        all_s.pop("gemini_api_key", None)
         with open(SETTINGS_BACKUP_FILE, "w", encoding="utf-8") as f:
             json.dump(all_s, f, ensure_ascii=False, indent=2)
     except Exception:

@@ -1338,6 +1338,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="oylanyapti">💭 O'ylayapti</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
+                        <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
+                            <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
+                                🔄 Instagramdan yangilash
+                            </button>
+                        </form>
                     </div>
                 </div>
 
