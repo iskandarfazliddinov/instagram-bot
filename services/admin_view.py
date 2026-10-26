@@ -711,9 +711,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <button onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition shadow-sm" title="Hisobotni chop etish yoki PDF saqlash">
                             🖨️ Chop etish / PDF
                         </button>
-                        <a href="/api/clients/excel" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 transition" title="Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish">
+                        <button type="button" onclick="exportLeadsToExcel(this)" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 transition cursor-pointer" title="Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish">
                             📥 Excel (.XLSX)
-                        </a>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1279,6 +1279,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     <title>Instagram CRM — Xalqaro Turizm Akademiyasi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
@@ -1310,12 +1311,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
             <div class="flex items-center gap-2.5">
                 {header_stats_btn}
-                <a href="/api/clients/excel" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition" title="Microsoft Excel (.xlsx) formatida yuklab olish">
+                <button type="button" onclick="exportLeadsToExcel(this)" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition cursor-pointer" title="Microsoft Excel (.xlsx) formatida yuklab olish">
                     📥 Excel (.XLSX)
-                </a>
-                <a href="/api/clients/csv" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-slate-200 transition" title="CSV formatida yuklab olish">
+                </button>
+                <button type="button" onclick="exportLeadsToCSV(this)" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-slate-200 transition cursor-pointer" title="CSV formatida yuklab olish">
                     📄 CSV
-                </a>
+                </button>
                 <a href="/logout" class="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Tizimdan chiqish">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path>
@@ -1707,6 +1708,152 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     row.style.display = 'none';
                 }}
             }});
+        }}
+
+        // Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish (Brauzer xatoliksiz)
+        async function exportLeadsToExcel(btn) {{
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {{
+                btn.innerHTML = '⏳ Tayyorlanmoqda...';
+                btn.disabled = true;
+            }}
+
+            try {{
+                const res = await fetch('/api/clients');
+                const json = await res.json();
+                const clients = json.clients || [];
+
+                const statusMap = {{
+                    'yangi': '⚪ Yangi',
+                    'jarayonda': '🟡 Jarayonda',
+                    'boglandi': '🟢 Bog\'lanildi',
+                    'oylanyapti': '💭 O\'ylayapti',
+                    'rad': '🔴 Rad / Ko\'tarmadi'
+                }};
+
+                const rows = clients.map((c, i) => ({{
+                    "№": c.id || (i + 1),
+                    "Instagram Username": c.username ? '@' + c.username : '—',
+                    "Mijoz Ismi": c.full_name || 'Kiritilmagan',
+                    "Telefon Raqami": c.phone_number ? String(c.phone_number) : '—',
+                    "Yo'nalish / Kurs": c.campaign || 'Umumiy',
+                    "Manba": c.source || 'Direct',
+                    "Holati": statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
+                    "Obuna Holati": c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
+                    "💡 AI Ehtiyoj Tahlili": (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
+                    "Oxirgi Xabar / So'rov": (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
+                    "Mas'ul Xodim": c.manager_name || '—',
+                    "Mutaxassis Izohi": (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
+                    "Yaratilgan Vaqt": (c.created_at || '').substring(0, 16).replace('T', ' '),
+                    "Instagram ID": String(c.instagram_id || ''),
+                    "Profil Havolasi": c.username ? 'https://instagram.com/' + c.username : ''
+                }}));
+
+                if (typeof XLSX !== 'undefined') {{
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    
+                    // Ustunlar kengligini chiroyli moslash
+                    ws['!cols'] = [
+                        {{ wch: 6 }},  // №
+                        {{ wch: 20 }}, // Username
+                        {{ wch: 22 }}, // Ism
+                        {{ wch: 18 }}, // Telefon
+                        {{ wch: 28 }}, // Kurs
+                        {{ wch: 32 }}, // Manba
+                        {{ wch: 18 }}, // Holat
+                        {{ wch: 14 }}, // Obuna
+                        {{ wch: 35 }}, // AI Tahlil
+                        {{ wch: 35 }}, // Oxirgi xabar
+                        {{ wch: 15 }}, // Mas'ul
+                        {{ wch: 25 }}, // Izoh
+                        {{ wch: 18 }}, // Vaqt
+                        {{ wch: 18 }}, // ID
+                        {{ wch: 30 }}  // Havola
+                    ];
+
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Instagram Lidlar");
+
+                    const nowStr = new Date().toISOString().slice(0, 10);
+                    XLSX.writeFile(wb, `instagram_lidlar_${{nowStr}}.xlsx`);
+                }} else {{
+                    window.location.href = '/api/clients/excel';
+                }}
+            }} catch (err) {{
+                console.error("Excel eksport xatoligi:", err);
+                window.location.href = '/api/clients/excel';
+            }} finally {{
+                if (btn) {{
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }}
+            }}
+        }}
+
+        // CSV formatida yuklab olish (UTF-8 BOM va regional ajratuvchilar bilan)
+        async function exportLeadsToCSV(btn) {{
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {{
+                btn.innerHTML = '⏳ Yuklanmoqda...';
+                btn.disabled = true;
+            }}
+
+            try {{
+                const res = await fetch('/api/clients');
+                const json = await res.json();
+                const clients = json.clients || [];
+
+                const statusMap = {{
+                    'yangi': '⚪ Yangi',
+                    'jarayonda': '🟡 Jarayonda',
+                    'boglandi': '🟢 Bog\'lanildi',
+                    'oylanyapti': '💭 O\'ylayapti',
+                    'rad': '🔴 Rad / Ko\'tarmadi'
+                }};
+
+                let csv = '\\ufeff'; // UTF-8 BOM Excel uchun
+                const headers = ["ID", "Username", "Mijoz Ismi", "Telefon Raqami", "Yo'nalish / Kurs", "Manba", "Holati", "Obuna", "💡 AI Ehtiyoj Tahlili", "Oxirgi Xabar / So'rov", "Mas'ul Xodim", "Mutaxassis Izohi", "Yaratilgan Vaqt", "Instagram ID", "Profil Havolasi"];
+                csv += headers.map(h => `"${{h}}"`).join(';') + '\\r\\n';
+
+                clients.forEach((c, idx) => {{
+                    const row = [
+                        c.id || (idx + 1),
+                        c.username ? '@' + c.username : '—',
+                        c.full_name || 'Kiritilmagan',
+                        c.phone_number ? `="${{c.phone_number}}"` : '—',
+                        c.campaign || 'Umumiy',
+                        c.source || 'Direct',
+                        statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
+                        c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
+                        (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
+                        (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
+                        c.manager_name || '—',
+                        (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
+                        (c.created_at || '').substring(0, 16).replace('T', ' '),
+                        String(c.instagram_id || ''),
+                        c.username ? 'https://instagram.com/' + c.username : ''
+                    ];
+                    csv += row.map(val => `"${{String(val).replace(/"/g, '""')}}"`).join(';') + '\\r\\n';
+                }});
+
+                const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `instagram_lidlar_${{new Date().toISOString().slice(0, 10)}}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }} catch (err) {{
+                console.error("CSV eksport xatoligi:", err);
+                window.location.href = '/api/clients/csv';
+            }} finally {{
+                if (btn) {{
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }}
+            }}
         }}
 
         {admin_scripts_js}
