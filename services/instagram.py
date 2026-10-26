@@ -478,24 +478,11 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
     Instagram Direct'dagi barcha yozishmalarni Meta Graph API orqali olib,
     CRM bazasidagi lidlarni yangilash va tiklash (Auto-recovery from Instagram)
     """
-    raw_token = get_setting("page_access_token", "").strip() or settings.PAGE_ACCESS_TOKEN.strip()
-    if not raw_token:
+    page_token = get_access_token()
+    if not page_token:
         return {"ok": False, "error": "Token topilmadi"}
 
-    page_id = "1314546795084427"
-    page_token = get_access_token()
-    try:
-        url_acc = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/accounts"
-        r_acc = requests.get(url_acc, params={"fields": "id,access_token", "access_token": raw_token}, timeout=8)
-        if r_acc.status_code == 200:
-            pages = r_acc.json().get("data", [])
-            if pages:
-                page_id = pages[0].get("id", page_id)
-                page_token = pages[0].get("access_token", page_token)
-    except Exception as e:
-        logger.warning(f"Page ID olishda xatolik: {e}")
-
-    conv_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/{page_id}/conversations"
+    conv_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/conversations"
     params = {
         "platform": "instagram",
         "fields": "id,updated_time,participants",
