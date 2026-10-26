@@ -216,23 +216,84 @@ def init_db():
     cursor.execute("UPDATE settings SET value = ? WHERE key = 'final_message'", (default_settings["final_message"],))
     cursor.execute("UPDATE settings SET value = ? WHERE key = 'ai_system_prompt'", (default_settings["ai_system_prompt"],))
 
-    # Hotel Operations kampaniyasini kiritish
-    cursor.execute("""
-        INSERT OR REPLACE INTO campaigns (
-            id, name, trigger_keyword, media_id, media_url, public_reply, dm_welcome, promo_link, is_active, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        1,
-        "Hotel Operations and Innovation 2026–2027",
-        "hotel, operations, inavation, innovation, mehmonxona, dastur, pdf, narx, reja",
-        "18122374856317012",
-        "https://www.instagram.com/reel/DerPZSNNS0F/",
-        "Directingizga Hotel Operations dasturi va to'liq PDF rejani yubordik! 📩",
-        "Assalomu alaykum! UN Tourism shafeligidagi \"Hotel Operations and Innovation 2026–2027\" xalqaro qayta tayyorlash dasturiga xush kelibsiz. 🏨✨\n\nTo'liq 27 sahifalik o'quv rejasini (PDF) Telegram orqali yuklab olishingiz mumkin:\n👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\nYoki brauzerda yuklab oling:\n📥 https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\nSavollaringiz bo'lsa, qaysi modul qiziqtirayotganini yozing yoki mutaxassisimiz bog'lanishi uchun ismingiz va raqamingizni qoldiring 😊",
-        "https://survey.zohopublic.com/zs/jQCZao",
-        1,
-        datetime.now().isoformat()
-    ))
+    # Rasmiy video kampaniyalarini kiritish (Reels va Postlar)
+    official_campaigns = [
+        (
+            1,
+            "Hotel Operations and Innovation 2026–2027",
+            "hotel, operations, inavation, innovation, mehmonxona, dastur, pdf, narx, reja",
+            "18122374856317012",
+            "https://www.instagram.com/reel/DerPZSNNS0F/",
+            "Directingizga Hotel Operations dasturi va to'liq PDF rejani yubordik! 📩",
+            "Assalomu alaykum! UN Tourism shafeligidagi \"Hotel Operations and Innovation 2026–2027\" xalqaro qayta tayyorlash dasturiga xush kelibsiz. 🏨✨\n\nTo'liq 27 sahifalik o'quv rejasini (PDF) Telegram orqali yuklab olishingiz mumkin:\n👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\nYoki brauzerda yuklab oling:\n📥 https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\nSavollaringiz bo'lsa, qaysi modul qiziqtirayotganini yozing yoki mutaxassisimiz bog'lanishi uchun ismingiz va raqamingizni qoldiring 😊",
+            "https://survey.zohopublic.com/zs/jQCZao",
+            1
+        ),
+        (
+            2,
+            "Hotel Operations and Innovation",
+            "hotel, operations, menejer, menejermisiz, boshliq, mehmonxona, +, narx, dastur",
+            "18398194846204313",
+            "https://www.instagram.com/reel/DeZbpoZtFw0/",
+            "Directingizga dastur va to'liq ma'lumotni yubordik! 📩",
+            "Assalomu alaykum! Mehmonxona sohasi rahbarlari uchun mo'ljallangan «Hotel Operations and Innovation» xalqaro dasturimizga qiziqqaningiz uchun rahmat. 🏨\n\nDastur bo'yicha to'liq PDF reja va narxlarni taqdim etishimiz uchun ismingiz va telefon raqamingizni qoldiring 😊",
+            "https://survey.zohopublic.com/zs/jQCZao",
+            1
+        ),
+        (
+            3,
+            "Gid-ekskursiyachi (Qayta tayyorlash)",
+            "gid, ekskursavod, ekskursiyachi, noldan, diplom, beyjik, +, narx, dastur",
+            "18021025358899605",
+            "https://www.instagram.com/reel/DbDpNKLKgll/",
+            "Directingizga Gid-ekskursiyachi kursi dasturini yubordik! 📩",
+            "Assalomu alaykum! 4 oylik «Professional Gid-ekskursiyachi» qayta tayyorlash kursimizga xush kelibsiz! 🌍\n\nKurs yakunida rasmiy davlat diplomi va butun O'zbekiston bo'ylab amal qiluvchi rasmiy beyjik beriladi. Narxi: 5 500 000 so'm.\n\nBatafsil ma'lumot olish yoki ro'yxatdan o'tish uchun ismingiz va telefon raqamingizni qoldiring 😊",
+            "https://tourism-edu.uz",
+            1
+        ),
+        (
+            4,
+            "Turagentlik kursi",
+            "turagent, agent, agentlik, +, narx, dastur",
+            "17891059488656047",
+            "https://www.instagram.com/p/DcQTeaKTBOa/",
+            "Directingizga Turagentlik kursi bo'yicha ma'lumot yubordik! 📩",
+            "Assalomu alaykum! 1 oylik «Turagentlik» kursimizga qiziqqaningiz uchun rahmat! ✈️ Narxi: 2 350 000 so'm, rasmiy sertifikat beriladi.\n\nBatafsil ma'lumot olish uchun ismingiz va telefon raqamingizni qoldiring 😊",
+            "https://tourism-edu.uz",
+            1
+        ),
+        (
+            5,
+            "Turoperatorlik kursi",
+            "turoperator, operator, turpaket, +, narx",
+            "18339193003251888",
+            "https://www.instagram.com/p/DbXj3F1joxH/",
+            "Directingizga Turoperatorlik kursi dasturini yubordik! 📩",
+            "Assalomu alaykum! 1 oylik «Turoperatorlik» kursimizga xush kelibsiz! 🌍 Narxi: 2 350 000 so'm, rasmiy sertifikat beriladi.\n\nBatafsil ma'lumot olish uchun ismingiz va telefon raqamingizni qoldiring 😊",
+            "https://tourism-edu.uz",
+            1
+        ),
+        (
+            6,
+            "Onlayn ta'lim platformasi",
+            "front office, housekeeping, onlayn, online, masofaviy, platforma, +, narx",
+            "18029301782836925",
+            "https://www.instagram.com/reel/DbM6EinhiZI/",
+            "Directingizga onlayn platforma havolasini yubordik! 📩",
+            "Assalomu alaykum! Bizning rasmiy onlayn ta'lim platformamiz: https://tourism-edu.uz 💻\n\nPlatformada Front Office va Housekeeping onlayn kurslarida masofadan to'liq o'qib, rasmiy sertifikat olishingiz mumkin. Bog'lanishimiz uchun ismingiz va telefon raqamingizni qoldiring 😊",
+            "https://tourism-edu.uz",
+            1
+        )
+    ]
+    for c_item in official_campaigns:
+        cursor.execute("""
+            INSERT OR REPLACE INTO campaigns (
+                id, name, trigger_keyword, media_id, media_url, public_reply, dm_welcome, promo_link, is_active, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            c_item[0], c_item[1], c_item[2], c_item[3], c_item[4], c_item[5], c_item[6], c_item[7], c_item[8],
+            datetime.now().isoformat()
+        ))
 
     # Agar zaxiradagi sozlamalar mavjud bo'lsa tiklash
     if os.path.exists(SETTINGS_BACKUP_FILE):
@@ -339,7 +400,8 @@ def init_db():
                             UPDATE clients SET 
                                 phone_number = CASE WHEN (phone_number = '' OR phone_number IS NULL) THEN COALESCE(?, phone_number) ELSE phone_number END,
                                 full_name = CASE WHEN (full_name = '' OR full_name IS NULL OR full_name = 'Noma\'lum') THEN COALESCE(?, full_name) ELSE full_name END,
-                                campaign = CASE WHEN (campaign = '' OR campaign IS NULL OR campaign = 'Umumiy') THEN COALESCE(?, campaign) ELSE campaign END,
+                                campaign = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Umumiy') THEN ? WHEN (campaign = '' OR campaign IS NULL OR campaign = 'Umumiy') THEN COALESCE(?, campaign) ELSE campaign END,
+                                source = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Direct') THEN ? WHEN (source = '' OR source IS NULL OR source = 'Direct') THEN COALESCE(?, source) ELSE source END,
                                 lead_status = CASE WHEN (lead_status = '' OR lead_status IS NULL OR lead_status = 'boshlangich') AND ? != '' THEN ? ELSE lead_status END,
                                 step = CASE WHEN (step = '' OR step IS NULL OR step = 'new') AND ? != '' THEN 'completed' ELSE step END,
                                 followup_count = COALESCE(?, followup_count),
@@ -349,7 +411,8 @@ def init_db():
                         """, (
                             b.get("phone_number"),
                             b.get("full_name"),
-                            b.get("campaign"),
+                            b.get("campaign"), b.get("campaign"), b.get("campaign"), b.get("campaign"), b.get("campaign"),
+                            b.get("source"), b.get("source"), b.get("source"), b.get("source"), b.get("source"),
                             b.get("phone_number", "") or "", b.get("lead_status", "yangi"),
                             b.get("phone_number", "") or "",
                             b.get("followup_count"),

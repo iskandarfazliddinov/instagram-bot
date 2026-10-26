@@ -441,10 +441,43 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
+        # Kurs va Manba nishonlari (Badges)
+        c_low = campaign.lower()
+        if "hotel" in c_low or "mehmonxona" in c_low or "operations" in c_low:
+            campaign_badge = '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🏨 Hotel Operations</span>'
+        elif "malaka" in c_low:
+            campaign_badge = '<span class="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🗺 Gidlik (Malaka oshirish)</span>'
+        elif "gid" in c_low or "ekskurs" in c_low:
+            campaign_badge = '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🌍 Gidlik (Qayta tayyorlash)</span>'
+        elif "turagent" in c_low:
+            campaign_badge = '<span class="bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">✈️ Turagentlik</span>'
+        elif "turoperator" in c_low:
+            campaign_badge = '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">✈️ Turoperatorlik</span>'
+        elif "onlayn" in c_low or "online" in c_low:
+            campaign_badge = '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">💻 Onlayn platforma</span>'
+        elif "narx" in c_low:
+            campaign_badge = '<span class="bg-amber-50/70 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💰 Kurslar narxi</span>'
+        elif "dastur" in c_low:
+            campaign_badge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O\'quv dasturi</span>'
+        else:
+            campaign_badge = f'<span class="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">💬 {campaign}</span>'
+
+        s_low = source.lower()
+        if "instagram.com/reel/" in s_low or "instagram.com/p/" in s_low:
+            m_url = re.search(r'https?://[^\s]+', source)
+            url_found = m_url.group(0) if m_url else "#"
+            source_badge = f'<a href="{url_found}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline mt-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-100" title="Videoni ochish">🎬 Reels izohi ↗</a>'
+        elif "reel" in s_low or "video" in s_low:
+            source_badge = '<div class="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 mt-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">🎬 Video izohi</div>'
+        else:
+            source_badge = '<div class="inline-flex items-center gap-1 text-[11px] text-slate-500 mt-1">💬 Direct</div>'
+
         clients_html += f"""
         <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
-            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()}"
-            data-status="{lead_status}">
+            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()}"
+            data-status="{lead_status}"
+            data-course="{campaign.lower()}"
+            data-source="{source.lower()}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
@@ -464,8 +497,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <span class="bg-purple-50 text-purple-700 border border-purple-100 px-2.5 py-0.5 rounded-md text-xs font-semibold">{campaign}</span>
-                <div class="text-[11px] text-slate-400 mt-0.5">{source}</div>
+                <div>{campaign_badge}</div>
+                <div>{source_badge}</div>
             </td>
             <td class="px-5 py-3.5">
                 {ai_card}
@@ -1329,18 +1362,35 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <input type="text" id="lead_search" onkeyup="filterLeads()" placeholder="Ism, telefon yoki kurs bo'yicha qidirish..."
                             class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
                     </div>
-                    <div class="flex items-center gap-3">
-                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none">
-                            <option value="all">Barcha holatlar</option>
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                            <option value="all">📋 Barcha holatlar</option>
                             <option value="yangi">⚪ Yangi</option>
                             <option value="jarayonda">🟡 Jarayonda</option>
                             <option value="boglandi">🟢 Bog'lanildi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
+                        <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                            <option value="all">📚 Barcha yo'nalishlar</option>
+                            <option value="hotel">🏨 Hotel Operations</option>
+                            <option value="gid_qayta">🌍 Gidlik (Qayta tayyorlash)</option>
+                            <option value="gid_malaka">🗺 Gidlik (Malaka oshirish)</option>
+                            <option value="turagent">✈️ Turagentlik</option>
+                            <option value="turoperator">✈️ Turoperatorlik</option>
+                            <option value="onlayn">💻 Onlayn platforma</option>
+                            <option value="narx">💰 Kurslar narxi</option>
+                            <option value="dastur">📄 O'quv dasturi</option>
+                            <option value="umumiy">💬 Umumiy / Boshqa</option>
+                        </select>
+                        <select id="lead_filter_source" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                            <option value="all">📍 Barcha manbalar</option>
+                            <option value="reels">🎬 Reels / Video izohi</option>
+                            <option value="direct">💬 Instagram Direct</option>
+                        </select>
                         <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
                             <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
-                                🔄 Instagramdan yangilash
+                                🔄 Yangilash
                             </button>
                         </form>
                     </div>
@@ -1601,17 +1651,53 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         function filterLeads() {{
             const searchVal = document.getElementById('lead_search').value.toLowerCase().trim();
             const statusVal = document.getElementById('lead_filter_status').value;
+            const courseVal = document.getElementById('lead_filter_course') ? document.getElementById('lead_filter_course').value : 'all';
+            const sourceVal = document.getElementById('lead_filter_source') ? document.getElementById('lead_filter_source').value : 'all';
             const rows = document.querySelectorAll('.client-row');
 
             let visibleCount = 0;
             rows.forEach(row => {{
                 const searchData = row.getAttribute('data-search') || '';
                 const statusData = row.getAttribute('data-status') || '';
+                const courseData = row.getAttribute('data-course') || '';
+                const sourceData = row.getAttribute('data-source') || '';
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
                 const matchesStatus = (statusVal === 'all') || (statusData === statusVal);
 
-                if (matchesSearch && matchesStatus) {{
+                let matchesCourse = true;
+                if (courseVal !== 'all') {{
+                    if (courseVal === 'hotel') {{
+                        matchesCourse = courseData.includes('hotel') || courseData.includes('mehmonxona') || courseData.includes('operations');
+                    }} else if (courseVal === 'gid_malaka') {{
+                        matchesCourse = courseData.includes('malaka');
+                    }} else if (courseVal === 'gid_qayta') {{
+                        matchesCourse = (courseData.includes('gid') || courseData.includes('ekskurs')) && !courseData.includes('malaka');
+                    }} else if (courseVal === 'turagent') {{
+                        matchesCourse = courseData.includes('turagent');
+                    }} else if (courseVal === 'turoperator') {{
+                        matchesCourse = courseData.includes('turoperator');
+                    }} else if (courseVal === 'onlayn') {{
+                        matchesCourse = courseData.includes('onlayn') || courseData.includes('online');
+                    }} else if (courseVal === 'narx') {{
+                        matchesCourse = courseData.includes('narx');
+                    }} else if (courseVal === 'dastur') {{
+                        matchesCourse = courseData.includes('dastur');
+                    }} else if (courseVal === 'umumiy') {{
+                        matchesCourse = courseData.includes('umumiy') || (!courseData.includes('hotel') && !courseData.includes('gid') && !courseData.includes('turagent') && !courseData.includes('turoperator') && !courseData.includes('onlayn'));
+                    }}
+                }}
+
+                let matchesSource = true;
+                if (sourceVal !== 'all') {{
+                    if (sourceVal === 'reels') {{
+                        matchesSource = sourceData.includes('reel') || sourceData.includes('instagram.com/reel') || sourceData.includes('instagram.com/p') || sourceData.includes('izoh') || sourceData.includes('video');
+                    }} else if (sourceVal === 'direct') {{
+                        matchesSource = !sourceData.includes('reel') && !sourceData.includes('instagram.com/reel') && !sourceData.includes('instagram.com/p') && !sourceData.includes('izoh') && !sourceData.includes('video');
+                    }}
+                }}
+
+                if (matchesSearch && matchesStatus && matchesCourse && matchesSource) {{
                     row.style.display = '';
                     visibleCount++;
                 }} else {{

@@ -59,27 +59,26 @@ def process_incoming_message(sender_id: str, user_text: str):
     # Qiziqqan kurs yo'nalishini aniqlash (Gid qayta tayyorlash, Gid malaka oshirish, Turagentlik, Turoperatorlik va h.k.)
     history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
     detected_course = None
-    if "malaka" in history_text or "72 soat" in history_text:
-        detected_course = "Gid malaka oshirish"
-    elif "qayta tayyorla" in history_text or "4 oy" in history_text or "beyjik" in history_text:
-        detected_course = "Gid qayta tayyorlash"
-    elif "turagent" in history_text:
-        detected_course = "Turagentlik kursi"
-    elif "turoperator" in history_text:
-        detected_course = "Turoperatorlik kursi"
-    elif "gid" in history_text or "ekskurs" in history_text:
-        detected_course = "Gid-ekskursiyachi kursi"
-    elif "hotel" in history_text or "operations" in history_text or "innovat" in history_text or "inavation" in history_text or "mehmonxona" in history_text:
+    if any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona", "отел", "гостиниц"]):
         detected_course = "Hotel Operations and Innovation"
-    elif "housekeeping" in history_text or "xona tozalash" in history_text:
-        detected_course = "Housekeeping (Onlayn)"
-    elif "frontoffice" in history_text or "front office" in history_text:
-        detected_course = "Front Office (Onlayn)"
-    elif "restoran" in history_text or "servis" in history_text or "f&b" in history_text:
+    elif any(k in history_text for k in ["malaka", "72 soat", "sertifikatim bor", "muddat tugagan", "повышение квалификации"]):
+        detected_course = "Gid-ekskursiyachi (Malaka oshirish)"
+    elif any(k in history_text for k in ["qayta tayyorla", "4 oy", "beyjik", "diplom", "gid", "ekskurs", "гид", "экскурсовод", "переподготовк"]):
+        detected_course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+    elif any(k in history_text for k in ["turagent", "турагент"]):
+        detected_course = "Turagentlik kursi"
+    elif any(k in history_text for k in ["turoperator", "туроператор"]):
+        detected_course = "Turoperatorlik kursi"
+    elif any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "online", "onlayn", "masofa", "platforma", "платформ"]):
+        detected_course = "Onlayn ta'lim platformasi"
+    elif any(k in history_text for k in ["restoran", "servis", "f&b"]):
         detected_course = "Restoran ishi va servis"
-    elif "online" in history_text or "onlayn" in history_text or "masofa" in history_text or "platforma" in history_text:
+    elif any(k in history_text for k in ["narx", "qancha", "сколько стоит", "стоимость", "narxi"]):
         if client.get("campaign") in ["Umumiy", "", None]:
-            detected_course = "Onlayn ta'lim platformasi"
+            detected_course = "Umumiy (Kurslar narxi)"
+    elif any(k in history_text for k in ["dastur", "программ", "reja"]):
+        if client.get("campaign") in ["Umumiy", "", None]:
+            detected_course = "Umumiy (Dastur so'ralgan)"
 
     if detected_course:
         if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course or "Hotel" in detected_course)):
