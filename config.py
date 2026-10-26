@@ -1,15 +1,18 @@
 import os
 import base64
-from dotenv import load_dotenv
-
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 _DEFAULT_GK = base64.b64decode(b"QVEuQWI4Uk42SWJQNzhzNHo3aWZUajZFUkphX1BKU2NaRFBjNXdIeW1KSEdxS3FqMnNXMUE=").decode("utf-8")
 _DEFAULT_PAT = base64.b64decode(b"RUFCRjBFMlRVWkMwQUJTMjJIeDBLdmcxQldHOXE3MzV2S3VVRDBzUkF5ZXRVM2hEdUFtaGczb2J0WkJnSWlQa0k3VXJaQ2QyYkd4NWRaQ1VxSzhjc2pXWkFEWDN6RG1SZUllNm9DbXhRNUNONnE0aWRXSjRxVTB5R2RjS1NrWFRpemFXTVpDZE5UUXg2WWlMc2d0M3pJVkN1YVpBakN6WkNLdGxlYlViSERzcGxNNWFrMm92R0c2MXZlY1BWWVN6R1BWZVpBRXdaRFpE").decode("utf-8")
+_DEFAULT_PAGE_TOKEN = base64.b64decode(b"RUFCRjBFMlRVWkMwQUJTejNXdjBTdFMzRU9MRzhFN211UFJic1E2UWYwaGxDZGFoRlEwV1MyaHpCczRDanMxN3VaQmVsdUxCMjRKRHBuWkFhVVdTYVB0blUxQnJtNFlVQmtkanhQSk82Y2V3RVUyTjY4VThndExuT2dhTFpDV3BaQ2NZZmJYeXFaQ0haQXJEZHlyWkJ6ZUFrTU5uWFpBZ2R4NGJJNENHWWlaQWllWkNPTEdlRzJyb3dtWkJHVjFFWkNOUTdmV1pCVUphT3ZhZmJMZQ==").decode("utf-8")
 
 class Settings:
     _raw_pat = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
-    PAGE_ACCESS_TOKEN: str = _raw_pat if (_raw_pat and _raw_pat != "YOUR_PAGE_ACCESS_TOKEN_HERE") else _DEFAULT_PAT
+    PAGE_ACCESS_TOKEN: str = _raw_pat if (_raw_pat and _raw_pat != "YOUR_PAGE_ACCESS_TOKEN_HERE") else _DEFAULT_PAGE_TOKEN
     VERIFY_TOKEN: str = os.getenv("VERIFY_TOKEN", "mening_maxfiy_webhook_tokenim_123")
     GRAPH_API_VERSION: str = os.getenv("GRAPH_API_VERSION", "v21.0")
     PORT: int = int(os.getenv("PORT", 8000))

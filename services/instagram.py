@@ -35,9 +35,11 @@ def resolve_page_token(tok: str) -> str:
     # Avval bevosita Page token ekanligini tekshiramiz
     try:
         url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me"
-        r = requests.get(url, params={"fields": "id,name,instagram_business_account", "access_token": cleaned}, timeout=5)
-        if r.status_code == 200 and r.json().get("instagram_business_account"):
-            return cleaned
+        r = requests.get(url, params={"fields": "id,name", "access_token": cleaned}, timeout=5)
+        if r.status_code == 200:
+            resp_data = r.json()
+            if resp_data.get("id") == "1314546795084427" or resp_data.get("name") == "ITASamarkand":
+                return cleaned
     except Exception:
         pass
 
@@ -54,7 +56,10 @@ def resolve_page_token(tok: str) -> str:
                     return p_tok
     except Exception as e:
         logger.warning(f"Page token olishda xatolik: {e}")
-    return cleaned
+
+    # Zaxiradagi rasmiy Page Token
+    from config import _DEFAULT_PAGE_TOKEN
+    return _DEFAULT_PAGE_TOKEN if _DEFAULT_PAGE_TOKEN else cleaned
 
 def get_access_token() -> str:
     """
