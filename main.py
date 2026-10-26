@@ -824,6 +824,18 @@ async def telegram_webhook(request: Request):
         logger.error(f"Telegram webhook callback xatoligi: {e}")
     return {"ok": True}
 
+@app.get("/api/token-check")
+def token_check_route():
+    from services.instagram import get_access_token
+    from config import settings
+    tok = get_access_token()
+    return {
+        "token_len": len(tok) if tok else 0,
+        "token_prefix": tok[:15] if tok else "",
+        "token_suffix": tok[-10:] if tok else "",
+        "is_default": tok == settings.PAGE_ACCESS_TOKEN
+    }
+
 @app.get("/api/sync-backup")
 def sync_backup_route():
     from database import init_db, get_all_clients

@@ -502,7 +502,13 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
         r_conv = requests.get(conv_url, params=params, timeout=12)
         if r_conv.status_code != 200:
             logger.error(f"Instagram conversations xatoligi: {r_conv.text}")
-            return {"ok": False, "error": r_conv.text}
+            from config import _DEFAULT_PAGE_TOKEN
+            if _DEFAULT_PAGE_TOKEN and page_token != _DEFAULT_PAGE_TOKEN:
+                params["access_token"] = _DEFAULT_PAGE_TOKEN
+                page_token = _DEFAULT_PAGE_TOKEN
+                r_conv = requests.get(conv_url, params=params, timeout=12)
+            if r_conv.status_code != 200:
+                return {"ok": False, "error": r_conv.text}
         
         threads = r_conv.json().get("data", [])
     except Exception as e:
