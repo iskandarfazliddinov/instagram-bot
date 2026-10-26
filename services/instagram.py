@@ -95,23 +95,53 @@ def notify_admin_token_error(error_details: str):
 
 def check_meta_response_for_errors(data: dict):
     """
-    Meta API javobini xatoliklarga tekshirish
+    Meta API javobini haqiqiy Access Token xatoliklariga tekshirish.
+    DIQQAT: Meta vaqtincha uzilishi (Code 1: 'An unknown error has occurred'), 
+    limitlar yoki foydalanuvchi maxfiylik sozlamalari token xatosi EMAS!
+    Faqatgina haqiqiy token eskirgan/bekor qilingan bo'lsa (Code 190) va
+    check_instagram_token() ham muvaffaqiyatsiz bo'lsa, adminga xabar yuboriladi.
     """
     if not isinstance(data, dict):
         return
     err = data.get("error")
-    if err:
-        err_msg = err.get("message", "")
-        err_type = err.get("type", "")
-        err_code = err.get("code")
-        if (
-            "API access blocked" in err_msg
-            or "OAuthException" in err_type
-            or err_code in [190, 200]
-            or "access token" in err_msg.lower()
-        ):
-            logger.critical(f"Meta Access Token xatosi aniqlandi: {err}")
-            notify_admin_token_error(err_msg or str(err))
+    if not err:
+        return
+
+    err_msg = str(err.get("message", ""))
+    err_code = err.get("code")
+    err_subcode = err.get("error_subcode")
+
+    # 1. Vaqtinchalik Meta server xatoliklari (Transient / Server errors) - bular token xatosi emas
+    if err_code in [1, 2, 4, 17, 32, 100, 368, 613] or "unknown error" in err_msg.lower():
+        logger.warning(f"Meta vaqtinchalik xatoligi (Code {err_code}): {err_msg}")
+        return
+
+    # 2. Foydalanuvchi o'z Directini yopib qo'ygan yoki bloklagan holatlar (Code 10 yoki 200)
+    if err_code in [10, 200] and not any(k in err_msg.lower() for k in ["token", "session"]):
+        logger.warning(f"Meta foydalanuvchi cheklovi (Code {err_code}): {err_msg}")
+        return
+
+    # 3. Haqiqiy token eskirgan yoki bekor qilinganligini bildiruvchi belgilar
+    is_genuine_token_error = (
+        err_code == 190
+        or err_subcode in [463, 467, 490]
+        or any(phrase in err_msg.lower() for phrase in [
+            "error validating access token",
+            "session has expired",
+            "invalid oauth access token",
+            "the access token could not be decrypted"
+        ])
+    )
+
+    if is_genuine_token_error:
+        # Shoshilmasdan, tokenni qayta tekshirib ko'ramiz
+        token_check = check_instagram_token()
+        if token_check.get("ok"):
+            logger.info("Meta bir martalik xatolik berdi, lekin token hali ham faol va ishlayapti.")
+            return
+
+        logger.critical(f"Haqiqiy Meta Access Token xatosi tasdiqlandi: {err}")
+        notify_admin_token_error(err_msg or str(err))
 
 def check_instagram_token(token: str = None) -> dict:
     """
@@ -232,6 +262,17 @@ def send_message(recipient_id: str, text: str) -> dict:
         response = requests.post(get_graph_messages_url(token), json=payload, headers=headers, timeout=10)
         data = response.json()
         if response.status_code != 200:
+            err = data.get("error", {})
+            if err.get("code") in [1, 2] or "unknown error" in str(err.get("message", "")).lower():
+                time.sleep(1)
+                try:
+                    retry_resp = requests.post(get_graph_messages_url(token), json=payload, headers=headers, timeout=10)
+                    if retry_resp.status_code == 200:
+                        return retry_resp.json()
+                    data = retry_resp.json()
+                except Exception:
+                    pass
+
             logger.error(f"Meta API xatoligi ({response.status_code}): {data}")
             check_meta_response_for_errors(data)
         return data
