@@ -873,7 +873,7 @@ def list_clients():
 @app.get("/api/clients/excel")
 @app.get("/api/clients/xlsx")
 def export_clients_excel():
-    """Yig'ilgan mijozlar bazasini Microsoft Excel (.xlsx) formatida formatlangan holda yuklab olish"""
+    """Yig'ilgan mijozlar bazasini Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish"""
     clients = get_all_clients()
     
     try:
@@ -883,25 +883,54 @@ def export_clients_excel():
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Instagram Lidlar"
+        ws.title = "Lidlar Ro'yxati"
         ws.views.sheetView[0].showGridLines = True
 
+        NAVY_HEADER = "1E1B4B"
+        WHITE = "FFFFFF"
+        ZEBRA_ROW = "F8FAFC"
+        BORDER_COLOR = "CBD5E1"
+
+        STATUS_STYLES = {
+            "yangi": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
+            "boshlangich": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
+            "jarayonda": {"fill": "FEF3C7", "font_color": "92400E", "label": "🟡 Jarayonda"},
+            "boglandi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
+            "bog'landi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
+            "oylanyapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
+            "o'ylayapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
+            "rad": {"fill": "FEE2E2", "font_color": "991B1B", "label": "🔴 Rad / Ko'tarmadi"}
+        }
+
+        COURSE_STYLES = {
+            "hotel": {"fill": "EEF2FF", "font_color": "3730A3", "label": "🏨 Hotel Operations and Innovation"},
+            "gid_qayta": {"fill": "ECFDF5", "font_color": "065F46", "label": "🌍 Gidlik (Qayta tayyorlash)"},
+            "gid_malaka": {"fill": "F0FDFA", "font_color": "115E59", "label": "🗺 Gidlik (Malaka oshirish)"},
+            "turagent": {"fill": "F0F9FF", "font_color": "0369A1", "label": "✈️ Turagentlik kursi"},
+            "turoperator": {"fill": "EFF6FF", "font_color": "1D4ED8", "label": "✈️ Turoperatorlik kursi"},
+            "onlayn": {"fill": "FFFBEB", "font_color": "92400E", "label": "💻 Onlayn platforma"},
+            "narx": {"fill": "FEF3C7", "font_color": "78350F", "label": "💰 Kurslar narxi"},
+            "dastur": {"fill": "FAF5FF", "font_color": "6B21A8", "label": "📄 O'quv dasturi"},
+            "umumiy": {"fill": "F1F5F9", "font_color": "334155", "label": "💬 Umumiy konsultatsiya"}
+        }
+
         headers = [
-            "№", "Instagram Username", "Mijoz Ismi", "Telefon Raqami",
-            "Yo'nalish / Kurs", "Manba (Video / Direct)", "Holati", "Obuna",
-            "💡 AI Ehtiyoj Tahlili", "Oxirgi Xabar / So'rov", "Mas'ul Xodim",
-            "Mutaxassis Izohi", "Sana va Vaqt", "Instagram ID", "Instagram Profil Havolasi"
+            "№", "Sana va Vaqt", "Mijoz Ismi", "Telefon Raqami",
+            "Yo'nalish / Kurs", "Manba", "Holati", "Instagram Profili",
+            "Obuna", "Oxirgi So'rov / Xabar", "💡 AI Ehtiyoj Tahlili",
+            "Mutaxassis Izohi", "Mas'ul Xodim"
         ]
         ws.append(headers)
 
-        header_fill = PatternFill(start_color="4338CA", end_color="4338CA", fill_type="solid")
-        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
         thin_border = Border(
-            left=Side(style="thin", color="CBD5E1"),
-            right=Side(style="thin", color="CBD5E1"),
-            top=Side(style="thin", color="CBD5E1"),
-            bottom=Side(style="thin", color="CBD5E1")
+            left=Side(style="thin", color=BORDER_COLOR),
+            right=Side(style="thin", color=BORDER_COLOR),
+            top=Side(style="thin", color=BORDER_COLOR),
+            bottom=Side(style="thin", color=BORDER_COLOR)
         )
+
+        header_fill = PatternFill(start_color=NAVY_HEADER, end_color=NAVY_HEADER, fill_type="solid")
+        header_font = Font(name="Segoe UI", size=11, bold=True, color=WHITE)
 
         for col_num in range(1, len(headers) + 1):
             cell = ws.cell(row=1, column=col_num)
@@ -910,80 +939,134 @@ def export_clients_excel():
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             cell.border = thin_border
 
-        ws.row_dimensions[1].height = 28
-
-        status_map = {
-            "yangi": "⚪ Yangi",
-            "jarayonda": "🟡 Jarayonda",
-            "boglandi": "🟢 Bog'lanildi",
-            "oylanyapti": "💭 O'ylayapti",
-            "rad": "🔴 Rad / Ko'tarmadi"
-        }
-
-        alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+        ws.row_dimensions[1].height = 32
 
         for r_idx, c in enumerate(clients, start=2):
-            uname = c.get("username") or ""
-            phone = c.get("phone_number") or ""
-            status_raw = c.get("lead_status", "yangi")
-            status_str = status_map.get(status_raw, status_raw)
+            uname = (c.get("username") or "").strip()
+            phone = (c.get("phone_number") or "").strip()
+            status_raw = str(c.get("lead_status") or "yangi").strip().lower()
+            st_info = STATUS_STYLES.get(status_raw, {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"})
+
             is_fol_str = "⭐ Obunachi" if c.get("is_follower") else "Obuna emas"
-            ig_url = f"https://instagram.com/{uname}" if uname else ""
             created_at = (c.get("created_at") or "")[:16].replace("T", " ")
 
+            campaign = c.get("campaign", "Umumiy")
+            c_low = campaign.lower()
+            if "hotel" in c_low or "operations" in c_low:
+                course_info = COURSE_STYLES["hotel"]
+            elif "malaka" in c_low:
+                course_info = COURSE_STYLES["gid_malaka"]
+            elif "gid" in c_low or "ekskurs" in c_low:
+                course_info = COURSE_STYLES["gid_qayta"]
+            elif "turagent" in c_low:
+                course_info = COURSE_STYLES["turagent"]
+            elif "turoperator" in c_low:
+                course_info = COURSE_STYLES["turoperator"]
+            elif "onlayn" in c_low or "online" in c_low:
+                course_info = COURSE_STYLES["onlayn"]
+            elif "narx" in c_low:
+                course_info = COURSE_STYLES["narx"]
+            elif "dastur" in c_low:
+                course_info = COURSE_STYLES["dastur"]
+            else:
+                course_info = COURSE_STYLES["umumiy"]
+
+            source = c.get("source", "Direct")
+            source_label = "💬 Direct"
+            source_url = None
+            if "reel" in source.lower() or "instagram.com" in source.lower():
+                source_label = "🎬 Reels Video ↗"
+                import re
+                m = re.search(r"https?://[^\s]+", source)
+                if m:
+                    source_url = m.group(0)
+
             row_data = [
-                c.get("id"),
-                f"@{uname}" if uname else "—",
+                c.get("id") or (r_idx - 1),
+                created_at if created_at else "—",
                 c.get("full_name") or "Kiritilmagan",
                 phone if phone else "—",
-                c.get("campaign", "Umumiy"),
-                c.get("source", "Direct"),
-                status_str,
+                course_info["label"],
+                source_label,
+                st_info["label"],
+                f"@{uname}" if uname else "—",
                 is_fol_str,
-                c.get("ai_summary") or "—",
                 c.get("last_message") or "—",
-                c.get("manager_name") or "—",
+                c.get("ai_summary") or "—",
                 c.get("manager_comment") or "—",
-                created_at,
-                str(c.get("instagram_id") or ""),
-                ig_url
+                c.get("manager_name") or "—"
             ]
             ws.append(row_data)
 
-            row_fill = alt_fill if r_idx % 2 == 1 else white_fill
-            ws.row_dimensions[r_idx].height = 22
+            row_fill_color = ZEBRA_ROW if r_idx % 2 == 1 else WHITE
+            default_fill = PatternFill(start_color=row_fill_color, end_color=row_fill_color, fill_type="solid")
+            ws.row_dimensions[r_idx].height = 24
 
             for c_idx in range(1, len(row_data) + 1):
                 cell = ws.cell(row=r_idx, column=c_idx)
-                cell.fill = row_fill
                 cell.border = thin_border
-                cell.font = Font(name="Calibri", size=10)
+                cell.fill = default_fill
+                cell.font = Font(name="Segoe UI", size=10)
 
-                if c_idx in [1, 4, 7, 8, 13]:
+                if c_idx in [1, 2, 4, 7, 9]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                elif c_idx in [9, 10, 12]:
+                elif c_idx in [10, 11, 12]:
                     cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
 
-                # Telefon raqamini TEXT (@) sifatida belgilash
-                if c_idx == 4:
+                # Telefon raqami: qalin shrift va text formati
+                if c_idx == 4 and phone:
                     cell.number_format = "@"
+                    cell.font = Font(name="Segoe UI", size=10, bold=True, color="0F172A")
+
+                # Kurs ustuni rangli nishoni
+                if c_idx == 5:
+                    cell.fill = PatternFill(start_color=course_info["fill"], end_color=course_info["fill"], fill_type="solid")
+                    cell.font = Font(name="Segoe UI", size=10, bold=True, color=course_info["font_color"])
+
+                # Manba havolasi (Reels bo'lsa)
+                if c_idx == 6 and source_url:
+                    cell.hyperlink = source_url
+                    cell.font = Font(name="Segoe UI", size=10, color="BE185D", underline="single")
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+                # Holat (Status) rangi
+                if c_idx == 7:
+                    cell.fill = PatternFill(start_color=st_info["fill"], end_color=st_info["fill"], fill_type="solid")
+                    cell.font = Font(name="Segoe UI", size=10, bold=True, color=st_info["font_color"])
+
+                # Instagram username bosiladigan havola
+                if c_idx == 8 and uname:
+                    cell.hyperlink = f"https://instagram.com/{uname}"
+                    cell.font = Font(name="Segoe UI", size=10, color="0284C7", underline="single")
 
         ws.freeze_panes = "A2"
         ws.auto_filter.ref = ws.dimensions
 
-        for col in ws.columns:
-            col_letter = get_column_letter(col[0].column)
-            max_len = max(len(str(cell.value or "")) for cell in col)
-            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 40)
+        col_widths = {
+            "A": 7,   # №
+            "B": 18,  # Sana va Vaqt
+            "C": 22,  # Mijoz Ismi
+            "D": 18,  # Telefon Raqami
+            "E": 30,  # Yo'nalish / Kurs
+            "F": 20,  # Manba
+            "G": 18,  # Holati
+            "H": 22,  # Instagram Profili
+            "I": 15,  # Obuna
+            "J": 38,  # Oxirgi So'rov / Xabar
+            "K": 45,  # 💡 AI Ehtiyoj Tahlili
+            "L": 30,  # Mutaxassis Izohi
+            "M": 18   # Mas'ul Xodim
+        }
+        for col_letter, width in col_widths.items():
+            ws.column_dimensions[col_letter].width = width
 
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
 
-        filename = f"instagram_lidlar_{time.strftime('%Y%m%d_%H%M')}.xlsx"
+        filename = f"XTA_Instagram_Lidlar_{time.strftime('%Y%m%d_%H%M')}.xlsx"
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -1733,73 +1733,88 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         const LEADS_DATA = {clients_json_data};
 
         // Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish (Brauzer xatoliksiz)
-        function exportLeadsToExcel(btn) {{
+        async function exportLeadsToExcel(btn) {{
             const originalText = btn ? btn.innerHTML : '';
             if (btn) {{
-                btn.innerHTML = '⏳ Yuklanmoqda...';
+                btn.innerHTML = '⏳ Tayyorlanmoqda...';
                 btn.disabled = true;
             }}
 
             try {{
-                const statusMap = {{
-                    "yangi": "⚪ Yangi",
-                    "jarayonda": "🟡 Jarayonda",
-                    "boglandi": "🟢 Bog'lanildi",
-                    "oylanyapti": "💭 O'ylayapti",
-                    "rad": "🔴 Rad / Ko'tarmadi"
-                }};
-
-                const rows = LEADS_DATA.map((c, i) => ({{
-                    "№": c.id || (i + 1),
-                    "Instagram Username": c.username ? '@' + c.username : '—',
-                    "Mijoz Ismi": c.full_name || 'Kiritilmagan',
-                    "Telefon Raqami": c.phone_number ? String(c.phone_number) : '—',
-                    "Yo'nalish / Kurs": c.campaign || 'Umumiy',
-                    "Manba": c.source || 'Direct',
-                    "Holati": statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
-                    "Obuna Holati": c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
-                    "💡 AI Ehtiyoj Tahlili": (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
-                    "Oxirgi Xabar / So'rov": (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
-                    "Mas'ul Xodim": c.manager_name || '—',
-                    "Mutaxassis Izohi": (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
-                    "Yaratilgan Vaqt": c.created_at || '—',
-                    "Instagram ID": String(c.instagram_id || ''),
-                    "Profil Havolasi": c.username ? 'https://instagram.com/' + c.username : ''
-                }}));
-
-                if (typeof XLSX !== 'undefined') {{
-                    const ws = XLSX.utils.json_to_sheet(rows);
-                    
-                    // Ustunlar kengligini chiroyli moslash
-                    ws['!cols'] = [
-                        {{ wch: 6 }},  // №
-                        {{ wch: 20 }}, // Username
-                        {{ wch: 22 }}, // Ism
-                        {{ wch: 18 }}, // Telefon
-                        {{ wch: 28 }}, // Kurs
-                        {{ wch: 32 }}, // Manba
-                        {{ wch: 18 }}, // Holat
-                        {{ wch: 14 }}, // Obuna
-                        {{ wch: 35 }}, // AI Tahlil
-                        {{ wch: 35 }}, // Oxirgi xabar
-                        {{ wch: 15 }}, // Mas'ul
-                        {{ wch: 25 }}, // Izoh
-                        {{ wch: 18 }}, // Vaqt
-                        {{ wch: 18 }}, // ID
-                        {{ wch: 30 }}  // Havola
-                    ];
-
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Instagram Lidlar");
-
+                // 1. Avval serverdagi to'liq formatlangan chiroyli Excel faylini yuklab olamiz
+                const resp = await fetch('/api/clients/excel');
+                if (resp.ok) {{
+                    const blob = await resp.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
                     const nowStr = new Date().toISOString().slice(0, 10);
-                    XLSX.writeFile(wb, `instagram_lidlar_${{nowStr}}.xlsx`);
-                }} else {{
+                    a.download = `XTA_Instagram_Lidlar_${{nowStr}}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    return;
+                }}
+                throw new Error("Server Excel xatosi");
+            }} catch (err) {{
+                console.warn("Serverdan yuklab bo'lmadi, brauzer orqali yuklanmoqda:", err);
+                // Brauzer orqali zaxira yuklash (SheetJS)
+                try {{
+                    if (typeof XLSX !== 'undefined') {{
+                        const statusMap = {{
+                            "yangi": "⚪ Yangi",
+                            "boshlangich": "⚪ Yangi",
+                            "jarayonda": "🟡 Jarayonda",
+                            "boglandi": "🟢 Bog'lanildi",
+                            "bog'landi": "🟢 Bog'lanildi",
+                            "oylanyapti": "💭 O'ylayapti",
+                            "o'ylayapti": "💭 O'ylayapti",
+                            "rad": "🔴 Rad / Ko'tarmadi"
+                        }};
+
+                        const rows = LEADS_DATA.map((c, i) => ({{
+                            "№": c.id || (i + 1),
+                            "Sana va Vaqt": c.created_at || '—',
+                            "Mijoz Ismi": c.full_name || 'Kiritilmagan',
+                            "Telefon Raqami": c.phone_number ? String(c.phone_number) : '—',
+                            "Yo'nalish / Kurs": c.campaign || 'Umumiy',
+                            "Manba": c.source || 'Direct',
+                            "Holati": statusMap[c.lead_status] || c.lead_status || '⚪ Yangi',
+                            "Instagram Username": c.username ? '@' + c.username : '—',
+                            "Obuna": c.is_follower ? '⭐ Obunachi' : 'Obuna emas',
+                            "Oxirgi Xabar": (c.last_message || '—').replace(/[\\r\\n]+/g, ' '),
+                            "AI Ehtiyoj Tahlili": (c.ai_summary || '—').replace(/[\\r\\n]+/g, ' '),
+                            "Mutaxassis Izohi": (c.manager_comment || '—').replace(/[\\r\\n]+/g, ' '),
+                            "Mas'ul Xodim": c.manager_name || '—'
+                        }}));
+
+                        const ws = XLSX.utils.json_to_sheet(rows);
+                        ws['!cols'] = [
+                            {{ wch: 6 }},
+                            {{ wch: 18 }},
+                            {{ wch: 22 }},
+                            {{ wch: 18 }},
+                            {{ wch: 28 }},
+                            {{ wch: 32 }},
+                            {{ wch: 18 }},
+                            {{ wch: 20 }},
+                            {{ wch: 14 }},
+                            {{ wch: 35 }},
+                            {{ wch: 35 }},
+                            {{ wch: 25 }},
+                            {{ wch: 15 }}
+                        ];
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Lidlar");
+                        const nowStr = new Date().toISOString().slice(0, 10);
+                        XLSX.writeFile(wb, `XTA_Instagram_Lidlar_${{nowStr}}.xlsx`);
+                    }} else {{
+                        downloadCSVDirectly();
+                    }}
+                }} catch (e2) {{
                     downloadCSVDirectly();
                 }}
-            }} catch (err) {{
-                console.error("Excel eksport xatoligi:", err);
-                downloadCSVDirectly();
             }} finally {{
                 if (btn) {{
                     btn.innerHTML = originalText;
@@ -1812,9 +1827,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         function downloadCSVDirectly() {{
             const statusMap = {{
                 "yangi": "⚪ Yangi",
+                "boshlangich": "⚪ Yangi",
                 "jarayonda": "🟡 Jarayonda",
                 "boglandi": "🟢 Bog'lanildi",
+                "bog'landi": "🟢 Bog'lanildi",
                 "oylanyapti": "💭 O'ylayapti",
+                "o'ylayapti": "💭 O'ylayapti",
                 "rad": "🔴 Rad / Ko'tarmadi"
             }};
 
