@@ -9,5 +9,71 @@
     "is_active": 1,
     "created_at": "2026-10-27T18:49:31.400873",
     "last_login": null
+  },
+  {
+    "id": 3,
+    "username": "baxodir",
+    "password_hash": "b4c4d6b060f6f7b38e3bcb9a2d68a52887f0a6780f02eb22b0e244dc0c07d589",
+    "display_name": "Baxodir Xusanov",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.318325",
+    "last_login": "27.10.2026 20:33"
+  },
+  {
+    "id": 4,
+    "username": "shohjahon",
+    "password_hash": "f53723583710c4d6cc914ef98d93685a58dc203a3ef6d3603398d0bccbbe0606",
+    "display_name": "Shohjahon",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.319710",
+    "last_login": "27.10.2026 20:33"
+  },
+  {
+    "id": 5,
+    "username": "sanjar",
+    "password_hash": "578174abf893d13ef7e4248bf4e9c9699d2a34b607c7230dd269f59897c4b0d2",
+    "display_name": "Sanjar",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.321218",
+    "last_login": "27.10.2026 20:33"
+  },
+  {
+    "id": 6,
+    "username": "shirin",
+    "password_hash": "3188e359b6c6b3d8e05c9d2c12dbf8d0a3c068ddf92e68ada74daed0b8247807",
+    "display_name": "Shirin",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.322549",
+    "last_login": "27.10.2026 20:33"
+  },
+  {
+    "id": 7,
+    "username": "iskandar",
+    "password_hash": "c80d3b1e10425b598c2067cec4172f75982bc48f7c74fdae55191124fd17e463",
+    "display_name": "Iskandar",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.323541",
+    "last_login": "27.10.2026 20:33"
+  },
+  {
+    "id": 8,
+    "username": "jasur",
+    "password_hash": "dfbd58d411d20fa547c838546540710829f87db7857cef47719e19b2acd639ed",
+    "display_name": "Jasur Raxmanov",
+    "phone": "",
+    "role": "operator",
+    "is_active": 1,
+    "created_at": "2026-10-27T20:31:38.324466",
+    "last_login": "27.10.2026 20:33"
   }
 ]

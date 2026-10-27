@@ -456,7 +456,8 @@ def init_db():
                 backup_ops = json.load(f)
             for op in backup_ops:
                 cursor.execute("SELECT id FROM operators WHERE username = ?", (op.get("username"),))
-                if not cursor.fetchone():
+                row = cursor.fetchone()
+                if not row:
                     cursor.execute("""
                         INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, last_login)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -469,6 +470,23 @@ def init_db():
                         op.get("is_active", 1),
                         op.get("created_at"),
                         op.get("last_login")
+                    ))
+                else:
+                    cursor.execute("""
+                        UPDATE operators SET
+                            password_hash = ?,
+                            display_name = ?,
+                            phone = COALESCE(NULLIF(?, ''), phone),
+                            role = ?,
+                            is_active = COALESCE(?, is_active)
+                        WHERE username = ?
+                    """, (
+                        op.get("password_hash"),
+                        op.get("display_name", op.get("username")),
+                        op.get("phone", ""),
+                        op.get("role", "operator"),
+                        op.get("is_active", 1),
+                        op.get("username")
                     ))
         except Exception:
             pass
