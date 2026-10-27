@@ -118,6 +118,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     in_progress_leads = len([c for c in clients if c.get("lead_status") == "jarayonda"])
     done_leads = len([c for c in clients if c.get("lead_status") == "boglandi"])
     thinking_leads = len([c for c in clients if c.get("lead_status") == "oylanyapti"])
+    reserve_leads = len([c for c in clients if c.get("lead_status") in ["zahira", "zaxira"]])
     rejected_leads = len([c for c in clients if c.get("lead_status") == "rad"])
 
     conversion_rate = round((done_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
@@ -357,6 +358,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     clients_html = ""
     colspan_num = 9
+    kanban_cards_dict = {
+        "yangi": [],
+        "jarayonda": [],
+        "boglandi": [],
+        "oylanyapti": [],
+        "zahira": [],
+        "rad": []
+    }
     if not clients:
         clients_html = f"""
         <tr id="empty_row">
@@ -377,7 +386,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         campaign = client.get('campaign') or "Umumiy"
         last_msg = client.get('last_message') or "—"
         created_at = client.get('created_at', '')[:16].replace("T", " ")
-        lead_status = client.get('lead_status', 'yangi')
+        lead_status = client.get('lead_status', 'yangi') or 'yangi'
+        if lead_status in ['zaxira', 'zahira']:
+            lead_status = 'zahira'
         manager_name = client.get('manager_name') or "—"
         manager_time = client.get('manager_time') or ""
         is_fol = client.get('is_follower')
@@ -435,6 +446,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span>'
         elif lead_status == "oylanyapti":
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">💭 O\'ylayapti</span>'
+        elif lead_status == "zahira":
+            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">📦 Zahira</span>'
         elif lead_status == "rad":
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">🔴 Rad / Ko\'tarmadi</span>'
         else:
@@ -481,6 +494,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
                         <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
                         <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                        <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                         <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                     </select>
                     <input type="hidden" name="manager_name" value="{curr_display_name}">
@@ -549,6 +563,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         clients_html += f"""
         <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
+            data-client-id="{client_id}"
             data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()}"
             data-status="{lead_status}"
             data-course="{campaign.lower()}"
@@ -590,6 +605,208 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
             {action_td}
         </tr>
+        """
+
+        target_status = lead_status if lead_status in kanban_cards_dict else "yangi"
+
+        kanban_ai_or_msg = ""
+        if ai_summary:
+            kanban_ai_or_msg = f"""
+            <div class="mb-2 p-2 rounded-xl bg-indigo-50/90 border border-indigo-200/80 text-indigo-950 text-xs shadow-2xs">
+                <div class="flex items-center gap-1 text-[10px] font-bold text-indigo-700 mb-0.5">
+                    <span>💡</span> <span>AI Tahlili:</span>
+                </div>
+                <div class="text-[11px] leading-snug line-clamp-3">{ai_summary}</div>
+            </div>
+            """
+        elif last_msg and last_msg != "—":
+            if str(last_msg).startswith("🎙️"):
+                voice_clean = str(last_msg).replace("🎙️", "").strip()
+                kanban_ai_or_msg = f"""
+                <div class="mb-2 p-1.5 rounded-lg bg-purple-50 border border-purple-100 text-[11px] text-purple-900">
+                    <span class="font-bold text-[10px] text-purple-700 block">🎙️ Ovozli xabar:</span>
+                    <span class="italic line-clamp-2">"{voice_clean}"</span>
+                </div>
+                """
+            else:
+                kanban_ai_or_msg = f"""
+                <div class="mb-2 text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded-lg border border-slate-100 italic line-clamp-2" title="{last_msg}">
+                    "{last_msg}"
+                </div>
+                """
+
+        kanban_comment_block = ""
+        if manager_comment:
+            kanban_comment_block = f"""
+            <div class="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 text-[11px] shadow-2xs mt-1">
+                <span class="font-bold text-amber-800">📝 Izoh:</span> {manager_comment}
+                {f'<span class="block text-[10px] text-slate-400 mt-0.5 font-normal">{manager_time}</span>' if manager_time else ''}
+            </div>
+            """
+
+        kanban_cards_dict[target_status].append(f"""
+        <div class="kanban-card bg-white rounded-xl p-3 border border-slate-200/90 hover:border-purple-300 hover:shadow-md transition shadow-xs cursor-grab active:cursor-grabbing relative group select-none"
+             id="kanban_card_{client_id}"
+             draggable="true"
+             ondragstart="handleDragStart(event, '{client_id}', '{lead_status}')"
+             ondragend="handleDragEnd(event, '{client_id}')"
+             data-client-id="{client_id}"
+             data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()}"
+             data-status="{lead_status}"
+             data-course="{campaign.lower()}"
+             data-source="{source.lower()}"
+             data-manager="{manager_name.lower()}">
+
+            <!-- Top row: Avatar, Name, Ig link, and Date -->
+            <div class="flex items-start justify-between gap-1.5 mb-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        {initials}
+                    </div>
+                    <div class="min-w-0">
+                        <div class="font-bold text-xs text-slate-900 truncate" title="{full_name}">{full_name}</div>
+                        {ig_badge}
+                    </div>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="text-[10px] text-slate-400 block font-mono">{created_at[-5:] if len(created_at) >= 5 else ''}</span>
+                    {fol_badge}
+                </div>
+            </div>
+
+            <!-- Phone & Quick Contact Buttons -->
+            <div class="flex items-center justify-between gap-1.5 py-1 px-2 bg-slate-50 rounded-lg border border-slate-100 mb-2">
+                <div class="text-xs font-mono font-bold text-slate-800 truncate">
+                    {phone if phone and phone != '—' else '<span class="text-slate-400 font-sans italic text-[11px] font-normal">Raqamsiz</span>'}
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    {call_btn}
+                    {tg_btn}
+                </div>
+            </div>
+
+            <!-- Course & Source badges -->
+            <div class="flex flex-wrap items-center gap-1 mb-2">
+                {campaign_badge}
+                {source_badge}
+            </div>
+
+            <!-- AI summary or Last message -->
+            {kanban_ai_or_msg}
+
+            <!-- Manager & Comment -->
+            <div class="pt-2 border-t border-slate-100 flex flex-col gap-1">
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400 text-[10px] font-medium">Mas'ul:</span>
+                    {manager_display_badge}
+                </div>
+                {kanban_comment_block}
+            </div>
+
+            <!-- Card Actions footer: Bog'lanish modal button + Quick status move dropdown -->
+            <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')"
+                        class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
+                    💬 Bog'lanish
+                </button>
+                <select onchange="quickMoveLead('{client_id}', this.value)" class="text-[11px] py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-2xs" title="Boshqa ustunga ko'chirish">
+                    <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                    <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
+                    <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'landi</option>
+                    <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                    <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
+                    <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                </select>
+            </div>
+        </div>
+        """)
+
+    # ---------------- 6.5 KANBAN USTUNLARI (PIPELINE) TUZISH ----------------
+    columns_meta = [
+        {
+            "status": "yangi",
+            "title": "Yangi Lidlar",
+            "icon": "⚪",
+            "subtitle": "Bog'lanish kutilmoqda",
+            "border": "border-slate-300",
+            "header_bg": "bg-slate-100 text-slate-800 border border-slate-200",
+            "badge_cls": "bg-slate-200 text-slate-800"
+        },
+        {
+            "status": "jarayonda",
+            "title": "Jarayonda",
+            "icon": "🟡",
+            "subtitle": "Aloqaga chiqilmoqda",
+            "border": "border-amber-300",
+            "header_bg": "bg-amber-100 text-amber-900 border border-amber-200",
+            "badge_cls": "bg-amber-200 text-amber-900"
+        },
+        {
+            "status": "boglandi",
+            "title": "Bog'lanildi",
+            "icon": "🟢",
+            "subtitle": "Muvaffaqiyatli gaplashildi",
+            "border": "border-emerald-300",
+            "header_bg": "bg-emerald-100 text-emerald-900 border border-emerald-200",
+            "badge_cls": "bg-emerald-200 text-emerald-900"
+        },
+        {
+            "status": "oylanyapti",
+            "title": "O'ylayapti",
+            "icon": "💭",
+            "subtitle": "Keyinroq bog'laniladi",
+            "border": "border-sky-300",
+            "header_bg": "bg-sky-100 text-sky-900 border border-sky-200",
+            "badge_cls": "bg-sky-200 text-sky-900"
+        },
+        {
+            "status": "zahira",
+            "title": "Zahira (Keyingi oqim)",
+            "icon": "📦",
+            "subtitle": "Yangi ochiladigan kurslar uchun",
+            "border": "border-indigo-300",
+            "header_bg": "bg-indigo-100 text-indigo-900 border border-indigo-200",
+            "badge_cls": "bg-indigo-200 text-indigo-900"
+        },
+        {
+            "status": "rad",
+            "title": "Rad / Ko'tarmadi",
+            "icon": "🔴",
+            "subtitle": "Bog'lanib bo'lmadi",
+            "border": "border-rose-300",
+            "header_bg": "bg-rose-100 text-rose-900 border border-rose-200",
+            "badge_cls": "bg-rose-200 text-rose-900"
+        }
+    ]
+
+    kanban_columns_html = ""
+    for col in columns_meta:
+        st_key = col["status"]
+        cards_list = kanban_cards_dict.get(st_key, [])
+        col_cards_inner = "".join(cards_list) if cards_list else '<div class="empty-col-placeholder py-8 text-center text-xs text-slate-400 font-medium">Hozircha lidlar yo\'q</div>'
+        
+        kanban_columns_html += f"""
+        <div class="kanban-col flex-1 min-w-[285px] sm:min-w-[305px] max-w-[340px] flex flex-col bg-slate-50/70 rounded-2xl border {col['border']} p-2.5 shadow-xs transition"
+             data-col-status="{st_key}"
+             ondragover="handleDragOver(event)"
+             ondragleave="handleDragLeave(event)"
+             ondrop="handleDrop(event, '{st_key}')">
+            <div class="flex items-center justify-between p-2.5 rounded-xl {col['header_bg']} mb-2.5 shadow-2xs">
+                <div>
+                    <div class="text-xs font-bold flex items-center gap-1.5">
+                        <span>{col['icon']}</span>
+                        <span>{col['title']}</span>
+                    </div>
+                    <div class="text-[10px] opacity-80 font-medium">{col['subtitle']}</div>
+                </div>
+                <span id="badge_count_{st_key}" class="px-2 py-0.5 rounded-full text-xs font-black {col['badge_cls']}">
+                    {len(cards_list)} ta
+                </span>
+            </div>
+            <div class="kanban-cards-box flex-1 space-y-2.5 overflow-y-auto max-h-[70vh] pr-1" id="kanban_col_{st_key}">
+                {col_cards_inner}
+            </div>
+        </div>
         """
 
     # ---------------- 7. VIDEO QOIDALARI JADVALI ----------------
@@ -1485,6 +1702,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <option value="jarayonda">🟡 Jarayonda (Bog'lanilmoqda / Ma'lumot berildi)</option>
                         <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
                         <option value="oylanyapti">💭 O'ylayapti (Qaror qabul qilmoqda 🤔)</option>
+                        <option value="zahira">📦 Zahira (Keyingi oqim / ochiladigan kurslar uchun 📦)</option>
                         <option value="rad">🔴 Rad / Ko'tarmadi (Bog'lanib bo'lmadi ❌)</option>
                     </select>
                 </div>
@@ -1532,6 +1750,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition cursor-pointer">Saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Toast Xabarnoma -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-900/95 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 border border-slate-700/60 backdrop-blur-sm" id="toastMessage">
+            Xabar
         </div>
     </div>
     """
@@ -1600,31 +1825,54 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <!-- 1-TAB: LIDLAR BAZASI (CRM) -->
         <div id="tab_leads" class="tab-content space-y-6">
             <!-- Statistika kartalari -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Jami Lidlar</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">⚪ Yangi Lidlar</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">⚪ Yangi Lidlar</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-slate-700">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">🟡 Jarayonda</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">🟡 Jarayonda</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-purple-600 mb-1">💭 O'ylayapti</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-purple-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-sky-600 mb-1">💭 O'ylayapti</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-sky-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">📦 Zahira</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{reserve_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
             </div>
 
             <!-- Qidiruv va Filtrlash Paneli -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
+                <!-- Ko'rinishni tanlash (Ustunlar vs Jadval) -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 mb-4 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Ko'rinish:</span>
+                        <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            <button type="button" id="view_btn_kanban" onclick="setViewMode('kanban')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-purple-700 shadow-xs cursor-pointer">
+                                📊 Ustunlar (Pipeline)
+                            </button>
+                            <button type="button" id="view_btn_table" onclick="setViewMode('table')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900 cursor-pointer">
+                                📋 Jadval
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                        <span>💡</span>
+                        <span>Lidlarni bosqichlar bo'yicha sudrab (Drag & Drop) yoki tezkor holat menyusi orqali boshqaring</span>
+                    </div>
+                </div>
+
                 <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-4">
                     <div class="flex-1 relative">
                         <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
@@ -1638,6 +1886,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="jarayonda">🟡 Jarayonda</option>
                             <option value="boglandi">🟢 Bog'lanildi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
+                            <option value="zahira">📦 Zahira (Keyingi oqim)</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
                         <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
@@ -1672,8 +1921,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
 
-                <!-- Lidlar Jadvali -->
-                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                <!-- 1. KANBAN USTUNLAR (PIPELINE) KO'RINIShI -->
+                <div id="leads_kanban_view" class="overflow-x-auto pb-4 pt-1">
+                    <div class="flex gap-3.5 items-start min-w-max">
+                        {kanban_columns_html}
+                    </div>
+                </div>
+
+                <!-- 2. JADVAL KO'RINIShI -->
+                <div id="leads_table_view" class="overflow-x-auto rounded-xl border border-slate-100 hidden">
                     <table class="w-full text-left text-sm" id="leads_table">
                         <thead class="bg-slate-50 text-xs font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
                             <tr>
@@ -1841,6 +2097,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     switchTab(hash);
                 }}
             }} catch (e) {{}}
+
+            try {{
+                const savedMode = localStorage.getItem('leads_view_mode') || 'kanban';
+                setViewMode(savedMode);
+            }} catch (e) {{
+                setViewMode('kanban');
+            }}
         }});
 
         let chartsInitialized = false;
@@ -1932,10 +2195,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 chartInstances.status = new Chart(ctxStatus, {{
                     type: 'doughnut',
                     data: {{
-                        labels: ["⚪ Yangi", "🟡 Jarayonda", "🟢 Bog'lanildi", "💭 O'ylayapti", "🔴 Rad"],
+                        labels: ["⚪ Yangi", "🟡 Jarayonda", "🟢 Bog'lanildi", "💭 O'ylayapti", "📦 Zahira", "🔴 Rad"],
                         datasets: [{{
-                            data: [{new_leads}, {in_progress_leads}, {done_leads}, {thinking_leads}, {rejected_leads}],
-                            backgroundColor: ['#94a3b8', '#6366f1', '#10b981', '#f59e0b', '#f43f5e'],
+                            data: [{new_leads}, {in_progress_leads}, {done_leads}, {thinking_leads}, {reserve_leads}, {rejected_leads}],
+                            backgroundColor: ['#94a3b8', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e'],
                             borderWidth: 2,
                             borderColor: '#ffffff'
                         }}]
@@ -2091,6 +2354,239 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     row.style.display = 'none';
                 }}
             }});
+
+            const cards = document.querySelectorAll('.kanban-card');
+            cards.forEach(card => {{
+                const searchData = card.getAttribute('data-search') || '';
+                const statusData = card.getAttribute('data-status') || '';
+                const courseData = card.getAttribute('data-course') || '';
+                const sourceData = card.getAttribute('data-source') || '';
+                const managerData = (card.getAttribute('data-manager') || '').toLowerCase().trim();
+
+                const matchesSearch = !searchVal || searchData.includes(searchVal);
+                const matchesStatus = (statusVal === 'all') || (statusData === statusVal);
+
+                let matchesCourse = true;
+                if (courseVal !== 'all') {{
+                    if (courseVal === 'front_office' || courseVal === 'onlayn') {{
+                        matchesCourse = courseData.includes('front') || courseData.includes('housekeeping') || courseData.includes('tourism-edu') || courseData.includes('onlayn') || courseData.includes('online');
+                    }} else if (courseVal === 'hotel') {{
+                        matchesCourse = courseData.includes('hotel') || courseData.includes('mehmonxona') || courseData.includes('operations');
+                    }} else if (courseVal === 'gid_malaka') {{
+                        matchesCourse = courseData.includes('malaka');
+                    }} else if (courseVal === 'gid_qayta') {{
+                        matchesCourse = (courseData.includes('gid') || courseData.includes('ekskurs')) && !courseData.includes('malaka');
+                    }} else if (courseVal === 'turagent') {{
+                        matchesCourse = courseData.includes('turagent');
+                    }} else if (courseVal === 'turoperator') {{
+                        matchesCourse = courseData.includes('turoperator');
+                    }} else if (courseVal === 'narx') {{
+                        matchesCourse = courseData.includes('narx');
+                    }} else if (courseVal === 'dastur') {{
+                        matchesCourse = courseData.includes('dastur');
+                    }} else if (courseVal === 'konsultatsiya') {{
+                        matchesCourse = courseData.includes('konsultatsiya') || courseData.includes('batafsil');
+                    }} else if (courseVal === 'umumiy') {{
+                        matchesCourse = courseData.includes('umumiy') || (!courseData.includes('hotel') && !courseData.includes('gid') && !courseData.includes('turagent') && !courseData.includes('turoperator') && !courseData.includes('front') && !courseData.includes('onlayn'));
+                    }}
+                }}
+
+                let matchesSource = true;
+                if (sourceVal !== 'all') {{
+                    if (sourceVal === 'reels') {{
+                        matchesSource = sourceData.includes('reel') || sourceData.includes('instagram.com/reel') || sourceData.includes('instagram.com/p') || sourceData.includes('izoh') || sourceData.includes('video');
+                    }} else if (sourceVal === 'direct') {{
+                        matchesSource = !sourceData.includes('reel') && !sourceData.includes('instagram.com/reel') && !sourceData.includes('instagram.com/p') && !sourceData.includes('izoh') && !sourceData.includes('video');
+                    }}
+                }}
+
+                let matchesManager = true;
+                if (managerVal !== 'all') {{
+                    if (managerVal === 'my_leads') {{
+                        matchesManager = managerData.includes('{curr_display_name.lower()}');
+                    }} else if (managerVal === 'unassigned') {{
+                        matchesManager = !managerData || managerData === '—' || managerData === 'biriktirilmagan' || managerData === 'yangi' || managerData === 'none' || managerData === '';
+                    }} else {{
+                        matchesManager = managerData.includes(managerVal.toLowerCase());
+                    }}
+                }}
+
+                if (matchesSearch && matchesStatus && matchesCourse && matchesSource && matchesManager) {{
+                    card.style.display = '';
+                }} else {{
+                    card.style.display = 'none';
+                }}
+            }});
+
+            updateKanbanCounts();
+        }}
+
+        function updateKanbanCounts() {{
+            const colStatuses = ['yangi', 'jarayonda', 'boglandi', 'oylanyapti', 'zahira', 'rad'];
+            colStatuses.forEach(st => {{
+                const colBox = document.getElementById('kanban_col_' + st);
+                if (colBox) {{
+                    const visibleCards = colBox.querySelectorAll('.kanban-card:not([style*="display: none"])').length;
+                    const badge = document.getElementById('badge_count_' + st);
+                    if (badge) badge.textContent = visibleCards + ' ta';
+                }}
+            }});
+        }}
+
+        const statusTitles = {{
+            'yangi': '⚪ Yangi Lid',
+            'jarayonda': '🟡 Jarayonda',
+            'boglandi': '🟢 Bog\'lanildi',
+            'oylanyapti': '💭 O\'ylayapti',
+            'zahira': '📦 Zahira (Keyingi oqim)',
+            'rad': '🔴 Rad / Ko\'tarmadi'
+        }};
+
+        function setViewMode(mode) {{
+            const kanbanBox = document.getElementById('leads_kanban_view');
+            const tableBox = document.getElementById('leads_table_view');
+            const btnKanban = document.getElementById('view_btn_kanban');
+            const btnTable = document.getElementById('view_btn_table');
+
+            if (mode === 'table') {{
+                if (kanbanBox) kanbanBox.classList.add('hidden');
+                if (tableBox) tableBox.classList.remove('hidden');
+                if (btnTable) {{
+                    btnTable.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-purple-700 shadow-xs cursor-pointer';
+                }}
+                if (btnKanban) {{
+                    btnKanban.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900 cursor-pointer';
+                }}
+                try {{ localStorage.setItem('leads_view_mode', 'table'); }} catch (e) {{}}
+            }} else {{
+                if (kanbanBox) kanbanBox.classList.remove('hidden');
+                if (tableBox) tableBox.classList.add('hidden');
+                if (btnKanban) {{
+                    btnKanban.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-purple-700 shadow-xs cursor-pointer';
+                }}
+                if (btnTable) {{
+                    btnTable.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900 cursor-pointer';
+                }}
+                try {{ localStorage.setItem('leads_view_mode', 'kanban'); }} catch (e) {{}}
+            }}
+            filterLeads();
+        }}
+
+        let draggedClientId = null;
+        let draggedOldStatus = null;
+
+        function handleDragStart(e, clientId, oldStatus) {{
+            draggedClientId = clientId;
+            draggedOldStatus = oldStatus;
+            e.dataTransfer.setData('text/plain', clientId);
+            e.dataTransfer.effectAllowed = 'move';
+            const card = document.getElementById('kanban_card_' + clientId);
+            if (card) {{
+                card.classList.add('opacity-40', 'scale-95');
+            }}
+        }}
+
+        function handleDragEnd(e, clientId) {{
+            const card = document.getElementById('kanban_card_' + clientId);
+            if (card) {{
+                card.classList.remove('opacity-40', 'scale-95');
+            }}
+            document.querySelectorAll('.kanban-col').forEach(col => {{
+                col.classList.remove('ring-2', 'ring-purple-400', 'bg-purple-50/50');
+            }});
+        }}
+
+        function handleDragOver(e) {{
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const col = e.currentTarget;
+            col.classList.add('ring-2', 'ring-purple-400', 'bg-purple-50/50');
+        }}
+
+        function handleDragLeave(e) {{
+            const col = e.currentTarget;
+            col.classList.remove('ring-2', 'ring-purple-400', 'bg-purple-50/50');
+        }}
+
+        async function handleDrop(e, newStatus) {{
+            e.preventDefault();
+            const col = e.currentTarget;
+            col.classList.remove('ring-2', 'ring-purple-400', 'bg-purple-50/50');
+            const clientId = e.dataTransfer.getData('text/plain') || draggedClientId;
+            if (!clientId) return;
+
+            const card = document.getElementById('kanban_card_' + clientId);
+            if (card) {{
+                card.classList.remove('opacity-40', 'scale-95');
+            }}
+
+            if (draggedOldStatus === newStatus) return;
+
+            await quickMoveLead(clientId, newStatus);
+        }}
+
+        async function quickMoveLead(clientId, newStatus) {{
+            const card = document.getElementById('kanban_card_' + clientId);
+            const targetCol = document.getElementById('kanban_col_' + newStatus);
+
+            // Optimistic UI move
+            if (card && targetCol) {{
+                const emptyPlaceholder = targetCol.querySelector('.empty-col-placeholder');
+                if (emptyPlaceholder) emptyPlaceholder.remove();
+
+                targetCol.prepend(card);
+                card.setAttribute('data-status', newStatus);
+                const sel = card.querySelector('select');
+                if (sel) sel.value = newStatus;
+            }}
+
+            // Jadval qatorini ham yangilash
+            const tableRow = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+            if (tableRow) {{
+                tableRow.setAttribute('data-status', newStatus);
+                const trSel = tableRow.querySelector('select[name="status"]');
+                if (trSel) trSel.value = newStatus;
+            }}
+
+            updateKanbanCounts();
+
+            // Serverga AJAX yuborish
+            try {{
+                const formData = new FormData();
+                formData.append('status', newStatus);
+                formData.append('manager_name', '{curr_display_name}');
+
+                const resp = await fetch('/admin/clients/' + clientId + '/status', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+
+                if (resp.ok) {{
+                    showToast('✅ Lid holati yangilandi: ' + (statusTitles[newStatus] || newStatus));
+                }} else {{
+                    showToast('⚠️ Holatni saqlashda xatolik yuz berdi');
+                }}
+            }} catch (err) {{
+                console.error('quickMoveLead error:', err);
+                showToast('⚠️ Server bilan bog\'lanishda xatolik');
+            }}
+        }}
+
+        function showToast(msg) {{
+            const toast = document.getElementById('toastNotification');
+            const msgEl = document.getElementById('toastMessage');
+            if (!toast || !msgEl) return;
+            msgEl.innerHTML = msg;
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {{
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }}, 2800);
         }}
 
         const LEADS_DATA = {clients_json_data};
@@ -2133,6 +2629,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             "bog'landi": "🟢 Bog'lanildi",
                             "oylanyapti": "💭 O'ylayapti",
                             "o'ylayapti": "💭 O'ylayapti",
+                            "zahira": "📦 Zahira (Keyingi oqim)",
+                            "zaxira": "📦 Zahira (Keyingi oqim)",
                             "rad": "🔴 Rad / Ko'tarmadi"
                         }};
 

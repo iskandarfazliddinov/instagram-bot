@@ -8,7 +8,7 @@ import urllib.parse
 import time
 from collections import OrderedDict
 from fastapi import FastAPI, Request, Response, Form, status, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 from config import settings
 from database import (
@@ -834,6 +834,16 @@ def update_status_from_admin(
     except Exception as e:
         logger.error(f"Telegram lead update error from CRM status change: {e}")
 
+    # Agar AJAX (Kanban drag-and-drop yoki tezkor ko'chirish) orqali chaqirilgan bo'lsa -> JSON qaytaramiz
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "success": True,
+            "client_id": client_id,
+            "new_status": status_val,
+            "manager_name": effective_manager,
+            "manager_time": now_str
+        })
+
     return RedirectResponse(
         url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
@@ -1065,6 +1075,8 @@ def export_clients_excel():
             "bog'landi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
             "oylanyapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
             "o'ylayapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
+            "zahira": {"fill": "E0E7FF", "font_color": "3730A3", "label": "📦 Zahira (Keyingi oqim)"},
+            "zaxira": {"fill": "E0E7FF", "font_color": "3730A3", "label": "📦 Zahira (Keyingi oqim)"},
             "rad": {"fill": "FEE2E2", "font_color": "991B1B", "label": "🔴 Rad / Ko'tarmadi"}
         }
 
@@ -1283,6 +1295,7 @@ def export_clients_csv():
         "jarayonda": "🟡 Jarayonda",
         "boglandi": "🟢 Bog'lanildi",
         "oylanyapti": "💭 O'ylayapti",
+        "zahira": "📦 Zahira (Keyingi oqim)",
         "rad": "🔴 Rad / Ko'tarmadi"
     }
 

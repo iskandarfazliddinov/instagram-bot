@@ -37,6 +37,9 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     elif status == "oylanyapti":
         status_icon = "💭"
         status_label = f"Mijoz o'ylab ko'rmoqchi (Keyinroq bog'laniladi) 🤔\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
+    elif status == "zahira":
+        status_icon = "📦"
+        status_label = f"Zahira (Keyingi oqim / ochiladigan kurslar) 📦\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
     elif status == "rad":
         status_icon = "🔴"
         status_label = f"Bog'lana olmadi (Ko'tarmadi / Rad etdi) ❌\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
@@ -104,17 +107,24 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
             {"text": "📞 Men bog'lanaman", "callback_data": f"claim_{client_id}"},
             {"text": "✅ Bog'lanildi", "callback_data": f"done_{client_id}"}
         ])
+        keyboard.append([
+            {"text": "📦 Zahiraga qo'shish (Keyingi oqim)", "callback_data": f"reserve_{client_id}"}
+        ])
     elif status == "jarayonda":
         keyboard.append([
             {"text": "✅ Muvaffaqiyatli gaplashildi", "callback_data": f"done_{client_id}"}
         ])
         keyboard.append([
-            {"text": "🤔 Mijoz o'ylab ko'rmoqchi", "callback_data": f"thinking_{client_id}"},
+            {"text": "🤔 O'ylayapti", "callback_data": f"thinking_{client_id}"},
+            {"text": "📦 Zahira", "callback_data": f"reserve_{client_id}"}
+        ])
+        keyboard.append([
             {"text": "❌ Ko'tarmadi / Rad", "callback_data": f"reject_{client_id}"}
         ])
-    elif status in ["boglandi", "rad", "oylanyapti"]:
+    elif status in ["boglandi", "rad", "oylanyapti", "zahira"]:
         keyboard.append([
-            {"text": "🔄 Holatni o'zgartirish", "callback_data": f"claim_{client_id}"}
+            {"text": "🔄 Holatni o'zgartirish", "callback_data": f"claim_{client_id}"},
+            {"text": "📦 Zahiraga olish", "callback_data": f"reserve_{client_id}"}
         ])
 
     quick_links = []
@@ -383,6 +393,9 @@ def handle_telegram_callback(update: dict):
     elif action == "thinking":
         new_status = "oylanyapti"
         alert_text = f"Belgilandi: Mijoz o'ylab ko'rmoqchi 🤔"
+    elif action == "reserve":
+        new_status = "zahira"
+        alert_text = f"Mijoz keyingi oqim uchun Zahiraga qo'shildi! 📦"
     elif action == "reject":
         new_status = "rad"
         alert_text = f"Belgilandi: Bog'lanib bo'lmadi ❌"
