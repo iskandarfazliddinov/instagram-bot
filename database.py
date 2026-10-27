@@ -13,6 +13,7 @@ DB_PATH = os.path.join(DB_DIR, "clients.db")
 BACKUP_FILE = os.path.join(DB_DIR, "leads_backup.json")
 SETTINGS_BACKUP_FILE = os.path.join(DB_DIR, "settings_backup.json")
 OPERATORS_BACKUP_FILE = os.path.join(DB_DIR, "operators_backup.json")
+ACTIVITY_LOGS_BACKUP_FILE = os.path.join(DB_DIR, "activity_logs_backup.json")
 _DEFAULT_GK = base64.b64decode(b"QVEuQWI4Uk42SWJQNzhzNHo3aWZUajZFUkphX1BKU2NaRFBjNXdIeW1KSEdxS3FqMnNXMUE=").decode("utf-8")
 DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", _DEFAULT_GK)
 
@@ -122,7 +123,17 @@ def init_db():
         )
     """)
 
-
+    # 5. Xodimlar faoliyat jurnali (Audit & Anti-Fraud logs)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            operator_name TEXT,
+            action_type TEXT,
+            details TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     # Standart matnlarni tekshirib kiritish
     default_settings = {
@@ -487,6 +498,28 @@ def init_db():
                         op.get("role", "operator"),
                         op.get("is_active", 1),
                         op.get("username")
+                    ))
+        except Exception:
+            pass
+
+    # Faoliyat jurnalini zaxiradan tiklash (agar mavjud bo'lsa)
+    if os.path.exists(ACTIVITY_LOGS_BACKUP_FILE):
+        try:
+            with open(ACTIVITY_LOGS_BACKUP_FILE, "r", encoding="utf-8") as f:
+                backup_logs = json.load(f)
+            for log in backup_logs:
+                cursor.execute("SELECT id FROM activity_logs WHERE id = ?", (log.get("id"),))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO activity_logs (id, client_id, operator_name, action_type, details, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        log.get("id"),
+                        log.get("client_id"),
+                        log.get("operator_name"),
+                        log.get("action_type"),
+                        log.get("details"),
+                        log.get("created_at")
                     ))
         except Exception:
             pass
@@ -1055,6 +1088,65 @@ def clear_all_clients():
     conn.commit()
     conn.close()
     sync_leads_backup()
+
+def sync_activity_logs_backup():
+    """Faoliyat jurnalini JSON zaxira faylida saqlash"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM activity_logs ORDER BY id DESC LIMIT 500")
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        if rows:
+            with open(ACTIVITY_LOGS_BACKUP_FILE, "w", encoding="utf-8") as f:
+                json.dump(rows, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def log_activity(client_id: int, operator_name: str, action_type: str, details: str):
+    """Mutaxassis yoki tizim harakatini audit jurnaliga yozish (Anti-Fraud monitoring uchun)"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO activity_logs (client_id, operator_name, action_type, details, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (client_id, (operator_name or "Tizim").strip(), action_type.strip(), details.strip(), datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        sync_activity_logs_backup()
+    except Exception as e:
+        logger.error(f"log_activity xatoligi: {e}")
+
+def get_client_activity_logs(client_id: int) -> list:
+    """Bitta lid bo'yicha barcha harakatlar tarixi"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM activity_logs WHERE client_id = ? ORDER BY id DESC", (client_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_recent_activity_logs(limit: int = 50) -> list:
+    """Oxirgi mutaxassislar harakatlari (Audit & Nazorat uchun)"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.*, c.full_name as client_name, c.username as client_username, c.campaign as client_campaign
+            FROM activity_logs a
+            LEFT JOIN clients c ON a.client_id = c.id
+            ORDER BY a.id DESC LIMIT ?
+        """, (limit,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
 
 
 

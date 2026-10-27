@@ -27,7 +27,9 @@ from database import (
     get_client_by_id,
     append_client_chat_history,
     get_client_chat_history,
-    set_client_ai_paused
+    set_client_ai_paused,
+    log_activity,
+    get_recent_activity_logs
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -524,6 +526,10 @@ def is_admin(request: Request) -> bool:
     user = get_current_user(request)
     return bool(user and user.get("role") == "admin")
 
+def is_supervisor_or_admin(request: Request) -> bool:
+    user = get_current_user(request)
+    return bool(user and user.get("role") in ["admin", "supervisor"])
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = ""):
     """CRM tizimiga kirish sahifasi"""
@@ -564,7 +570,8 @@ def login_action(
             update_operator(op["id"], last_login=now_dt_str)
             resp = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
             disp_name = op.get("display_name") or op["username"]
-            token = make_session_token(op["id"], "operator", op["username"], disp_name)
+            op_role = op.get("role") or "operator"
+            token = make_session_token(op["id"], op_role, op["username"], disp_name)
             resp.set_cookie(key="crm_session", value=token, max_age=86400 * 30, httponly=True, samesite="lax")
             return resp
 
@@ -604,13 +611,15 @@ def admin_dashboard(request: Request, notice: str = ""):
     recent_media = get_recent_media(limit=25)
     from database import get_all_operators
     operators_data = get_all_operators()
+    recent_logs = get_recent_activity_logs(60)
 
     html_content = get_admin_dashboard_html(
         settings_data, campaigns_data, clients_data,
         recent_media=recent_media, notice=notice,
         user_role=curr_user["role"],
         current_user=curr_user,
-        operators=operators_data
+        operators=operators_data,
+        activity_logs=recent_logs
     )
     return HTMLResponse(content=html_content)
 
@@ -832,6 +841,7 @@ def update_status_from_admin(
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
     update_client_by_id(client_id, lead_status=status_val, manager_name=effective_manager, manager_time=now_str)
+    log_activity(client_id, effective_manager, "status", f"Holat o'zgartirildi: {status_val}")
     
     try:
         update_telegram_lead_message(client_id)
@@ -887,6 +897,9 @@ def update_comment_from_admin(
             update_data["phone_number"] = p_clean
 
     update_client_by_id(client_id, **update_data)
+    st_text = status_val if status_val else "o'zgarmadi"
+    comm_text = (comment or "")[:60]
+    log_activity(client_id, effective_manager, "comment", f"Izoh: {comm_text}; Holat: {st_text}")
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
@@ -979,6 +992,7 @@ def send_direct_message_from_crm(
         manager_time=now_str,
         ai_paused=1
     )
+    log_activity(client_id, manager_name, "direct_message", f"Instagram Direct xabari: {msg_text[:60]}")
 
     try:
         update_telegram_lead_message(client_id)

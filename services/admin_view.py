@@ -79,17 +79,21 @@ def get_login_page_html(error: str = "") -> str:
 </html>
 """
 
-def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None) -> str:
+def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None, activity_logs: list = None) -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     is_operator = (user_role == "operator")
+    is_supervisor = (user_role == "supervisor")
+    is_admin = (user_role == "admin")
     if current_user is None:
         current_user = {
-            "username": "admin" if user_role == "admin" else "operator",
+            "username": "admin" if user_role == "admin" else ("jasur" if user_role == "supervisor" else "operator"),
             "role": user_role,
-            "display_name": "Admin" if user_role == "admin" else "Operator 1"
+            "display_name": "Admin" if user_role == "admin" else ("Jasur Raxmanov" if user_role == "supervisor" else "Operator 1")
         }
     if operators is None:
         operators = []
+    if activity_logs is None:
+        activity_logs = []
 
     curr_display_name = current_user.get("display_name", "Admin")
 
@@ -130,6 +134,40 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     follower_rate = round((follower_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
 
     followup_leads = len([c for c in clients if (c.get("followup_count") or 0) > 0])
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    month_str = datetime.now().strftime("%Y-%m")
+    current_month_name = datetime.now().strftime("%B %Y")
+    now_date_display = datetime.now().strftime("%d.%m.%Y")
+
+    # Bugungi lidlar
+    today_clients = [c for c in clients if (c.get("created_at") or "")[:10] == today_str]
+    today_total = len(today_clients)
+    today_phones = len([c for c in today_clients if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]])
+    today_done = len([c for c in today_clients if c.get("lead_status") == "boglandi"])
+    today_conv = round((today_done / today_total * 100), 1) if today_total > 0 else 0.0
+
+    # Oylik lidlar
+    month_clients = [c for c in clients if (c.get("created_at") or "")[:7] == month_str]
+    month_total = len(month_clients)
+    month_phones = len([c for c in month_clients if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]])
+    month_done = len([c for c in month_clients if c.get("lead_status") == "boglandi"])
+    month_conv = round((month_done / month_total * 100), 1) if month_total > 0 else 0.0
+
+    # Shubhali lidlarni hisoblash (Anti-Fraud: Telefoni ham, Direct xabari ham yo'q holda 'Bog'lanildi' qilingan)
+    def check_is_suspicious(client_dict):
+        st = client_dict.get("lead_status") or "yangi"
+        ph = str(client_dict.get("phone_number") or "").strip()
+        has_ph = bool(ph and ph not in ["", "—", "None"])
+        ch_raw = client_dict.get("chat_history") or "[]"
+        try:
+            ch = json.loads(ch_raw) if isinstance(ch_raw, str) else ch_raw
+        except Exception:
+            ch = []
+        has_m_msg = any(m.get("role") in ["manager", "operator"] for m in ch)
+        return bool(st == "boglandi" and not has_ph and not has_m_msg)
+
+    total_suspicious = sum(1 for c in clients if check_is_suspicious(c))
 
     # ---------------- 2. SO'NGGI 14 KUNLIK VAQT DINAMIKASI ----------------
     today = datetime.now().date()
@@ -195,8 +233,28 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             source_stats["Boshqa"] += 1
 
-    # ---------------- 5. MENEJERLAR FAOLIYATI (LEADERBOARD) TAHLILI ----------------
+    # ---------------- 5. MENEJERLAR FAOLIYATI (LEADERBOARD VA AUDIT) TAHLILI ----------------
     manager_stats = {}
+    for op in operators:
+        d_name = (op.get("display_name") or op.get("username") or "").strip()
+        if d_name:
+            manager_stats[d_name] = {
+                "name": d_name,
+                "total": 0,
+                "today": 0,
+                "month": 0,
+                "boglandi": 0,
+                "jarayonda": 0,
+                "oylanyapti": 0,
+                "zahira": 0,
+                "rad": 0,
+                "yangi": 0,
+                "phones": 0,
+                "direct_msgs": 0,
+                "suspicious": 0,
+                "comments": 0
+            }
+
     for c in clients:
         m_name = (c.get('manager_name') or '').strip()
         if not m_name or m_name == "—":
@@ -208,19 +266,53 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             manager_stats[m_key] = {
                 "name": m_key,
                 "total": 0,
+                "today": 0,
+                "month": 0,
                 "boglandi": 0,
                 "jarayonda": 0,
                 "oylanyapti": 0,
+                "zahira": 0,
                 "rad": 0,
                 "yangi": 0,
+                "phones": 0,
+                "direct_msgs": 0,
+                "suspicious": 0,
                 "comments": 0
             }
         manager_stats[m_key]["total"] += 1
+
+        c_date = (c.get("created_at") or "")[:10]
+        c_month = (c.get("created_at") or "")[:7]
+        m_time = (c.get("manager_time") or "")
+        if c_date == today_str or (today_str in m_time):
+            manager_stats[m_key]["today"] += 1
+        if c_month == month_str:
+            manager_stats[m_key]["month"] += 1
+
+        ph = str(c.get("phone_number") or "").strip()
+        has_ph = bool(ph and ph not in ["", "—", "None"])
+        if has_ph:
+            manager_stats[m_key]["phones"] += 1
+
+        ch_raw = c.get("chat_history") or "[]"
+        try:
+            ch_list = json.loads(ch_raw) if isinstance(ch_raw, str) else ch_raw
+        except Exception:
+            ch_list = []
+        has_dm = any(m.get("role") in ["manager", "operator"] for m in ch_list)
+        if has_dm:
+            manager_stats[m_key]["direct_msgs"] += 1
+
         st = c.get("lead_status") or "yangi"
+        if st in ["zahira", "zaxira"]:
+            st = "zahira"
         if st in manager_stats[m_key]:
             manager_stats[m_key][st] += 1
         else:
             manager_stats[m_key]["yangi"] += 1
+
+        if st == "boglandi" and not has_ph and not has_dm:
+            manager_stats[m_key]["suspicious"] += 1
 
         if c.get("manager_comment") and c.get("manager_comment").strip():
             manager_stats[m_key]["comments"] += 1
@@ -396,6 +488,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         ai_summary = client.get('ai_summary') or ""
         manager_comment = client.get('manager_comment') or ""
         ai_paused = 1 if client.get('ai_paused') else 0
+        is_suspicious = check_is_suspicious(client)
 
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
@@ -445,7 +538,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         if lead_status == "jarayonda":
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">🟡 Jarayonda</span>'
         elif lead_status == "boglandi":
-            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span>'
+            if is_suspicious:
+                badge_html = '<div class="flex flex-col gap-1 items-start"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse" title="Anti-Fraud: Telefon raqami ham, Direct yozishmasi ham yo\'q">⚠️ Shubhali</span></div>'
+            else:
+                badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span>'
         elif lead_status == "oylanyapti":
             badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">💭 O\'ylayapti</span>'
         elif lead_status == "zahira":
@@ -578,7 +674,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             data-status="{lead_status}"
             data-course="{campaign.lower()}"
             data-source="{source.lower()}"
-            data-manager="{manager_name.lower()}">
+            data-manager="{manager_name.lower()}"
+            data-suspicious="{1 if is_suspicious else 0}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
@@ -654,6 +751,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
             """
 
+        kanban_suspicious_banner = ""
+        if is_suspicious:
+            kanban_suspicious_banner = """
+            <div class="mb-2 p-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 text-[10px] font-bold flex items-center justify-between shadow-2xs">
+                <span>⚠️ Shubhali Bog'lanish</span>
+                <span class="text-[9px] text-rose-600 font-semibold">Telefon/Direct yo'q</span>
+            </div>
+            """
+
         kanban_cards_dict[target_status].append(f"""
         <div class="kanban-card bg-white rounded-xl p-3 border border-slate-200/90 hover:border-purple-300 hover:shadow-md transition shadow-xs cursor-grab active:cursor-grabbing relative group select-none"
              id="kanban_card_{client_id}"
@@ -665,7 +771,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
              data-status="{lead_status}"
              data-course="{campaign.lower()}"
              data-source="{source.lower()}"
-             data-manager="{manager_name.lower()}">
+             data-manager="{manager_name.lower()}"
+             data-suspicious="{1 if is_suspicious else 0}">
 
             <!-- Top row: Avatar, Name, Ig link, and Date -->
             <div class="flex items-start justify-between gap-1.5 mb-2">
@@ -683,6 +790,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     {fol_badge}
                 </div>
             </div>
+
+            {kanban_suspicious_banner}
 
             <!-- Phone & Quick Contact Buttons -->
             <div class="flex items-center justify-between gap-1.5 py-1 px-2 bg-slate-50 rounded-lg border border-slate-100 mb-2">
@@ -899,8 +1008,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     operator_password = settings.get("operator_password", "operator123")
 
     leads_header_action_th = '<th class="px-5 py-3.5 text-right">Boshqarish & Holat</th>'
-    user_role_badge = f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">👤 {curr_display_name} (Operator)</span>' if is_operator else f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs">👑 {curr_display_name} (Admin)</span>'
+    if is_operator:
+        user_role_badge = f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">👤 {curr_display_name} (Operator)</span>'
+    elif is_supervisor:
+        user_role_badge = f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs">🛡️ {curr_display_name} (Supervisor / Rahbar)</span>'
+    else:
+        user_role_badge = f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs">👑 {curr_display_name} (Admin)</span>'
     header_stats_btn = '<button onclick="switchTab(\'analytics\')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">📊 Statistika</button>'
+
+    suspicious_nav_badge = f'<span class="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_suspicious} ta</span>' if total_suspicious > 0 else '<span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>'
 
     if is_operator:
         tabs_nav_html = f"""
@@ -920,9 +1036,27 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
     """
+    elif is_supervisor:
+        tabs_nav_html = f"""
+        <!-- CRM Bo'limlar Navigatsiyasi (Supervisor / Rahbar rejimi) -->
+        <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1.5 mb-6 text-sm font-semibold text-slate-600">
+            <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                📊 2. Statistika (Kunlik/Oylik/Umumiy)
+            </button>
+            <button onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                🛡️ 3. Xodimlar Auditi & Nazorat {suspicious_nav_badge}
+            </button>
+            <button onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                👥 4. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
+            </button>
+        </div>
+    """
     else:
         tabs_nav_html = f"""
-        <!-- CRM Bo'limlar Navigatsiyasi (Tablar) -->
+        <!-- CRM Bo'limlar Navigatsiyasi (Admin) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 text-sm font-semibold text-slate-600">
             <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
@@ -930,20 +1064,23 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
                 📊 2. Statistika & Tahlil
             </button>
+            <button onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                🛡️ 3. Xodimlar Auditi {suspicious_nav_badge}
+            </button>
             <button onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🤖 3. Sun'iy Intellekt
+                🤖 4. Sun'iy Intellekt
             </button>
             <button onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🎬 4. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
+                🎬 5. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
             </button>
             <button onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                💬 5. Direct Shabloni
+                💬 6. Direct Shabloni
             </button>
             <button onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                👥 6. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
+                👥 7. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
             </button>
             <button onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🔐 7. Login & Parol
+                🔐 8. Login & Parol
             </button>
         </div>
     """
@@ -1011,6 +1148,84 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <button type="button" onclick="exportLeadsToExcel(this)" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 transition cursor-pointer" title="Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish">
                             📥 Excel (.XLSX)
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Davrlar bo'yicha Tahlil (Bugun, Oylik, Umumiy) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Bugungi Tahlil -->
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/50 border border-purple-200/80 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
+                            <span>📅</span> <span>Bugun ({now_date_display})</span>
+                        </span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Kunlik</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 mb-2">{today_total} <span class="text-xs text-slate-500 font-normal">ta yangi lid</span></div>
+                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-purple-200/60 pt-2.5">
+                        <div class="flex justify-between">
+                            <span>📞 Olingan telefonlar:</span>
+                            <span class="font-bold text-emerald-700">{today_phones} ta</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>🟢 Bog'lanildi:</span>
+                            <span class="font-bold text-indigo-700">{today_done} ta</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>📈 Kunlik konversiya:</span>
+                            <span class="font-bold text-purple-700">{today_conv}%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shu Oygi Tahlil -->
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-200/80 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                            <span>🗓️</span> <span>Shu Oy ({current_month_name})</span>
+                        </span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Oylik</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 mb-2">{month_total} <span class="text-xs text-slate-500 font-normal">ta oylik lid</span></div>
+                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-indigo-200/60 pt-2.5">
+                        <div class="flex justify-between">
+                            <span>📞 Olingan telefonlar:</span>
+                            <span class="font-bold text-emerald-700">{month_phones} ta</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>🟢 Bog'lanildi:</span>
+                            <span class="font-bold text-indigo-700">{month_done} ta</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>📈 Oylik konversiya:</span>
+                            <span class="font-bold text-indigo-700">{month_conv}%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Umumiy Tahlil -->
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                            <span>🌐</span> <span>Barcha Davr (Umumiy)</span>
+                        </span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Umumiy</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 mb-2">{total_leads} <span class="text-xs text-slate-500 font-normal">ta jami lid</span></div>
+                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-emerald-200/60 pt-2.5">
+                        <div class="flex justify-between">
+                            <span>📞 Telefonli lidlar:</span>
+                            <span class="font-bold text-emerald-700">{leads_with_phone} ta ({phone_rate}%)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>🟢 Bog'lanildi:</span>
+                            <span class="font-bold text-indigo-700">{done_leads} ta ({conversion_rate}%)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>⚠️ Shubhali holatlar:</span>
+                            <span class="font-bold {'text-rose-600' if total_suspicious > 0 else 'text-slate-500'}">{total_suspicious} ta</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1251,6 +1466,199 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </div>
     """
 
+    # ---------------- 5.5 ANTI-FRAUD VA AUDIT JURNALI TAHLILI ----------------
+    audit_managers_rows = ""
+    for m in sorted_managers:
+        m_name = m["name"]
+        m_total = m["total"]
+        m_today = m["today"]
+        m_month = m["month"]
+        m_done = m["boglandi"]
+        m_phone = m["phones"]
+        m_direct = m["direct_msgs"]
+        m_susp = m["suspicious"]
+
+        if m_name == "Biriktirilmagan (Yangi)":
+            m_avatar = "⚪"
+            m_label = f'<span class="font-medium text-slate-500 italic">{m_name}</span>'
+        else:
+            m_avatar = "👤"
+            m_label = f'<span class="font-bold text-slate-800">{m_name}</span>'
+
+        if m_susp > 0:
+            susp_badge = f'<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">⚠️ {m_susp} ta shubhali</span>'
+            status_eval = '<span class="text-xs text-rose-600 font-semibold">Tekshirish lozim</span>'
+        else:
+            susp_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Toza</span>'
+            status_eval = '<span class="text-xs text-emerald-600 font-semibold">Qoidaga muvofiq</span>'
+
+        audit_managers_rows += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100">{m_avatar}</span>
+                    {m_label}
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-800">{m_today}</td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-800">{m_month}</td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-900">{m_total}</td>
+            <td class="px-4 py-3.5 text-center font-semibold text-emerald-700">{m_phone}</td>
+            <td class="px-4 py-3.5 text-center font-semibold text-pink-700">{m_direct}</td>
+            <td class="px-4 py-3.5 text-center font-bold text-slate-800">{m_done}</td>
+            <td class="px-4 py-3.5 text-center">{susp_badge}</td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">{status_eval}</td>
+        </tr>
+        """
+
+    # Activity Logs table rows
+    activity_rows_html = ""
+    if not activity_logs:
+        activity_rows_html = """
+        <tr>
+            <td colspan="5" class="px-6 py-8 text-center text-slate-400">
+                Hozircha xodimlarning harakatlar jurnali mavjud emas. Mutaxassislar lidlar holatini o'zgartirganda, izoh yozganda yoki xabar yuborganda bu yerda avtomatik qayd etiladi.
+            </td>
+        </tr>
+        """
+    else:
+        for log in activity_logs:
+            l_time = log.get("created_at") or "—"
+            l_op = log.get("operator_name") or "Tizim"
+            l_type = log.get("action_type") or "harakat"
+            l_cid = log.get("client_id") or "—"
+            l_det = log.get("details") or "—"
+
+            if l_type == "status":
+                type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">🔄 Holat</span>'
+            elif l_type == "comment":
+                type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📝 Izoh</span>'
+            elif l_type == "direct_message":
+                type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-pink-50 text-pink-700 border border-pink-200">💬 Direct</span>'
+            else:
+                type_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700">{l_type}</span>'
+
+            activity_rows_html += f"""
+            <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+                <td class="px-5 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">{l_time}</td>
+                <td class="px-4 py-3 whitespace-nowrap font-bold text-slate-800 text-xs">👤 {l_op}</td>
+                <td class="px-4 py-3 text-center whitespace-nowrap">{type_badge}</td>
+                <td class="px-4 py-3 text-center whitespace-nowrap text-xs font-mono text-purple-700 font-bold">#{l_cid}</td>
+                <td class="px-5 py-3 text-xs text-slate-700">{l_det}</td>
+            </tr>
+            """
+
+    if is_operator:
+        audit_tab_html = ""
+    else:
+        if total_suspicious > 0:
+            anti_fraud_banner = f"""
+            <div class="p-6 rounded-3xl bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div class="flex items-start gap-3.5">
+                    <span class="text-3xl">⚠️</span>
+                    <div>
+                        <h3 class="text-lg font-extrabold">Diqqat: Tizimda {total_suspicious} ta shubhali holat aniqlandi!</h3>
+                        <p class="text-rose-100 text-xs sm:text-sm mt-1 max-w-2xl">
+                            Ushbu lidlar bo'yicha mijoz bilan telefon orqali gaplashilmagan (telefon raqami yo'q) va Instagram Direct orqali ham xabar yuborilmagan, biroq xodimlar tomonidan &quot;🟢 Bog'lanildi&quot; deb belgilangan.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="filterSuspiciousLeads()" class="px-4 py-2.5 bg-white text-rose-800 hover:bg-rose-50 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition whitespace-nowrap cursor-pointer">
+                    🔍 Shubhali lidlarni ochish ({total_suspicious} ta)
+                </button>
+            </div>
+            """
+        else:
+            anti_fraud_banner = f"""
+            <div class="p-6 rounded-3xl bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-lg flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <span class="text-3xl">🛡️</span>
+                    <div>
+                        <h3 class="text-lg font-extrabold">Anti-Fraud Nazorati Faol: Barcha Bog'lanishlar Toza</h3>
+                        <p class="text-emerald-100 text-xs sm:text-sm mt-1">
+                            Hozircha birorta ham soxta yoki asossiz bog'lanish holati aniqlanmadi. Barcha xodimlar qoidalarga to'liq rioya qilmoqda.
+                        </p>
+                    </div>
+                </div>
+                <span class="px-3 py-1.5 rounded-xl bg-white/20 text-white text-xs font-bold border border-white/20">
+                    100% Tasdiqlangan
+                </span>
+            </div>
+            """
+
+        audit_tab_html = f"""
+        <!-- 3-TAB: XODIMLAR AUDITI VA ANTI-FRAUD NAZORATI -->
+        <div id="tab_audit" class="tab-content hidden space-y-6">
+            {anti_fraud_banner}
+
+            <!-- Mutaxassislar Faoliyati va Nazorat Jadvali -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>🛡️</span> <span>Mutaxassislarning Haqiqiy Ish Unumdorligi va Nazorati</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Telefon olish, Direct orqali yozishish va shubhali holatlar balansi</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl">
+                        Kuzatuv ostida: {len(operators)} ta mutaxassis
+                    </span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
+                            <tr>
+                                <th class="px-5 py-3">Mutaxassis</th>
+                                <th class="px-4 py-3 text-center">Bugungi Lidlar</th>
+                                <th class="px-4 py-3 text-center">Oylik Lidlar</th>
+                                <th class="px-4 py-3 text-center">Jami Biriktirilgan</th>
+                                <th class="px-4 py-3 text-center">📞 Olingan Telefonlar</th>
+                                <th class="px-4 py-3 text-center">💬 Direct Xabarlar</th>
+                                <th class="px-4 py-3 text-center">🟢 Bog'landi Belgilangan</th>
+                                <th class="px-4 py-3 text-center">⚠️ Shubhali Holat</th>
+                                <th class="px-5 py-3 text-right">Audit Xulosasi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {audit_managers_rows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Jonli Harakatlar Jurnali (Audit Activity Log) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>📜</span> <span>Xodimlarning Jonli Harakatlar Jurnali (Audit Log)</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Kim, qachon, qaysi mijozning statusini o'zgartirdi, izoh yozdi yoki xabar jo'natdi</p>
+                    </div>
+                    <button onclick="window.location.reload()" class="text-xs text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl font-bold transition">
+                        🔄 Yangilash
+                    </button>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100 max-h-96">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider sticky top-0 bg-slate-50">
+                            <tr>
+                                <th class="px-5 py-3">Vaqti</th>
+                                <th class="px-4 py-3">Xodim</th>
+                                <th class="px-4 py-3 text-center">Amal Turi</th>
+                                <th class="px-4 py-3 text-center">Mijoz ID</th>
+                                <th class="px-5 py-3">Tafsilotlar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {activity_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        """
+
     # Operatorlar HTML jadvali
     operators_table_rows = ""
     if not operators:
@@ -1305,10 +1713,88 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </tr>
         """
 
+    op_table_col_class = "lg:col-span-2" if is_admin else "lg:col-span-3"
+    new_op_form_html = """
+    <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="text-2xl">➕</span>
+            <div>
+                <h3 class="text-base font-bold text-slate-800">Yangi Operator Qo'shish</h3>
+                <p class="text-xs text-slate-400">Mutaxassisga login va parol berish</p>
+            </div>
+        </div>
+        <form method="POST" action="/admin/operators/create" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ism va Familiya *</label>
+                <input type="text" name="display_name" required placeholder="Masalan: Aziza Karimova" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Login (Username) *</label>
+                <input type="text" name="username" required placeholder="Masalan: aziza" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
+                <p class="text-[11px] text-slate-400 mt-0.5">Kichik lotin harflarida, probellarsiz</p>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Parol *</label>
+                <input type="text" name="password" required placeholder="Masalan: aziza2026" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Telefon raqami (ixtiyoriy)</label>
+                <input type="text" name="phone" placeholder="+998901234567" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
+            </div>
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition cursor-pointer">
+                ➕ Operatorni Saqlash
+            </button>
+        </form>
+    </div>
+    """ if is_admin else ""
+
     if is_operator:
-        admin_settings_tabs_html = ""
+        operators_tab_html = ""
     else:
-        admin_settings_tabs_html = f"""
+        operators_tab_html = f"""
+        <!-- 4-TAB: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -->
+        <div id="tab_operators" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {new_op_form_html}
+
+                <!-- Operatorlar Ro'yxati Table -->
+                <div class="{op_table_col_class} bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">👥</span>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800">Mavjud Mutaxassislar (Operatorlar)</h3>
+                                <p class="text-xs text-slate-500">Har bir xodim o'z login/paroli bilan kirib lidlar bilan ishlaydi</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200">Jami: {len(operators)} ta xodim</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 bg-slate-50/70">
+                                    <th class="px-5 py-3">Xodim</th>
+                                    <th class="px-4 py-3">Telefon</th>
+                                    <th class="px-4 py-3 text-center">Lidlari</th>
+                                    <th class="px-4 py-3 text-center">Holati</th>
+                                    <th class="px-4 py-3">Oxirgi kirishi</th>
+                                    <th class="px-5 py-3 text-right">Amallar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {operators_table_rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+
+    if not is_admin:
+        admin_only_tabs_html = ""
+    else:
+        admin_only_tabs_html = f"""
         <!-- 3-TAB: SUN'IY INTELLEKT (AI MASLAHATCHI) -->
         <div id="tab_ai" class="tab-content hidden">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
@@ -1539,76 +2025,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 6-TAB: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -->
-        <div id="tab_operators" class="tab-content hidden space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Yangi Operator Qo'shish Card -->
-                <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="text-2xl">➕</span>
-                        <div>
-                            <h3 class="text-base font-bold text-slate-800">Yangi Operator Qo'shish</h3>
-                            <p class="text-xs text-slate-400">Mutaxassisga login va parol berish</p>
-                        </div>
-                    </div>
-                    <form method="POST" action="/admin/operators/create" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Ism va Familiya *</label>
-                            <input type="text" name="display_name" required placeholder="Masalan: Aziza Karimova" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Login (Username) *</label>
-                            <input type="text" name="username" required placeholder="Masalan: aziza" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
-                            <p class="text-[11px] text-slate-400 mt-0.5">Kichik lotin harflarida, probellarsiz</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Parol *</label>
-                            <input type="text" name="password" required placeholder="Masalan: aziza2026" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Telefon raqami (ixtiyoriy)</label>
-                            <input type="text" name="phone" placeholder="+998901234567" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
-                        </div>
-                        <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition cursor-pointer">
-                            ➕ Operatorni Saqlash
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Operatorlar Ro'yxati Table -->
-                <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <span class="text-2xl">👥</span>
-                            <div>
-                                <h3 class="text-base font-bold text-slate-800">Mavjud Mutaxassislar (Operatorlar)</h3>
-                                <p class="text-xs text-slate-500">Har bir xodim o'z login/paroli bilan kirib lidlar bilan ishlaydi</p>
-                            </div>
-                        </div>
-                        <span class="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200">Jami: {len(operators)} ta xodim</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 bg-slate-50/70">
-                                    <th class="px-5 py-3">Xodim</th>
-                                    <th class="px-4 py-3">Telefon</th>
-                                    <th class="px-4 py-3 text-center">Lidlari</th>
-                                    <th class="px-4 py-3 text-center">Holati</th>
-                                    <th class="px-4 py-3">Oxirgi kirishi</th>
-                                    <th class="px-5 py-3 text-right">Amallar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {operators_table_rows}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 7-TAB: XAVFSIZLIK & LOGIN PAROL -->
+        <!-- 8-TAB: XAVFSIZLIK & LOGIN PAROL -->
         <div id="tab_security" class="tab-content hidden space-y-6">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl">
                 <div class="border-b border-slate-100 pb-4 mb-6">
@@ -1967,6 +2384,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                         <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
                             <option value="all">📋 Barcha holatlar</option>
+                            <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
                             <option value="yangi">⚪ Yangi</option>
                             <option value="jarayonda">🟡 Jarayonda</option>
                             <option value="boglandi">🟢 Bog'lanildi</option>
@@ -2038,7 +2456,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </div>
 
         {analytics_tab_html}
-        {admin_settings_tabs_html}
+        {audit_tab_html}
+        {operators_tab_html}
+        {admin_only_tabs_html}
     </main>
 
     {common_modals_html}
@@ -2683,7 +3103,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 const managerData = (row.getAttribute('data-manager') || '').toLowerCase().trim();
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
-                const matchesStatus = (statusVal === 'all') || (statusData === statusVal);
+                const isRowSuspicious = (row.getAttribute('data-suspicious') === '1');
+                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isRowSuspicious : (statusData === statusVal));
 
                 let matchesCourse = true;
                 if (courseVal !== 'all') {{
@@ -2747,7 +3168,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 const managerData = (card.getAttribute('data-manager') || '').toLowerCase().trim();
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
-                const matchesStatus = (statusVal === 'all') || (statusData === statusVal);
+                const isCardSuspicious = (card.getAttribute('data-suspicious') === '1');
+                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isCardSuspicious : (statusData === statusVal));
 
                 let matchesCourse = true;
                 if (courseVal !== 'all') {{
@@ -2814,6 +3236,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     if (badge) badge.textContent = visibleCards + ' ta';
                 }}
             }});
+        }}
+
+        function filterSuspiciousLeads() {{
+            switchTab('leads');
+            const sel = document.getElementById('lead_filter_status');
+            if (sel) {{
+                sel.value = 'suspicious';
+                filterLeads();
+            }}
         }}
 
         const statusTitles = {{
