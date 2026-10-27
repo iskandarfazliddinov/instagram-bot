@@ -79,9 +79,37 @@ def get_login_page_html(error: str = "") -> str:
 </html>
 """
 
-def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin") -> str:
+def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None) -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     is_operator = (user_role == "operator")
+    if current_user is None:
+        current_user = {
+            "username": "admin" if user_role == "admin" else "operator",
+            "role": user_role,
+            "display_name": "Admin" if user_role == "admin" else "Operator 1"
+        }
+    if operators is None:
+        operators = []
+
+    curr_display_name = current_user.get("display_name", "Admin")
+
+    # Har bir operatorga biriktirilgan lidlar soni
+    op_lead_counts = {}
+    for c in clients:
+        m = (c.get("manager_name") or "").strip()
+        if m:
+            op_lead_counts[m] = op_lead_counts.get(m, 0) + 1
+
+    operators_options_html = '<option value="Admin">👑 Admin</option>'
+    for op in operators:
+        d_name = op.get("display_name") or op.get("username")
+        operators_options_html += f'<option value="{d_name}">👤 {d_name} (@{op.get("username")})</option>'
+
+    operators_filter_options_html = '<option value="admin">👑 Admin</option>'
+    for op in operators:
+        d_name = op.get("display_name") or op.get("username")
+        operators_filter_options_html += f'<option value="{d_name.lower()}">👤 {d_name}</option>'
+
     current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
     
     # ---------------- 1. LIDLAR ASOSIY HISOB-KITOBLARI ----------------
@@ -419,6 +447,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         escaped_comment = manager_comment.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace('\n', ' ')
         escaped_name = full_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
         escaped_campaign = campaign.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
+        escaped_manager = manager_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
 
         comment_block = ""
         if manager_comment:
@@ -430,7 +459,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             """
 
         comment_btn = f"""
-        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
+        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
             💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
         </button>
         """
@@ -443,7 +472,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </form>
             """
 
-        manager_label = "Operator" if is_operator else "Admin"
         action_td = f"""
         <td class="px-5 py-3.5 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5">
@@ -455,14 +483,21 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
                         <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                     </select>
-                    <input type="hidden" name="manager_name" value="{manager_label}">
+                    <input type="hidden" name="manager_name" value="{curr_display_name}">
                     <noscript><button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button></noscript>
                 </form>
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium" title="Bog'lanish & Izoh">💬</button>
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium" title="Bog'lanish & Izoh">💬</button>
                 {delete_btn}
             </div>
         </td>
         """
+
+        if not manager_name or manager_name == "—":
+            manager_display_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-slate-400 bg-slate-100">⚪ Biriktirilmagan</span>'
+        elif manager_name == curr_display_name:
+            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 shadow-2xs">⭐ {manager_name} (Men)</span>'
+        else:
+            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200">👤 {manager_name}</span>'
 
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
@@ -514,10 +549,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         clients_html += f"""
         <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
-            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()}"
+            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()}"
             data-status="{lead_status}"
             data-course="{campaign.lower()}"
-            data-source="{source.lower()}">
+            data-source="{source.lower()}"
+            data-manager="{manager_name.lower()}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
@@ -547,7 +583,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <td class="px-5 py-3.5 whitespace-nowrap">{fol_badge}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">{badge_html}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <div class="text-xs font-bold text-slate-800">{manager_name}</div>
+                <div>{manager_display_badge}</div>
                 {comment_block}
                 {comment_btn}
             </td>
@@ -632,7 +668,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     operator_password = settings.get("operator_password", "operator123")
 
     leads_header_action_th = '<th class="px-5 py-3.5 text-right">Boshqarish & Holat</th>'
-    user_role_badge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">👤 Operator (Sotuv bo\'limi)</span>' if is_operator else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">👑 Admin</span>'
+    user_role_badge = f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">👤 {curr_display_name} (Operator)</span>' if is_operator else f'<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs">👑 {curr_display_name} (Admin)</span>'
     header_stats_btn = '<button onclick="switchTab(\'analytics\')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">📊 Statistika</button>'
 
     if is_operator:
@@ -647,9 +683,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     📊 2. Statistika & Tahlil
                 </button>
             </div>
-            <div class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200 flex items-center gap-1.5 shadow-xs">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>👤 Operator paneli: Lidlar bilan aloqa qilish, status va izoh kiritish faol</span>
+            <div class="text-xs text-slate-700 font-bold px-3 py-1.5 rounded-xl bg-white border border-slate-200 flex items-center gap-2 shadow-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>👤 Mutaxassis: <b>{curr_display_name}</b></span>
             </div>
         </div>
     """
@@ -664,16 +700,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 📊 2. Statistika & Tahlil
             </button>
             <button onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🤖 3. Sun'iy Intellekt (AI Maslahatchi)
+                🤖 3. Sun'iy Intellekt
             </button>
             <button onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🎬 4. Video (Reels) Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
+                🎬 4. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
             </button>
             <button onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
                 💬 5. Direct Shabloni
             </button>
+            <button onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                👥 6. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
+            </button>
             <button onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
-                🔐 6. Login & Parol
+                🔐 7. Login & Parol
             </button>
         </div>
     """
@@ -981,6 +1020,60 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </div>
     """
 
+    # Operatorlar HTML jadvali
+    operators_table_rows = ""
+    if not operators:
+        operators_table_rows = """
+        <tr>
+            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                Hozircha qo'shimcha operatorlar qo'shilmagan.
+            </td>
+        </tr>
+        """
+    for op in operators:
+        op_id = op.get("id")
+        op_name = op.get("display_name") or op.get("username")
+        op_user = op.get("username")
+        op_phone = op.get("phone") or "—"
+        op_active = op.get("is_active", 1)
+        op_last = op.get("last_login") or "Kirilmagan"
+        op_leads_cnt = op_lead_counts.get(op_name, 0)
+
+        status_pill = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">🟢 Faol</span>' if op_active else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">🔴 Bloklangan</span>'
+        toggle_label = "Bloklash" if op_active else "Faollashtirish"
+        toggle_btn_class = "text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200" if op_active else "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200"
+
+        operators_table_rows += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100 shadow-2xs">👤</div>
+                    <div>
+                        <div class="font-bold text-slate-900">{op_name}</div>
+                        <div class="text-xs text-slate-500 font-mono">@{op_user}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-xs font-medium text-slate-700">{op_phone}</td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">{op_leads_cnt} ta lid</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">{status_pill}</td>
+            <td class="px-4 py-3.5 text-xs text-slate-500">{op_last}</td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-1.5">
+                    <button type="button" onclick="openPasswordChangeModal('{op_id}', '{op_name}', '{op_user}')" class="text-xs px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium transition cursor-pointer" title="Parolni o'zgartirish">🔑 Parol</button>
+                    <form method="POST" action="/admin/operators/{op_id}/toggle-status" class="inline">
+                        <button type="submit" class="text-xs px-2.5 py-1 rounded-lg {toggle_btn_class} font-medium transition cursor-pointer">{toggle_label}</button>
+                    </form>
+                    <form method="POST" action="/admin/operators/{op_id}/delete" onsubmit="return confirm('Haqiqatan ham {op_name} operatorini o\\'chirmoqchimisiz?')" class="inline">
+                        <button type="submit" class="text-xs px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium transition cursor-pointer" title="O'chirish">🗑️</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        """
+
     if is_operator:
         admin_settings_tabs_html = ""
     else:
@@ -1215,7 +1308,76 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        <!-- 6-TAB: XAVFSIZLIK & LOGIN PAROL -->
+        <!-- 6-TAB: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -->
+        <div id="tab_operators" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Yangi Operator Qo'shish Card -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-2xl">➕</span>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800">Yangi Operator Qo'shish</h3>
+                            <p class="text-xs text-slate-400">Mutaxassisga login va parol berish</p>
+                        </div>
+                    </div>
+                    <form method="POST" action="/admin/operators/create" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Ism va Familiya *</label>
+                            <input type="text" name="display_name" required placeholder="Masalan: Aziza Karimova" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Login (Username) *</label>
+                            <input type="text" name="username" required placeholder="Masalan: aziza" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
+                            <p class="text-[11px] text-slate-400 mt-0.5">Kichik lotin harflarida, probellarsiz</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Parol *</label>
+                            <input type="text" name="password" required placeholder="Masalan: aziza2026" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Telefon raqami (ixtiyoriy)</label>
+                            <input type="text" name="phone" placeholder="+998901234567" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
+                        </div>
+                        <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition cursor-pointer">
+                            ➕ Operatorni Saqlash
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Operatorlar Ro'yxati Table -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">👥</span>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800">Mavjud Mutaxassislar (Operatorlar)</h3>
+                                <p class="text-xs text-slate-500">Har bir xodim o'z login/paroli bilan kirib lidlar bilan ishlaydi</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200">Jami: {len(operators)} ta xodim</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 bg-slate-50/70">
+                                    <th class="px-5 py-3">Xodim</th>
+                                    <th class="px-4 py-3">Telefon</th>
+                                    <th class="px-4 py-3 text-center">Lidlari</th>
+                                    <th class="px-4 py-3 text-center">Holati</th>
+                                    <th class="px-4 py-3">Oxirgi kirishi</th>
+                                    <th class="px-5 py-3 text-right">Amallar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {operators_table_rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7-TAB: XAVFSIZLIK & LOGIN PAROL -->
         <div id="tab_security" class="tab-content hidden space-y-6">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl">
                 <div class="border-b border-slate-100 pb-4 mb-6">
@@ -1327,6 +1489,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </select>
                 </div>
 
+                <!-- Mas'ul mutaxassisni tanlash va O'zimga biriktirish -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-bold text-slate-700">👤 Mas'ul Mutaxassis (Operator):</label>
+                        <button type="button" onclick="assignToMe('{curr_display_name}')" class="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition shadow-2xs">⭐ O'zimga biriktirish</button>
+                    </div>
+                    <select name="manager_name" id="modalManagerSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
+                        <option value="">⚪ Biriktirilmagan (Yangi)</option>
+                        {operators_options_html}
+                    </select>
+                </div>
+
                 <!-- Mutaxassis izohi -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">📝 Mutaxassis Izohi:</label>
@@ -1338,6 +1512,24 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition flex items-center gap-1.5 cursor-pointer">
                         <span>💾</span> <span>Saqlash & Telegramga uzatish</span>
                     </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Operator Parolini Yangilash Modali -->
+    <div id="opPasswordModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <h3 class="text-base font-bold text-slate-900 mb-1" id="opPasswordTitle">Operator Parolini Yangilash</h3>
+            <p class="text-xs text-slate-500 mb-4" id="opPasswordSubtitle">Yangi parol kiriting</p>
+            <form method="POST" id="opPasswordForm" action="" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Yangi Parol:</label>
+                    <input type="text" name="new_password" required placeholder="Kamida 4 ta belgi" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeOpPasswordModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">Bekor qilish</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition cursor-pointer">Saqlash</button>
                 </div>
             </form>
         </div>
@@ -1466,6 +1658,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="reels">🎬 Reels / Video izohi</option>
                             <option value="direct">💬 Instagram Direct</option>
                         </select>
+                        <select id="lead_filter_manager" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                            <option value="all">👥 Barcha xodimlar</option>
+                            <option value="my_leads">⭐ Faqat mening lidlarim ({curr_display_name})</option>
+                            <option value="unassigned">⚪ Biriktirilmagan lidlar</option>
+                            {operators_filter_options_html}
+                        </select>
                         <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
                             <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
                                 🔄 Yangilash
@@ -1506,7 +1704,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
-        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign) {{
+        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager) {{
             const form = document.getElementById('modalCommentForm');
             if (!form) return;
             form.action = '/admin/clients/' + clientId + '/comment';
@@ -1523,6 +1721,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const statusSelect = document.getElementById('modalStatusSelect');
             if (statusSelect) {{
                 statusSelect.value = currentStatus || 'yangi';
+            }}
+
+            const managerSelect = document.getElementById('modalManagerSelect');
+            if (managerSelect) {{
+                managerSelect.value = currentManager || '';
             }}
 
             const phoneInput = document.getElementById('modalPhoneInput');
@@ -1557,6 +1760,29 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             if (commentInput) commentInput.focus();
         }}
 
+        function assignToMe(name) {{
+            const sel = document.getElementById('modalManagerSelect');
+            if (sel) {{
+                sel.value = name;
+            }}
+        }}
+
+        function openPasswordChangeModal(opId, opName, opUser) {{
+            const form = document.getElementById('opPasswordForm');
+            const title = document.getElementById('opPasswordTitle');
+            const sub = document.getElementById('opPasswordSubtitle');
+            const modal = document.getElementById('opPasswordModal');
+            if (form) form.action = '/admin/operators/' + opId + '/update-password';
+            if (title) title.textContent = opName + ' uchun yangi parol';
+            if (sub) sub.textContent = '@' + opUser + ' loginli operator parolini yangilash';
+            if (modal) modal.classList.remove('hidden');
+        }}
+
+        function closeOpPasswordModal() {{
+            const modal = document.getElementById('opPasswordModal');
+            if (modal) modal.classList.add('hidden');
+        }}
+
         function closeCommentModal() {{
             const modal = document.getElementById('commentModal');
             if (modal) modal.classList.add('hidden');
@@ -1566,6 +1792,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const modal = document.getElementById('commentModal');
             if (modal && e.target === modal) {{
                 closeCommentModal();
+            }}
+            const opModal = document.getElementById('opPasswordModal');
+            if (opModal && e.target === opModal) {{
+                closeOpPasswordModal();
             }}
         }});
 
@@ -1795,6 +2025,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const statusVal = document.getElementById('lead_filter_status').value;
             const courseVal = document.getElementById('lead_filter_course') ? document.getElementById('lead_filter_course').value : 'all';
             const sourceVal = document.getElementById('lead_filter_source') ? document.getElementById('lead_filter_source').value : 'all';
+            const managerVal = document.getElementById('lead_filter_manager') ? document.getElementById('lead_filter_manager').value : 'all';
             const rows = document.querySelectorAll('.client-row');
 
             let visibleCount = 0;
@@ -1803,6 +2034,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 const statusData = row.getAttribute('data-status') || '';
                 const courseData = row.getAttribute('data-course') || '';
                 const sourceData = row.getAttribute('data-source') || '';
+                const managerData = (row.getAttribute('data-manager') || '').toLowerCase().trim();
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
                 const matchesStatus = (statusVal === 'all') || (statusData === statusVal);
@@ -1841,7 +2073,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     }}
                 }}
 
-                if (matchesSearch && matchesStatus && matchesCourse && matchesSource) {{
+                let matchesManager = true;
+                if (managerVal !== 'all') {{
+                    if (managerVal === 'my_leads') {{
+                        matchesManager = managerData.includes('{curr_display_name.lower()}');
+                    }} else if (managerVal === 'unassigned') {{
+                        matchesManager = !managerData || managerData === '—' || managerData === 'biriktirilmagan' || managerData === 'yangi' || managerData === 'none' || managerData === '';
+                    }} else {{
+                        matchesManager = managerData.includes(managerVal.toLowerCase());
+                    }}
+                }}
+
+                if (matchesSearch && matchesStatus && matchesCourse && matchesSource && matchesManager) {{
                     row.style.display = '';
                     visibleCount++;
                 }} else {{

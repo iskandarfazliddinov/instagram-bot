@@ -464,32 +464,61 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
 # ----------------- CRM AVTORIZATSIYA VA XAVFSIZLIK -----------------
 
-def get_auth_token(role: str = "admin") -> str:
-    if role == "operator":
-        pwd = get_setting("operator_password", "operator123").strip()
-        return hashlib.sha256(f"operator_{pwd}_crm_salt_2026".encode()).hexdigest()
-    pwd = get_setting("admin_password", "admin").strip()
-    return hashlib.sha256(f"admin_{pwd}_crm_salt_2026".encode()).hexdigest()
+SECRET_SALT = "xta_crm_secret_session_salt_2026_secure"
 
-def get_current_user_role(request: Request) -> str | None:
-    token = request.cookies.get("crm_session")
+def make_session_token(user_id: int, role: str, username: str, display_name: str) -> str:
+    import base64
+    payload = f"{user_id}:{role}:{username}:{display_name}"
+    sig = hashlib.sha256(f"{payload}:{SECRET_SALT}".encode()).hexdigest()
+    raw = f"{payload}:{sig}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+def parse_session_token(token: str) -> dict | None:
     if not token:
         return None
-    if token == get_auth_token("admin"):
-        return "admin"
-    if token == get_auth_token("operator"):
-        return "operator"
-    # Legacy fallback for old admin token
-    old_pwd = get_setting("admin_password", "admin").strip()
-    if token == hashlib.sha256(f"{old_pwd}_crm_salt_2026".encode()).hexdigest():
-        return "admin"
+    import base64
+    try:
+        decoded = base64.urlsafe_b64decode(token.encode()).decode()
+        parts = decoded.split(":")
+        if len(parts) == 5:
+            uid, role, username, display_name, sig = parts
+            expected_sig = hashlib.sha256(f"{uid}:{role}:{username}:{display_name}:{SECRET_SALT}".encode()).hexdigest()
+            if sig == expected_sig:
+                return {
+                    "id": int(uid),
+                    "role": role,
+                    "username": username,
+                    "display_name": display_name
+                }
+    except Exception:
+        pass
+
+    # Legacy fallback for old tokens
+    admin_pwd = get_setting("admin_password", "admin").strip()
+    if token == hashlib.sha256(f"admin_{admin_pwd}_crm_salt_2026".encode()).hexdigest() or \
+       token == hashlib.sha256(f"{admin_pwd}_crm_salt_2026".encode()).hexdigest():
+        return {"id": 0, "role": "admin", "username": "admin", "display_name": "Admin"}
+
+    oper_pwd = get_setting("operator_password", "operator123").strip()
+    if token == hashlib.sha256(f"operator_{oper_pwd}_crm_salt_2026".encode()).hexdigest():
+        return {"id": 1, "role": "operator", "username": "operator", "display_name": "Operator 1"}
+
     return None
 
+def get_current_user(request: Request) -> dict | None:
+    token = request.cookies.get("crm_session")
+    return parse_session_token(token)
+
+def get_current_user_role(request: Request) -> str | None:
+    user = get_current_user(request)
+    return user["role"] if user else None
+
 def is_authenticated(request: Request) -> bool:
-    return get_current_user_role(request) is not None
+    return get_current_user(request) is not None
 
 def is_admin(request: Request) -> bool:
-    return get_current_user_role(request) == "admin"
+    user = get_current_user(request)
+    return bool(user and user.get("role") == "admin")
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = ""):
@@ -503,40 +532,51 @@ def login_action(
     username: str = Form(...),
     password: str = Form(...)
 ):
-    """Login va parolni tekshirib sessiya o'rnatish (Admin yoki Operator)"""
-    admin_user = get_setting("admin_username", "admin").strip()
-    admin_pwd = get_setting("admin_password", "admin").strip()
-    oper_user = get_setting("operator_username", "operator").strip()
-    oper_pwd = get_setting("operator_password", "operator123").strip()
-
+    """Login va parolni tekshirib sessiya o'rnatish (Admin yoki ko'p operatorlar)"""
     u = username.strip()
     p = password.strip()
+    admin_user = get_setting("admin_username", "admin").strip()
+    admin_pwd = get_setting("admin_password", "admin").strip()
 
-    if u == admin_user and p == admin_pwd:
+    # 1. Admin tekshiruvi
+    if u.lower() == admin_user.lower() and p == admin_pwd:
         resp = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
-        resp.set_cookie(
-            key="crm_session",
-            value=get_auth_token("admin"),
-            httponly=True,
-            max_age=86400 * 30, # 30 kun saqlanadi
-            samesite="lax"
-        )
+        token = make_session_token(0, "admin", admin_user, "Admin")
+        resp.set_cookie(key="crm_session", value=token, max_age=86400 * 30, httponly=True, samesite="lax")
         return resp
-    elif u == oper_user and p == oper_pwd:
+
+    # 2. Operatorlar bazasidan tekshirish
+    from database import get_operator_by_username, verify_operator_password, update_operator
+    op = get_operator_by_username(u)
+    if op:
+        if not op.get("is_active", 1):
+            return RedirectResponse(
+                url="/login?error=Ushbu+operator+akkounti+faolsizlantirilgan.+Administratorga+murojaat+qiling.",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+        if verify_operator_password(op.get("password_hash", ""), p):
+            from datetime import datetime
+            now_dt_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+            update_operator(op["id"], last_login=now_dt_str)
+            resp = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+            disp_name = op.get("display_name") or op["username"]
+            token = make_session_token(op["id"], "operator", op["username"], disp_name)
+            resp.set_cookie(key="crm_session", value=token, max_age=86400 * 30, httponly=True, samesite="lax")
+            return resp
+
+    # 3. Zaxira: eski operator_password
+    oper_user = get_setting("operator_username", "operator").strip()
+    oper_pwd = get_setting("operator_password", "operator123").strip()
+    if u.lower() == oper_user.lower() and p == oper_pwd:
         resp = RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
-        resp.set_cookie(
-            key="crm_session",
-            value=get_auth_token("operator"),
-            httponly=True,
-            max_age=86400 * 30,
-            samesite="lax"
-        )
+        token = make_session_token(1, "operator", oper_user, "Operator 1")
+        resp.set_cookie(key="crm_session", value=token, max_age=86400 * 30, httponly=True, samesite="lax")
         return resp
-    else:
-        return RedirectResponse(
-            url="/login?error=Login+yoki+parol+noto%27g%27ri",
-            status_code=status.HTTP_303_SEE_OTHER
-        )
+
+    return RedirectResponse(
+        url="/login?error=Login+yoki+parol+noto%27g%27ri",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
 
 @app.get("/logout")
 def logout():
@@ -550,18 +590,23 @@ def logout():
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, notice: str = ""):
     """Instagram CRM boshqaruv paneli"""
-    role = get_current_user_role(request)
-    if not role:
+    curr_user = get_current_user(request)
+    if not curr_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     settings_data = get_all_settings()
     campaigns_data = get_all_campaigns()
     clients_data = get_all_clients()
     recent_media = get_recent_media(limit=25)
+    from database import get_all_operators
+    operators_data = get_all_operators()
+
     html_content = get_admin_dashboard_html(
         settings_data, campaigns_data, clients_data,
         recent_media=recent_media, notice=notice,
-        user_role=role
+        user_role=curr_user["role"],
+        current_user=curr_user,
+        operators=operators_data
     )
     return HTMLResponse(content=html_content)
 
@@ -769,14 +814,17 @@ def update_status_from_admin(
     client_id: int,
     request: Request,
     status_val: str = Form(..., alias="status"),
-    manager_name: str = Form("Admin", alias="manager_name")
+    manager_name: str = Form(None, alias="manager_name")
 ):
     """Admin yoki Operator paneldan mijoz holati va mas'ul xodimni to'g'ridan-to'g'ri o'zgartirish"""
-    role = get_current_user_role(request)
-    if not role:
+    user = get_current_user(request)
+    if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    effective_manager = "Operator" if role == "operator" else (manager_name or "Admin")
+    effective_manager = (manager_name or "").strip()
+    if not effective_manager or effective_manager in ["Admin", "Operator"]:
+        effective_manager = user.get("display_name", "Operator")
+
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
     update_client_by_id(client_id, lead_status=status_val, manager_name=effective_manager, manager_time=now_str)
@@ -797,14 +845,18 @@ def update_comment_from_admin(
     request: Request,
     comment: str = Form(""),
     status_val: str = Form(None, alias="status"),
-    phone_val: str = Form(None, alias="phone")
+    phone_val: str = Form(None, alias="phone"),
+    manager_name: str = Form(None, alias="manager_name")
 ):
-    """CRM dan mutaxassis izohi, holati va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
-    role = get_current_user_role(request)
-    if not role:
+    """CRM dan mutaxassis izohi, holati, mas'ul xodimi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
+    user = get_current_user(request)
+    if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    effective_manager = "Operator" if role == "operator" else "Admin"
+    effective_manager = (manager_name or "").strip()
+    if not effective_manager or effective_manager in ["Admin", "Operator"]:
+        effective_manager = user.get("display_name", "Operator")
+
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
 
@@ -830,6 +882,81 @@ def update_comment_from_admin(
         url="/admin?notice=Mijoz+ma%27lumotlari+va+izohi+muvaffaqiyatli+saqlandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+# ----------------- ADMIN: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -----------------
+
+@app.post("/admin/operators/create")
+def admin_create_operator(
+    request: Request,
+    display_name: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    phone: str = Form("")
+):
+    """Admin tomonidan yangi mutaxassis (operator) qo'shish"""
+    if not is_admin(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+    u = username.strip().lower()
+    p = password.strip()
+    name = display_name.strip()
+    if not u or not p or not name:
+        return RedirectResponse(url="/admin?notice=Barcha+majburiy+maydonlarni+to%27ldiring#operators", status_code=status.HTTP_303_SEE_OTHER)
+
+    from database import get_operator_by_username, create_operator
+    if u == "admin" or get_operator_by_username(u):
+        return RedirectResponse(url="/admin?notice=Bunday+loginli+operator+allaqachon+mavjud!#operators", status_code=status.HTTP_303_SEE_OTHER)
+
+    create_operator(u, p, name, phone=phone.strip(), role="operator")
+    return RedirectResponse(
+        url=f"/admin?notice=Yangi+operator+{name}+muvaffaqiyatli+qo%27shildi!#operators",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/operators/{op_id}/update-password")
+def admin_update_operator_password(
+    op_id: int,
+    request: Request,
+    new_password: str = Form(...)
+):
+    """Operator parolini admin tomonidan o'zgartirish"""
+    if not is_admin(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+    p = new_password.strip()
+    if not p:
+        return RedirectResponse(url="/admin?notice=Parol+bo%27sh+bo%27lishi+mumkin+emas#operators", status_code=status.HTTP_303_SEE_OTHER)
+    from database import update_operator
+    update_operator(op_id, password=p)
+    return RedirectResponse(url="/admin?notice=Operator+paroli+muvaffaqiyatli+yangilandi#operators", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/admin/operators/{op_id}/toggle-status")
+def admin_toggle_operator_status(
+    op_id: int,
+    request: Request
+):
+    """Operatorni bloklash yoki faollashtirish"""
+    if not is_admin(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+    from database import get_operator_by_id, update_operator
+    op = get_operator_by_id(op_id)
+    if op:
+        new_st = 0 if op.get("is_active", 1) else 1
+        update_operator(op_id, is_active=new_st)
+        msg = "Operator+faolsizlantirildi+(bloklandi)" if new_st == 0 else "Operator+qayta+faollashtirildi"
+        return RedirectResponse(url=f"/admin?notice={msg}#operators", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/admin#operators", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/admin/operators/{op_id}/delete")
+def admin_delete_operator(
+    op_id: int,
+    request: Request
+):
+    """Operatorni tizimdan o'chirish"""
+    if not is_admin(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+    from database import delete_operator
+    delete_operator(op_id)
+    return RedirectResponse(url="/admin?notice=Operator+muvaffaqiyatli+o%27chirildi#operators", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):

@@ -12,8 +12,18 @@ os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "clients.db")
 BACKUP_FILE = os.path.join(DB_DIR, "leads_backup.json")
 SETTINGS_BACKUP_FILE = os.path.join(DB_DIR, "settings_backup.json")
+OPERATORS_BACKUP_FILE = os.path.join(DB_DIR, "operators_backup.json")
 _DEFAULT_GK = base64.b64decode(b"QVEuQWI4Uk42SWJQNzhzNHo3aWZUajZFUkphX1BKU2NaRFBjNXdIeW1KSEdxS3FqMnNXMUE=").decode("utf-8")
 DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", _DEFAULT_GK)
+
+def hash_operator_password(password: str) -> str:
+    import hashlib
+    return hashlib.sha256(f"{password}_salt_xta_2026".encode()).hexdigest()
+
+def verify_operator_password(stored_hash: str, password: str) -> bool:
+    if not stored_hash:
+        return False
+    return stored_hash == hash_operator_password(password) or stored_hash == password
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -93,6 +103,21 @@ def init_db():
         CREATE TABLE IF NOT EXISTS processed_comments (
             comment_id TEXT PRIMARY KEY,
             created_at TIMESTAMP
+        )
+    """)
+
+    # 4. Mutaxassislar (Operatorlar) jadvali
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS operators (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            phone TEXT DEFAULT '',
+            role TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
         )
     """)
 
@@ -423,6 +448,38 @@ def init_db():
         except Exception:
             pass
 
+    # Operatorlarni zaxiradan tiklash (agar mavjud bo'lsa)
+    if os.path.exists(OPERATORS_BACKUP_FILE):
+        try:
+            with open(OPERATORS_BACKUP_FILE, "r", encoding="utf-8") as f:
+                backup_ops = json.load(f)
+            for op in backup_ops:
+                cursor.execute("SELECT id FROM operators WHERE username = ?", (op.get("username"),))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, last_login)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        op.get("username"),
+                        op.get("password_hash"),
+                        op.get("display_name", op.get("username")),
+                        op.get("phone", ""),
+                        op.get("role", "operator"),
+                        op.get("is_active", 1),
+                        op.get("created_at"),
+                        op.get("last_login")
+                    ))
+        except Exception:
+            pass
+
+    # Standart operator mavjudligini ta'minlash
+    cursor.execute("SELECT COUNT(*) FROM operators")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at)
+            VALUES (?, ?, ?, '', 'operator', 1, ?)
+        """, ("operator", hash_operator_password("operator123"), "Operator 1", datetime.now().isoformat()))
+
     # Sozlamalar zaxirasini yangilab qo'yish
     try:
         cursor.execute("SELECT key, value FROM settings")
@@ -467,10 +524,101 @@ def sync_settings_backup():
     except Exception:
         pass
 
+def sync_operators_backup():
+    """Barcha operatorlarni JSON faylga saqlab borish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM operators ORDER BY id ASC")
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        if rows:
+            with open(OPERATORS_BACKUP_FILE, "w", encoding="utf-8") as f:
+                json.dump(rows, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def get_all_operators() -> list:
+    """Barcha operatorlar ro'yxatini olish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, display_name, phone, role, is_active, created_at, last_login FROM operators ORDER BY id ASC")
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+def get_operator_by_username(username: str) -> dict | None:
+    """Username bo'yicha operatorni topish"""
+    if not username:
+        return None
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM operators WHERE LOWER(username) = LOWER(?)", (username.strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_operator_by_id(op_id: int) -> dict | None:
+    """ID bo'yicha operatorni topish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM operators WHERE id = ?", (op_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def create_operator(username: str, password: str, display_name: str, phone: str = "", role: str = "operator") -> int:
+    """Yangi operator qo'shish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    pwd_hash = hash_operator_password(password)
+    now_iso = datetime.now().isoformat()
+    cursor.execute("""
+        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
+    """, (username.strip().lower(), pwd_hash, display_name.strip(), phone.strip(), role, now_iso))
+    conn.commit()
+    op_id = cursor.lastrowid
+    conn.close()
+    sync_operators_backup()
+    return op_id
+
+def update_operator(op_id: int, **kwargs):
+    """Operator ma'lumotlarini yoki parolini yangilash"""
+    if not kwargs:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    fields = []
+    values = []
+    for k, v in kwargs.items():
+        if k == "password":
+            fields.append("password_hash = ?")
+            values.append(hash_operator_password(v))
+        elif k in ["display_name", "phone", "role", "is_active", "last_login"]:
+            fields.append(f"{k} = ?")
+            values.append(v)
+    if fields:
+        values.append(op_id)
+        cursor.execute(f"UPDATE operators SET {', '.join(fields)} WHERE id = ?", tuple(values))
+        conn.commit()
+    conn.close()
+    sync_operators_backup()
+
+def delete_operator(op_id: int):
+    """Operatorni o'chirish"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM operators WHERE id = ?", (op_id,))
+    conn.commit()
+    conn.close()
+    sync_operators_backup()
+
 # Modul yuklanganda bazani avtomatik tayyorlab qo'yish
 init_db()
 sync_leads_backup()
 sync_settings_backup()
+sync_operators_backup()
 
 def get_or_create_client(instagram_id: str) -> dict:
     """Mijozni bazadan olish yoki yangi bo'lsa yaratish"""
