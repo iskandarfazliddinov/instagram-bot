@@ -764,18 +764,20 @@ def update_status_from_admin(
     status_val: str = Form(..., alias="status"),
     manager_name: str = Form("Admin", alias="manager_name")
 ):
-    """Admin paneldan mijoz holati va mas'ul xodimni to'g'ridan-to'g'ri o'zgartirish"""
-    if not is_admin(request):
-        return RedirectResponse(url="/admin?notice=Xatolik:+Holatni+o%27zgartirishga+ruxsat+yo%27q#leads", status_code=status.HTTP_303_SEE_OTHER)
+    """Admin yoki Operator paneldan mijoz holati va mas'ul xodimni to'g'ridan-to'g'ri o'zgartirish"""
+    role = get_current_user_role(request)
+    if not role:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
+    effective_manager = "Operator" if role == "operator" else (manager_name or "Admin")
     from datetime import datetime
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    update_client_by_id(client_id, lead_status=status_val, manager_name=manager_name, manager_time=now_str)
+    update_client_by_id(client_id, lead_status=status_val, manager_name=effective_manager, manager_time=now_str)
     
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
-        logger.error(f"Telegram lead update error from CRM: {e}")
+        logger.error(f"Telegram lead update error from CRM status change: {e}")
 
     return RedirectResponse(
         url="/admin?notice=Mijoz+holati+muvaffaqiyatli+yangilandi#leads",
@@ -786,20 +788,39 @@ def update_status_from_admin(
 def update_comment_from_admin(
     client_id: int,
     request: Request,
-    comment: str = Form(...)
+    comment: str = Form(""),
+    status_val: str = Form(None, alias="status"),
+    phone_val: str = Form(None, alias="phone")
 ):
-    """CRM dan mutaxassis izohini saqlash va Telegram guruhidagi xabarni yangilash"""
-    if not is_admin(request):
-        return RedirectResponse(url="/admin?notice=Xatolik:+Izoh+qoldirishga+ruxsat+yo%27q#leads", status_code=status.HTTP_303_SEE_OTHER)
+    """CRM dan mutaxassis izohi, holati va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
+    role = get_current_user_role(request)
+    if not role:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    update_client_manager_comment(client_id, comment, manager_name="Admin")
+    effective_manager = "Operator" if role == "operator" else "Admin"
+    from datetime import datetime
+    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    update_data = {
+        "manager_comment": (comment or "").strip(),
+        "manager_name": effective_manager,
+        "manager_time": now_str
+    }
+    if status_val and status_val.strip():
+        update_data["lead_status"] = status_val.strip()
+    if phone_val is not None:
+        p_clean = phone_val.strip()
+        if p_clean and p_clean != "—":
+            update_data["phone_number"] = p_clean
+
+    update_client_by_id(client_id, **update_data)
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
         logger.error(f"Telegram lead update error from CRM comment: {e}")
 
     return RedirectResponse(
-        url="/admin?notice=Mutaxassis+izohi+muvaffaqiyatli+saqlandi#leads",
+        url="/admin?notice=Mijoz+ma%27lumotlari+va+izohi+muvaffaqiyatli+saqlandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
 

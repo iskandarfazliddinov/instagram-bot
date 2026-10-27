@@ -328,7 +328,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     clients_json_data = json.dumps(clients_for_export, ensure_ascii=False).replace("</script>", "<\\/script>")
 
     clients_html = ""
-    colspan_num = 8 if is_operator else 9
+    colspan_num = 9
     if not clients:
         clients_html = f"""
         <tr id="empty_row">
@@ -418,6 +418,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         # Mutaxassis izohi kartasi va tugmasi
         escaped_comment = manager_comment.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace('\n', ' ')
         escaped_name = full_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
+        escaped_campaign = campaign.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
 
         comment_block = ""
         if manager_comment:
@@ -428,36 +429,40 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
             """
 
-        comment_btn = ""
+        comment_btn = f"""
+        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
+            💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
+        </button>
+        """
+
+        delete_btn = ""
         if not is_operator:
-            comment_btn = f"""
-            <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1">
-                💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
-            </button>
+            delete_btn = f"""
+            <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
+                <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
+            </form>
             """
 
-        action_td = ""
-        if not is_operator:
-            action_td = f"""
-            <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                <div class="inline-flex items-center gap-1.5">
-                    <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
-                        <select name="status" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500">
-                            <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                            <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
-                            <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
-                            <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
-                            <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
-                        </select>
-                        <input type="hidden" name="manager_name" value="Admin">
-                        <button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button>
-                    </form>
-                    <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
-                        <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
-                    </form>
-                </div>
-            </td>
-            """
+        manager_label = "Operator" if is_operator else "Admin"
+        action_td = f"""
+        <td class="px-5 py-3.5 text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-1.5">
+                <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
+                    <select name="status" onchange="this.form.submit()" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
+                        <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                        <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
+                        <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
+                        <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                        <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                    </select>
+                    <input type="hidden" name="manager_name" value="{manager_label}">
+                    <noscript><button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button></noscript>
+                </form>
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium" title="Bog'lanish & Izoh">💬</button>
+                {delete_btn}
+            </div>
+        </td>
+        """
 
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
@@ -611,22 +616,28 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     operator_username = settings.get("operator_username", "operator")
     operator_password = settings.get("operator_password", "operator123")
 
-    leads_header_action_th = '<th class="px-5 py-3.5 text-right">Boshqarish</th>' if not is_operator else ''
-    user_role_badge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">👤 Operator (Cheklangan)</span>' if is_operator else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">👑 Admin</span>'
-    header_stats_btn = '<button onclick="switchTab(\'analytics\')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">📊 Statistika</button>' if not is_operator else ''
+    leads_header_action_th = '<th class="px-5 py-3.5 text-right">Boshqarish & Holat</th>'
+    user_role_badge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">👤 Operator (Sotuv bo\'limi)</span>' if is_operator else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">👑 Admin</span>'
+    header_stats_btn = '<button onclick="switchTab(\'analytics\')" class="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition" title="Statistika va Tahlil">📊 Statistika</button>'
 
     if is_operator:
         tabs_nav_html = f"""
         <!-- CRM Bo'limlar Navigatsiyasi (Operator rejimi) -->
-        <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center justify-between mb-6 text-sm font-semibold text-slate-600">
-            <div class="tab-btn active px-4 py-2.5 rounded-xl flex items-center gap-2">
-                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+        <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 mb-6 text-sm font-semibold text-slate-600">
+            <div class="flex items-center gap-2">
+                <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                    👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+                </button>
+                <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                    📊 2. Statistika & Tahlil
+                </button>
             </div>
-            <div class="text-xs text-slate-500 font-medium px-3 flex items-center gap-1.5">
-                <span>🔒</span> <span>Operator paneli: Faqat lidlar (o'zgartirish va o'chirish taqiqlangan)</span>
+            <div class="text-xs text-slate-600 font-semibold px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200 flex items-center gap-1.5 shadow-xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>👤 Operator paneli: Lidlar bilan aloqa qilish, status va izoh kiritish faol</span>
             </div>
         </div>
-        """
+    """
     else:
         tabs_nav_html = f"""
         <!-- CRM Bo'limlar Navigatsiyasi (Tablar) -->
@@ -650,7 +661,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 🔐 6. Login & Parol
             </button>
         </div>
-        """
+    """
 
     # Chart.js JSON ma'lumotlari
     json_daily_labels = json.dumps(daily_labels)
@@ -660,28 +671,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     json_top_campaign_counts = json.dumps(top_campaign_counts)
 
     if is_operator:
-        admin_only_tabs_html = ""
-        admin_only_modals_html = ""
         admin_scripts_js = ""
     else:
         admin_scripts_js = """
-        function openCommentModal(clientId, currentComment, clientName) {
-            const form = document.getElementById('modalCommentForm');
-            if (!form) return;
-            form.action = '/admin/clients/' + clientId + '/comment';
-            document.getElementById('modalCommentInput').value = currentComment || '';
-            document.getElementById('modalClientInfo').textContent = (clientName || 'Mijoz') + ' uchun mutaxassis izohini kiriting:';
-            const modal = document.getElementById('commentModal');
-            if (modal) modal.classList.remove('hidden');
-            const inp = document.getElementById('modalCommentInput');
-            if (inp) inp.focus();
-        }
-
-        function closeCommentModal() {
-            const modal = document.getElementById('commentModal');
-            if (modal) modal.classList.add('hidden');
-        }
-
         async function checkCurrentToken() {
             const input = document.getElementById('page_access_token_input');
             const box = document.getElementById('token_status_box');
@@ -708,7 +700,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }
         """
 
-        admin_only_tabs_html = f"""
+    analytics_tab_html = f"""
         <!-- 2-TAB: STATISTIKA VA TAHLIL (YANGI ANALITIKA DASHBOARD) -->
         <div id="tab_analytics" class="tab-content hidden space-y-6">
             <!-- Asosiy Sarlavha banneri -->
@@ -972,7 +964,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </div>
         </div>
+    """
 
+    if is_operator:
+        admin_settings_tabs_html = ""
+    else:
+        admin_settings_tabs_html = f"""
         <!-- 3-TAB: SUN'IY INTELLEKT (AI MASLAHATCHI) -->
         <div id="tab_ai" class="tab-content hidden">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
@@ -1241,10 +1238,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mt-6">
                 <div class="border-b border-slate-100 pb-4 mb-6">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        👥 Operator Akkaunti (Faqat Lidlar & Read-Only)
+                        👥 Operator Akkaunti (Sotuv Bo'limi & Lidlar bilan Ishlash)
                     </h2>
                     <p class="text-sm text-slate-500">
-                        Ushbu login va parol xodimlar (operatorlar) uchun. Ular tizimga kirganda <strong>faqat Lidlar bazasi</strong> ko'rinadi. O'zgartirish, o'chirish va tizim sozlamalari yashiriladi.
+                        Ushbu login va parol operatorlar / sotuv bo'limi uchun. Ular tizimga kirganda lidlar bilan to'g'ridan-to'g'ri bog'lanish (qo'ng'iroq, Telegram, Instagram), ularning holatini (statusini) o'zgartirish va izoh yozish imkoniyatiga ega bo'ladi. Tizim sozlamalari va lidlarni o'chirish faqat Admin uchun saqlanadi.
                     </p>
                 </div>
 
@@ -1268,23 +1265,64 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </form>
             </div>
         </div>
-        """
-        admin_only_modals_html = f"""
-    <!-- Mutaxassis Izohi Qoldirish Modali -->
+    """
+
+    common_modals_html = f"""
+    <!-- Bog'lanish & Mutaxassis Izohi Modali -->
     <div id="commentModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span>📝</span> <span>Mutaxassis Izohi Qoldirish</span>
-                </h3>
-                <button type="button" onclick="closeCommentModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none p-1">&times;</button>
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold shadow-xs">
+                        📞
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900" id="modalClientTitle">Mijoz bilan Bog'lanish & Izoh</h3>
+                        <p class="text-xs text-slate-500 font-medium" id="modalClientCourse">Qiziqqan yo'nalishi: —</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCommentModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none p-1.5 rounded-lg hover:bg-slate-100 transition">&times;</button>
             </div>
-            <p class="text-xs text-slate-500 mb-3" id="modalClientInfo">Mijoz uchun mutaxassis izohini kiriting:</p>
-            <form method="POST" id="modalCommentForm" action="">
-                <textarea name="comment" id="modalCommentInput" rows="4" required class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none placeholder-slate-400 leading-relaxed" placeholder="Mijoz bilan nima gaplashildi, qaysi guruhga yozildi yoki qachon qayta qo'ng'iroq qilish kerak..."></textarea>
-                <div class="flex items-center justify-end gap-2 mt-4">
-                    <button type="button" onclick="closeCommentModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition">Bekor qilish</button>
-                    <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 transition">Saqlash & Telegramga yuborish 💾</button>
+
+            <!-- Tezkor Aloqa Tugmalari -->
+            <div class="mb-4 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200">
+                <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">⚡ Tezkor Bog'lanish:</div>
+                <div class="flex flex-wrap items-center gap-2" id="modalContactButtons">
+                    <!-- Dinamik ravishda JS orqali to'ldiriladi: Tel, Telegram, Instagram -->
+                </div>
+            </div>
+
+            <form method="POST" id="modalCommentForm" action="" class="space-y-4">
+                <!-- Telefon raqam (kiritish yoki to'g'rilash) -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">📞 Telefon Raqami:</label>
+                    <input type="text" name="phone" id="modalPhoneInput" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-slate-400" placeholder="+998901234567">
+                    <p class="text-[11px] text-slate-400 mt-1">Agar mijoz raqamini Directda aytgan bo'lsa, shu yerga yozib saqlashingiz mumkin.</p>
+                </div>
+
+                <!-- Holatni tanlash -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">🎯 Mijoz Holati (Status):</label>
+                    <select name="status" id="modalStatusSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
+                        <option value="yangi">⚪ Yangi (Bog'lanish kutilmoqda ⏳)</option>
+                        <option value="jarayonda">🟡 Jarayonda (Bog'lanilmoqda / Ma'lumot berildi)</option>
+                        <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
+                        <option value="oylanyapti">💭 O'ylayapti (Qaror qabul qilmoqda 🤔)</option>
+                        <option value="rad">🔴 Rad / Ko'tarmadi (Bog'lanib bo'lmadi ❌)</option>
+                    </select>
+                </div>
+
+                <!-- Mutaxassis izohi -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">📝 Mutaxassis Izohi:</label>
+                    <textarea name="comment" id="modalCommentInput" rows="3" class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-slate-400 leading-relaxed" placeholder="Mijoz bilan nima gaplashildi, qaysi guruhga yo'naltirildi yoki qachon qayta qo'ng'iroq qilish kerak..."></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeCommentModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition">Bekor qilish</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition flex items-center gap-1.5 cursor-pointer">
+                        <span>💾</span> <span>Saqlash & Telegramga uzatish</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -1444,13 +1482,77 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
-        {admin_only_tabs_html}
+        {analytics_tab_html}
+        {admin_settings_tabs_html}
     </main>
 
-    {admin_only_modals_html}
+    {common_modals_html}
 
     <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
+        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign) {{
+            const form = document.getElementById('modalCommentForm');
+            if (!form) return;
+            form.action = '/admin/clients/' + clientId + '/comment';
+            
+            const titleElem = document.getElementById('modalClientTitle');
+            if (titleElem) {{
+                titleElem.textContent = (clientName || 'Mijoz') + (username ? ' (@' + username + ')' : '');
+            }}
+            const courseElem = document.getElementById('modalClientCourse');
+            if (courseElem) {{
+                courseElem.textContent = "Qiziqqan yo'nalishi: " + (campaign || 'Umumiy');
+            }}
+            
+            const statusSelect = document.getElementById('modalStatusSelect');
+            if (statusSelect) {{
+                statusSelect.value = currentStatus || 'yangi';
+            }}
+
+            const phoneInput = document.getElementById('modalPhoneInput');
+            const cleanPhone = (currentPhone && currentPhone !== '—' && currentPhone !== 'None') ? currentPhone : '';
+            if (phoneInput) {{
+                phoneInput.value = cleanPhone;
+            }}
+
+            const commentInput = document.getElementById('modalCommentInput');
+            if (commentInput) {{
+                commentInput.value = currentComment || '';
+            }}
+
+            const btnBox = document.getElementById('modalContactButtons');
+            if (btnBox) {{
+                let btnsHtml = '';
+                const digits = cleanPhone.replace(/\\D/g, '');
+                if (digits.length >= 9) {{
+                    btnsHtml += '<a href="tel:' + cleanPhone + '" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">📞 Qo\\'ng\\'iroq qilish</a>';
+                    btnsHtml += '<a href="https://t.me/+' + digits + '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-sm transition">✈️ Telegramda yozish</a>';
+                }} else {{
+                    btnsHtml += '<span class="text-xs text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200">📞 Raqam kiritilmagan</span>';
+                }}
+                if (username) {{
+                    btnsHtml += '<a href="https://instagram.com/' + username + '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold shadow-sm transition">📸 Instagram Direct ↗</a>';
+                }}
+                btnBox.innerHTML = btnsHtml;
+            }}
+
+            const modal = document.getElementById('commentModal');
+            if (modal) modal.classList.remove('hidden');
+            if (commentInput) commentInput.focus();
+        }}
+
+        function closeCommentModal() {{
+            const modal = document.getElementById('commentModal');
+            if (modal) modal.classList.add('hidden');
+        }}
+
+        document.addEventListener('click', function(e) {{
+            const modal = document.getElementById('commentModal');
+            if (modal && e.target === modal) {{
+                closeCommentModal();
+            }}
+        }});
+
         function switchTab(tabId) {{
             try {{
                 // Barcha tab kontentlarini yashirish
