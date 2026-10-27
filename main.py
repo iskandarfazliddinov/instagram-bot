@@ -58,7 +58,7 @@ async def run_followup_and_unresponsive_check():
     sent_followups = 0
     sent_unresponsive = 0
     try:
-        if get_setting("ai_followup_enabled", "1") == "1":
+        if get_setting("ai_followup_enabled", "0") == "1":
             try:
                 delay_mins = int(get_setting("ai_followup_delay_minutes", "30"))
             except ValueError:
@@ -79,7 +79,7 @@ async def run_followup_and_unresponsive_check():
             from services.telegram import notify_admin_new_lead
 
             # 1. Suhbat to'xtab qolgan mijozlarga AI orqali aqlli eslatma (Follow-up) yuborish (Faqat Direct ichida)
-            abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=23)
+            abandoned_clients = get_abandoned_clients(min_minutes=delay_mins, max_hours=12)
             for client in abandoned_clients:
                 try:
                     ig_id = client.get("instagram_id")
@@ -109,11 +109,15 @@ async def follow_up_background_worker():
     Suhbati yakunlanmagan (telefon raqamini qoldirmagan) mijozlarga
     AI orqali avtomatik aqlli eslatma (Follow-up) yuboruvchi xizmat
     """
-    await asyncio.sleep(5)  # Server ishga tushgandan so'ng 5 soniya kutish
+    await asyncio.sleep(600)  # Server ishga tushgandan so'ng darhol emas, 10 daqiqa kutish
     while True:
-        await run_followup_and_unresponsive_check()
-        # Har 5 daqiqada tekshirish
-        await asyncio.sleep(300)
+        try:
+            if get_setting("ai_followup_enabled", "0") == "1":
+                await run_followup_and_unresponsive_check()
+        except Exception as e:
+            logger.error(f"Follow-up background worker xatoligi: {e}")
+        # Har 15 daqiqada tekshirish
+        await asyncio.sleep(900)
 
 async def token_auto_refresh_worker():
     """

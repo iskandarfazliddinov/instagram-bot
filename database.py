@@ -146,7 +146,7 @@ def init_db():
         "operator_username": "operator",
         "operator_password": "operator123",
         "ai_enabled": "1",
-        "ai_followup_enabled": "1",
+        "ai_followup_enabled": "0",
         "ai_followup_delay_minutes": "30",
         "gemini_api_key": DEFAULT_GEMINI_KEY,
         "ai_system_prompt": (
@@ -848,10 +848,15 @@ def get_all_clients():
     conn.close()
     return [dict(r) for r in rows]
 
-def get_abandoned_clients(min_minutes: int = 30, max_hours: int = 23) -> list:
+def get_abandoned_clients(min_minutes: int = 30, max_hours: int = 12) -> list:
     """
     Telefon raqamini qoldirmagan, suhbat to'xtab qolgan va belgilangan vaqt o'tgan mijozlarni topish.
     (Meta Instagram 24 soatlik oynasi doirasida qayta eslatma yuborish uchun)
+    Qat'iy xavfsizlik:
+    - faqat 'yangi' holatidagi lidlar (bog'lanilgan, jarayonda yoki boshqa holatdagi lidlarga aslo xabar yuborilmasin)
+    - inson / mutaxassis biriktirilmagan bo'lishi shart
+    - AI to'xtatilmagan (ai_paused != 1) bo'lishi shart
+    - oxirgi xabar foydalanuvchi tomonidan bo'lishi shart (bot ketma-ket qayta yozmasligi uchun)
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -860,6 +865,9 @@ def get_abandoned_clients(min_minutes: int = 30, max_hours: int = 23) -> list:
         WHERE (step != 'completed' OR phone_number IS NULL OR phone_number = '')
           AND instagram_id IS NOT NULL 
           AND instagram_id != ''
+          AND (lead_status IS NULL OR lead_status = 'yangi')
+          AND (ai_paused IS NULL OR ai_paused = 0)
+          AND (manager_name IS NULL OR manager_name = '' OR manager_name = '—')
           AND (followup_count IS NULL OR followup_count = 0)
         ORDER BY updated_at ASC
     """)
@@ -869,6 +877,17 @@ def get_abandoned_clients(min_minutes: int = 30, max_hours: int = 23) -> list:
     eligible = []
     now = datetime.now()
     for c in rows:
+        # Oxirgi xabarni tekshirish (bot ketma-ket o'ziga o'zi yozmasligi uchun)
+        ch_raw = c.get("chat_history") or "[]"
+        try:
+            ch = json.loads(ch_raw) if isinstance(ch_raw, str) else ch_raw
+        except Exception:
+            ch = []
+        if ch and len(ch) > 0:
+            last_msg = ch[-1]
+            if last_msg.get("role") in ["assistant", "manager", "operator"]:
+                continue
+
         up_str = c.get("updated_at")
         if not up_str:
             continue
