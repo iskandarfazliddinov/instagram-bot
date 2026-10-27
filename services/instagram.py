@@ -553,8 +553,10 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
         phone = None
         full_name = username
         last_msg = ""
-        course = "Umumiy"
-        source = "Direct"
+        course = None
+        source = None
+
+        all_text_combined = ""
 
         for m in msgs:
             sender_un = m.get("from", {}).get("username", "")
@@ -563,6 +565,7 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
                 continue
             role = "assistant" if sender_un == "xalqaro_turizm_akademiyasi" else "user"
             chat_history.append({"role": role, "text": text, "time": m.get("created_time", "")[11:16]})
+            all_text_combined += text + " "
 
             if role == "user":
                 last_msg = text
@@ -573,17 +576,46 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
                     if len(name_cand) >= 2 and not any(k in name_cand.lower() for k in ["salom", "rahmat", "assalomu"]):
                         full_name = name_cand
 
-                t_lower = text.lower()
-                if any(k in t_lower for k in ["hotel", "operations", "mehmonxona", "inavation", "innovation"]):
-                    course = "Hotel Operations and Innovation"
-                elif any(k in t_lower for k in ["gid", "ekskurs", "beyjik", "qayta tayyorlash"]):
-                    course = "Gid-ekskursiyachi (Qayta tayyorlash)"
-                elif any(k in t_lower for k in ["malaka oshirish", "malaka"]):
-                    course = "Gid-ekskursiyachi (Malaka oshirish)"
-                elif any(k in t_lower for k in ["turagent"]):
-                    course = "Turagentlik kursi"
-                elif any(k in t_lower for k in ["turoperator"]):
-                    course = "Turoperatorlik kursi"
+        f_low = all_text_combined.lower()
+
+        # 1. Front Office & Housekeeping (DbM6EinhiZI)
+        if any(k in f_low for k in ["front office", "frontoffice", "housekeeping", "tourism-edu.uz", "xona tozalash"]):
+            course = "Onlayn ta'lim (Front Office)"
+            source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        # 2. Hotel Operations and Innovation (DeZbpoZtFw0 / DerPZSNNS0F)
+        elif any(k in f_low for k in ["hotel operations", "hotel operation", "mehmonxona boshqaruvi", "menejermisiz", "menejer yoki bo'lim"]):
+            course = "Hotel Operations and Innovation"
+            source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
+        # 3. Gid malaka oshirish
+        elif any(k in f_low for k in ["malaka oshirish", "72 soat", "sertifikatim bor", "повышение квалификации"]):
+            course = "Gid-ekskursiyachi (Malaka oshirish)"
+        # 4. Gid qayta tayyorlash (DbDpNKLKgll)
+        elif any(k in f_low for k in ["qayta tayyorla", "professional gid", "gidlik", "гид", "экскурсовод", "beyjik", "diplom va beyjik"]):
+            course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+            source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+        # 5. Turagentlik (DcQTeaKTBOa)
+        elif any(k in f_low for k in ["turagent", "турагент", "1 oylik «turagentlik»"]):
+            course = "Turagentlik kursi"
+            source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
+        # 6. Turoperatorlik (DbXj3F1joxH)
+        elif any(k in f_low for k in ["turoperator", "туроператор", "1 oylik «turoperatorlik»"]):
+            course = "Turoperatorlik kursi"
+            source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
+        # 7. Umumiy narx so'raganlar
+        elif any(k in f_low for k in ["сколько стоит", "narxi qancha", "narx", "стоимость", "to'lov"]):
+            course = "Kurslar narxi"
+            source = "Direct"
+        # 8. Umumiy dastur so'raganlar
+        elif any(k in f_low for k in ["dastur", "программ", "reja", "o'quv reja"]):
+            course = "O'quv dasturi"
+            source = "Direct"
+        # 9. Umumiy ma'lumot / konsultatsiya
+        elif any(k in f_low for k in ["подробнее", "batafsil", "malumot", "info", "haqida", "kurslar bormi"]):
+            course = "Batafsil konsultatsiya"
+            source = "Direct"
+        else:
+            course = "Batafsil konsultatsiya"
+            source = "Direct"
 
         if ig_id == "1773167100618269":
             full_name = "Temirova Iroda"
@@ -592,6 +624,7 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
             source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
         elif ig_id == "1448672499922524":
             phone = "+998904517877"
+            course = "Kurslar narxi"
             source = "Direct"
 
         client = get_or_create_client(ig_id)
@@ -604,9 +637,9 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
             updates["phone_number"] = phone
             updates["lead_status"] = "yangi"
             updates["step"] = "completed"
-        if course != "Umumiy" and (client.get("campaign") in ["Umumiy", "", None]):
+        if course:
             updates["campaign"] = course
-        if source != "Direct" and (client.get("source") in ["Direct", "", None]):
+        if source:
             updates["source"] = source
         if last_msg:
             updates["last_message"] = last_msg
@@ -618,4 +651,94 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
             recovered_count += 1
 
     sync_leads_backup()
+    enrich_all_leads_campaign_and_source()
     return {"ok": True, "recovered_count": recovered_count, "total_threads": len(threads)}
+
+def enrich_all_leads_campaign_and_source():
+    """
+    Barcha lidlarni suhbat tarixi va xabarlariga asoslanib,
+    aniq qaysi video va qaysi kursga qiziqqanini aniqlash va bazani boyitish.
+    """
+    from database import get_all_clients, update_client_by_id, sync_leads_backup
+    clients = get_all_clients()
+    updated = 0
+    
+    for c in clients:
+        cid = c.get("id")
+        cur_camp = str(c.get("campaign") or "Umumiy").strip()
+        cur_src = str(c.get("source") or "Direct").strip()
+        
+        full_text = (c.get("last_message") or "") + " " + (c.get("ai_summary") or "") + " "
+        chat = c.get("chat_history")
+        if chat:
+            try:
+                msgs = json.loads(chat) if isinstance(chat, str) else chat
+                for m in msgs:
+                    full_text += (m.get("text") or "") + " "
+            except Exception:
+                pass
+                
+        f_low = full_text.lower()
+        
+        detected_course = None
+        detected_source = None
+        
+        # 1. Front Office & Housekeeping (DbM6EinhiZI)
+        if any(k in f_low for k in ["front office", "frontoffice", "housekeeping", "tourism-edu.uz", "xona tozalash"]):
+            detected_course = "Onlayn ta'lim (Front Office)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+            
+        # 2. Hotel Operations and Innovation (DeZbpoZtFw0 / DerPZSNNS0F)
+        elif any(k in f_low for k in ["hotel operations", "hotel operation", "mehmonxona boshqaruvi", "menejermisiz", "menejer yoki bo'lim", "derpzsnns0f", "dezbpozttfw0"]):
+            detected_course = "Hotel Operations and Innovation"
+            detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
+            
+        # 3. Gid malaka oshirish
+        elif any(k in f_low for k in ["malaka oshirish", "72 soat", "sertifikatim bor", "повышение квалификации"]):
+            detected_course = "Gid-ekskursiyachi (Malaka oshirish)"
+            
+        # 4. Gid qayta tayyorlash (DbDpNKLKgll)
+        elif any(k in f_low for k in ["qayta tayyorla", "professional gid", "gidlik", "гид", "экскурсовод", "beyjik", "diplom va beyjik"]):
+            detected_course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+            
+        # 5. Turagentlik (DcQTeaKTBOa)
+        elif any(k in f_low for k in ["turagent", "турагент", "1 oylik «turagentlik»"]):
+            detected_course = "Turagentlik kursi"
+            detected_source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
+            
+        # 6. Turoperatorlik (DbXj3F1joxH)
+        elif any(k in f_low for k in ["turoperator", "туроператор", "1 oylik «turoperatorlik»"]):
+            detected_course = "Turoperatorlik kursi"
+            detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
+            
+        # 7. Umumiy narx so'raganlar
+        elif any(k in f_low for k in ["сколько стоит", "narxi qancha", "narx", "стоимость", "to'lov"]):
+            detected_course = "Kurslar narxi"
+            
+        # 8. Umumiy dastur so'raganlar
+        elif any(k in f_low for k in ["dastur", "программ", "reja", "o'quv reja", "kurs dasturi"]):
+            detected_course = "O'quv dasturi"
+            
+        # 9. Umumiy ma'lumot / konsultatsiya
+        elif any(k in f_low for k in ["подробнее", "batafsil", "malumot", "info", "haqida", "kurslar bormi"]):
+            detected_course = "Batafsil konsultatsiya"
+        else:
+            detected_course = "Batafsil konsultatsiya"
+            
+        updates = {}
+        if detected_course:
+            if cur_camp in ["Umumiy", "", None] or "Umumiy" in cur_camp:
+                updates["campaign"] = detected_course
+            elif cur_camp == "Batafsil konsultatsiya" and detected_course != "Batafsil konsultatsiya":
+                updates["campaign"] = detected_course
+                
+        if detected_source and (cur_src in ["Direct", "", None] or not cur_src):
+            updates["source"] = detected_source
+            
+        if updates and cid:
+            update_client_by_id(cid, **updates)
+            updated += 1
+            
+    sync_leads_backup()
+    return updated

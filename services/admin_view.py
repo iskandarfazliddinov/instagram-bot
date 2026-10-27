@@ -468,7 +468,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         # Kurs va Manba nishonlari (Badges)
         c_low = campaign.lower()
-        if "hotel" in c_low or "mehmonxona" in c_low or "operations" in c_low:
+        if "front" in c_low or "housekeeping" in c_low or "xona tozalash" in c_low or "tourism-edu" in c_low:
+            campaign_badge = '<span class="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">💻 Front Office (Onlayn)</span>'
+        elif "hotel" in c_low or "mehmonxona" in c_low or "operations" in c_low:
             campaign_badge = '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🏨 Hotel Operations</span>'
         elif "malaka" in c_low:
             campaign_badge = '<span class="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🗺 Gidlik (Malaka oshirish)</span>'
@@ -481,9 +483,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         elif "onlayn" in c_low or "online" in c_low:
             campaign_badge = '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">💻 Onlayn platforma</span>'
         elif "narx" in c_low:
-            campaign_badge = '<span class="bg-amber-50/70 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💰 Kurslar narxi</span>'
+            campaign_badge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💰 Kurslar narxi</span>'
         elif "dastur" in c_low:
-            campaign_badge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O\'quv dasturi</span>'
+            campaign_badge = '<span class="bg-violet-50 text-violet-700 border border-violet-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O\'quv dasturi</span>'
+        elif "konsultatsiya" in c_low or "batafsil" in c_low:
+            campaign_badge = '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💬 Batafsil konsultatsiya</span>'
         else:
             campaign_badge = f'<span class="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">💬 {campaign}</span>'
 
@@ -491,7 +495,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         if "instagram.com/reel/" in s_low or "instagram.com/p/" in s_low:
             m_url = re.search(r'https?://[^\s]+', source)
             url_found = m_url.group(0) if m_url else "#"
-            source_badge = f'<a href="{url_found}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline mt-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-100" title="Videoni ochish">🎬 Reels izohi ↗</a>'
+            video_label = "🎬 Reels izohi ↗"
+            if "dbm6ein" in s_low:
+                video_label = "🎬 Front Office Reels ↗"
+            elif "dezbpoz" in s_low or "derpzsn" in s_low:
+                video_label = "🎬 Hotel Ops Reels ↗"
+            elif "dbdpnkl" in s_low:
+                video_label = "🎬 Gidlik Reels ↗"
+            elif "dcqteak" in s_low:
+                video_label = "🎬 Turagent Reels ↗"
+            elif "dbxj3f" in s_low:
+                video_label = "🎬 Turoperator Reels ↗"
+            source_badge = f'<a href="{url_found}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline mt-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 shadow-2xs" title="Instagram videoni ko\'rish">{video_label}</a>'
         elif "reel" in s_low or "video" in s_low:
             source_badge = '<div class="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 mt-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">🎬 Video izohi</div>'
         else:
@@ -1435,15 +1450,16 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         </select>
                         <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
                             <option value="all">📚 Barcha yo'nalishlar</option>
+                            <option value="front_office">💻 Front Office (Onlayn)</option>
                             <option value="hotel">🏨 Hotel Operations</option>
                             <option value="gid_qayta">🌍 Gidlik (Qayta tayyorlash)</option>
                             <option value="gid_malaka">🗺 Gidlik (Malaka oshirish)</option>
                             <option value="turagent">✈️ Turagentlik</option>
                             <option value="turoperator">✈️ Turoperatorlik</option>
-                            <option value="onlayn">💻 Onlayn platforma</option>
                             <option value="narx">💰 Kurslar narxi</option>
                             <option value="dastur">📄 O'quv dasturi</option>
-                            <option value="umumiy">💬 Umumiy / Boshqa</option>
+                            <option value="konsultatsiya">💬 Batafsil konsultatsiya</option>
+                            <option value="umumiy">💬 Boshqa</option>
                         </select>
                         <select id="lead_filter_source" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
                             <option value="all">📍 Barcha manbalar</option>
@@ -1793,7 +1809,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                 let matchesCourse = true;
                 if (courseVal !== 'all') {{
-                    if (courseVal === 'hotel') {{
+                    if (courseVal === 'front_office' || courseVal === 'onlayn') {{
+                        matchesCourse = courseData.includes('front') || courseData.includes('housekeeping') || courseData.includes('tourism-edu') || courseData.includes('onlayn') || courseData.includes('online');
+                    }} else if (courseVal === 'hotel') {{
                         matchesCourse = courseData.includes('hotel') || courseData.includes('mehmonxona') || courseData.includes('operations');
                     }} else if (courseVal === 'gid_malaka') {{
                         matchesCourse = courseData.includes('malaka');
@@ -1803,14 +1821,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         matchesCourse = courseData.includes('turagent');
                     }} else if (courseVal === 'turoperator') {{
                         matchesCourse = courseData.includes('turoperator');
-                    }} else if (courseVal === 'onlayn') {{
-                        matchesCourse = courseData.includes('onlayn') || courseData.includes('online');
                     }} else if (courseVal === 'narx') {{
                         matchesCourse = courseData.includes('narx');
                     }} else if (courseVal === 'dastur') {{
                         matchesCourse = courseData.includes('dastur');
+                    }} else if (courseVal === 'konsultatsiya') {{
+                        matchesCourse = courseData.includes('konsultatsiya') || courseData.includes('batafsil');
                     }} else if (courseVal === 'umumiy') {{
-                        matchesCourse = courseData.includes('umumiy') || (!courseData.includes('hotel') && !courseData.includes('gid') && !courseData.includes('turagent') && !courseData.includes('turoperator') && !courseData.includes('onlayn'));
+                        matchesCourse = courseData.includes('umumiy') || (!courseData.includes('hotel') && !courseData.includes('gid') && !courseData.includes('turagent') && !courseData.includes('turoperator') && !courseData.includes('front') && !courseData.includes('onlayn'));
                     }}
                 }}
 

@@ -59,31 +59,45 @@ def process_incoming_message(sender_id: str, user_text: str):
     # Qiziqqan kurs yo'nalishini aniqlash (Gid qayta tayyorlash, Gid malaka oshirish, Turagentlik, Turoperatorlik va h.k.)
     history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
     detected_course = None
-    if any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona", "отел", "гостиниц"]):
+    detected_source = None
+
+    if any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "tourism-edu.uz", "платформ"]):
+        detected_course = "Onlayn ta'lim (Front Office)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+    elif any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona", "отел", "гостиниц"]):
         detected_course = "Hotel Operations and Innovation"
+        detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
     elif any(k in history_text for k in ["malaka", "72 soat", "sertifikatim bor", "muddat tugagan", "повышение квалификации"]):
         detected_course = "Gid-ekskursiyachi (Malaka oshirish)"
     elif any(k in history_text for k in ["qayta tayyorla", "4 oy", "beyjik", "diplom", "gid", "ekskurs", "гид", "экскурсовод", "переподготовк"]):
         detected_course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
     elif any(k in history_text for k in ["turagent", "турагент"]):
         detected_course = "Turagentlik kursi"
+        detected_source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
     elif any(k in history_text for k in ["turoperator", "туроператор"]):
         detected_course = "Turoperatorlik kursi"
-    elif any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "online", "onlayn", "masofa", "platforma", "платформ"]):
-        detected_course = "Onlayn ta'lim platformasi"
+        detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
     elif any(k in history_text for k in ["restoran", "servis", "f&b"]):
         detected_course = "Restoran ishi va servis"
     elif any(k in history_text for k in ["narx", "qancha", "сколько стоит", "стоимость", "narxi"]):
-        if client.get("campaign") in ["Umumiy", "", None]:
-            detected_course = "Umumiy (Kurslar narxi)"
+        detected_course = "Kurslar narxi"
     elif any(k in history_text for k in ["dastur", "программ", "reja"]):
-        if client.get("campaign") in ["Umumiy", "", None]:
-            detected_course = "Umumiy (Dastur so'ralgan)"
+        detected_course = "O'quv dasturi"
+    elif any(k in history_text for k in ["batafsil", "podrobneye", "подробнее", "malumot", "info"]):
+        detected_course = "Batafsil konsultatsiya"
 
+    upd_payload = {}
     if detected_course:
-        if client.get("campaign") in ["Umumiy", "", None] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course or "Hotel" in detected_course)):
+        if client.get("campaign") in ["Umumiy", "", None, "Batafsil konsultatsiya"] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course or "Hotel" in detected_course or "Front" in detected_course)):
             client["campaign"] = detected_course
-            update_client(sender_id, campaign=detected_course)
+            upd_payload["campaign"] = detected_course
+    if detected_source and (client.get("source") in ["Direct", "", None] or not client.get("source")):
+        client["source"] = detected_source
+        upd_payload["source"] = detected_source
+
+    if upd_payload:
+        update_client(sender_id, **upd_payload)
 
     # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
     digits = re.sub(r"\D", "", text_clean)

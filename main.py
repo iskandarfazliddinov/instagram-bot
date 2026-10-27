@@ -143,8 +143,15 @@ async def on_startup():
     asyncio.create_task(follow_up_background_worker())
     asyncio.create_task(token_auto_refresh_worker())
 
-    # Server ishga tushganda Instagram Direct'dagi lidlarni avtomatik bazaga sinxronlash
-    async def initial_leads_sync():
+    # Server ishga tushganda barcha lidlarni kurs va video manbasi bo'yicha boyitish
+    async def initial_leads_enrich_and_sync():
+        try:
+            from services.instagram import enrich_all_leads_campaign_and_source
+            cnt = enrich_all_leads_campaign_and_source()
+            logger.info(f"Barcha mavjud lidlar video va kurs bo'yicha boyitildi: {cnt} ta yangilandi.")
+        except Exception as e:
+            logger.error(f"Dastlabki lidlarni boyitishda xatolik: {e}")
+
         await asyncio.sleep(15)
         try:
             from services.instagram import sync_leads_from_instagram_inbox
@@ -153,7 +160,7 @@ async def on_startup():
         except Exception as e:
             logger.error(f"Dastlabki Instagram sinxronlashda xatolik: {e}")
 
-    asyncio.create_task(initial_leads_sync())
+    asyncio.create_task(initial_leads_enrich_and_sync())
     logger.info("Ma'lumotlar bazasi, AI Follow-up va Token Auto-Refresh xizmati ishga tushirildi.")
 
 @app.get("/")
@@ -886,6 +893,17 @@ async def trigger_followup_route():
     result = await run_followup_and_unresponsive_check()
     return {"ok": True, **result}
 
+@app.get("/api/enrich-leads")
+def enrich_leads_api():
+    """Barcha lidlarni kurs va video manbasi bo'yicha boyitish"""
+    try:
+        from services.instagram import enrich_all_leads_campaign_and_source
+        updated = enrich_all_leads_campaign_and_source()
+        return {"ok": True, "updated": updated, "message": f"{updated} ta lid muvaffaqiyatli boyitildi"}
+    except Exception as e:
+        logger.error(f"Lidlarni boyitishda xatolik: {e}")
+        return {"ok": False, "error": str(e)}
+
 @app.get("/api/clients")
 def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""
@@ -924,6 +942,7 @@ def export_clients_excel():
         }
 
         COURSE_STYLES = {
+            "front_office": {"fill": "FEF3C7", "font_color": "92400E", "label": "💻 Front Office (Onlayn)"},
             "hotel": {"fill": "EEF2FF", "font_color": "3730A3", "label": "🏨 Hotel Operations and Innovation"},
             "gid_qayta": {"fill": "ECFDF5", "font_color": "065F46", "label": "🌍 Gidlik (Qayta tayyorlash)"},
             "gid_malaka": {"fill": "F0FDFA", "font_color": "115E59", "label": "🗺 Gidlik (Malaka oshirish)"},
@@ -932,7 +951,8 @@ def export_clients_excel():
             "onlayn": {"fill": "FFFBEB", "font_color": "92400E", "label": "💻 Onlayn platforma"},
             "narx": {"fill": "FEF3C7", "font_color": "78350F", "label": "💰 Kurslar narxi"},
             "dastur": {"fill": "FAF5FF", "font_color": "6B21A8", "label": "📄 O'quv dasturi"},
-            "umumiy": {"fill": "F1F5F9", "font_color": "334155", "label": "💬 Umumiy konsultatsiya"}
+            "konsultatsiya": {"fill": "EFF6FF", "font_color": "1E40AF", "label": "💬 Batafsil konsultatsiya"},
+            "umumiy": {"fill": "F1F5F9", "font_color": "334155", "label": "💬 Boshqa"}
         }
 
         headers = [
@@ -973,7 +993,9 @@ def export_clients_excel():
 
             campaign = c.get("campaign", "Umumiy")
             c_low = campaign.lower()
-            if "hotel" in c_low or "operations" in c_low:
+            if "front" in c_low or "housekeeping" in c_low or "tourism-edu" in c_low:
+                course_info = COURSE_STYLES["front_office"]
+            elif "hotel" in c_low or "operations" in c_low:
                 course_info = COURSE_STYLES["hotel"]
             elif "malaka" in c_low:
                 course_info = COURSE_STYLES["gid_malaka"]
@@ -989,14 +1011,28 @@ def export_clients_excel():
                 course_info = COURSE_STYLES["narx"]
             elif "dastur" in c_low:
                 course_info = COURSE_STYLES["dastur"]
+            elif "konsultatsiya" in c_low or "batafsil" in c_low:
+                course_info = COURSE_STYLES["konsultatsiya"]
             else:
                 course_info = COURSE_STYLES["umumiy"]
 
             source = c.get("source", "Direct")
             source_label = "💬 Direct"
             source_url = None
-            if "reel" in source.lower() or "instagram.com" in source.lower():
-                source_label = "🎬 Reels Video ↗"
+            s_low = str(source).lower()
+            if "reel" in s_low or "instagram.com" in s_low or "video" in s_low:
+                if "dbm6ein" in s_low:
+                    source_label = "🎬 Front Office Reels ↗"
+                elif "dezbpoz" in s_low or "derpzsn" in s_low:
+                    source_label = "🎬 Hotel Ops Reels ↗"
+                elif "dbdpnkl" in s_low:
+                    source_label = "🎬 Gidlik Reels ↗"
+                elif "dcqteak" in s_low:
+                    source_label = "🎬 Turagent Reels ↗"
+                elif "dbxj3f" in s_low:
+                    source_label = "🎬 Turoperator Reels ↗"
+                else:
+                    source_label = "🎬 Reels Video ↗"
                 import re
                 m = re.search(r"https?://[^\s]+", source)
                 if m:
