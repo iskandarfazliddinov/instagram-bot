@@ -63,7 +63,8 @@ def init_db():
         ("manager_comment", "TEXT DEFAULT ''"),
         ("chat_history", "TEXT DEFAULT '[]'"),
         ("followup_count", "INTEGER DEFAULT 0"),
-        ("last_followup_at", "TEXT DEFAULT ''")
+        ("last_followup_at", "TEXT DEFAULT ''"),
+        ("ai_paused", "INTEGER DEFAULT 0")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -689,7 +690,7 @@ def get_client_by_tg_message_id(message_id: int) -> dict | None:
     conn.close()
     return dict(row) if row else None
 
-def append_client_chat_history(instagram_id: str, role: str, text: str):
+def append_client_chat_history(instagram_id: str, role: str, text: str, manager_name: str = ""):
     """Mijoz bilan Direct suhbat tarixini saqlab borish (AI tahlili va kontekst uchun)"""
     if not instagram_id or not text:
         return
@@ -706,10 +707,13 @@ def append_client_chat_history(instagram_id: str, role: str, text: str):
                 history = []
         
         now_time = datetime.now().strftime("%H:%M")
-        history.append({"role": role, "text": text.strip(), "time": now_time})
-        # Oxirgi 20 ta xabarni saqlash
-        if len(history) > 20:
-            history = history[-20:]
+        msg_obj = {"role": role, "text": text.strip(), "time": now_time}
+        if manager_name:
+            msg_obj["manager"] = manager_name
+        history.append(msg_obj)
+        # Oxirgi 30 ta xabarni saqlash
+        if len(history) > 30:
+            history = history[-30:]
             
         cursor.execute("UPDATE clients SET chat_history = ?, updated_at = ? WHERE instagram_id = ?", (
             json.dumps(history, ensure_ascii=False),
@@ -721,6 +725,24 @@ def append_client_chat_history(instagram_id: str, role: str, text: str):
         sync_leads_backup()
     except Exception as e:
         logger.error(f"Suhbat tarixini saqlashda xatolik: {e}")
+
+def set_client_ai_paused(client_id: int, paused: bool) -> bool:
+    """Mijoz uchun AI avtomatik javoblarini to'xtatish (1) yoki yoqish (0)"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE clients SET ai_paused = ?, updated_at = ? WHERE id = ?", (
+            1 if paused else 0,
+            datetime.now().isoformat(),
+            client_id
+        ))
+        conn.commit()
+        conn.close()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"set_client_ai_paused xatolik: {e}")
+        return False
 
 def get_client_chat_history(instagram_id: str) -> list:
     """Mijoz suhbat tarixini ro'yxat ko'rinishida olish"""

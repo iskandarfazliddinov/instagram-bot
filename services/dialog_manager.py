@@ -99,6 +99,23 @@ def process_incoming_message(sender_id: str, user_text: str):
     if upd_payload:
         update_client(sender_id, **upd_payload)
 
+    # AGAR USHBU MIJOZ UCHUN MUTAXASSIS AI NI TO'XTATGAN BO'LSA (INSON / OPERATOR REJIMI):
+    # Sun'iy intellekt va avtomatik bot aralashmaydi va hech qanday avtomatik javob qaytarmaydi!
+    if client.get("ai_paused") in [1, "1", True]:
+        logger.info(f"Mijoz [{sender_id}] uchun AI to'xtatilgan (Inson / Operator rejimi). AI javob bermaydi.")
+        
+        # Agar telefon raqam yozgan bo'lsa, bazada saqlab qo'yamiz
+        digits = re.sub(r"\D", "", text_clean)
+        has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
+        if has_phone:
+            clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
+            update_client(sender_id, phone_number=clean_phone)
+            client["phone_number"] = clean_phone
+
+        from services.telegram import notify_operator_direct_reply
+        notify_operator_direct_reply(client, text_clean)
+        return
+
     # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
     digits = re.sub(r"\D", "", text_clean)
     has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
@@ -640,6 +657,12 @@ def process_incoming_video_message(sender_id: str, video_title: str = "", video_
         return
 
     # 4. Agar foydalanuvchi shunchaki video/reels yuborgan bo'lsa (hech qanday matnsiz):
+    if client.get("ai_paused") in [1, "1", True]:
+        logger.info(f"Mijoz [{sender_id}] video/reels yubordi, lekin AI to'xtatilgan.")
+        from services.telegram import notify_operator_direct_reply
+        notify_operator_direct_reply(client, f"🎬 Video yubordi: «{video_title}»")
+        return
+
     # Salomlashib, ushbu video bo'yicha qanday yordam bera olishimizni va nima xohlashini so'raymiz
     client_name = client.get("full_name") or ""
     if client_name in ["None", "Kiritilmagan", "Noma'lum"]:
@@ -822,6 +845,15 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
             client["campaign"] = detected_course
 
         append_client_chat_history(sender_id, "user", f"[Ovozli xabar]: {transcription}" if transcription else "[Ovozli xabar]")
+
+        # AGAR MUTAXASSIS BILAN MULOQOTDA BO'LSA (AI TO'XTATILGAN BO'LSA):
+        if client.get("ai_paused") in [1, "1", True]:
+            logger.info(f"Mijoz [{sender_id}] ovozli xabar yubordi, lekin AI to'xtatilgan. Faqat transkripsiya saqlanadi.")
+            if updates:
+                update_client(sender_id, **updates)
+            from services.telegram import notify_operator_direct_reply
+            notify_operator_direct_reply(client, transcription or "[Ovozli xabar]", is_voice=True)
+            return
 
         # 4. Agar ovozda telefon raqami aytilgan bo'lsa -> To'liq Lid yaratiladi
         if extracted_phone:

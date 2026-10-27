@@ -250,9 +250,9 @@ def refresh_long_lived_token() -> bool:
         logger.error(f"Tokenni avtomatik yangilashda xatolik: {e}")
         return False
 
-def send_message(recipient_id: str, text: str) -> dict:
+def send_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
     """
-    Instagram Direct orqali mijozga xabar yuborish
+    Instagram Direct orqali mijozga xabar yuborish (Avtomatik yoki Inson/Mutaxassis orqali)
     """
     token = get_access_token()
     if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
@@ -273,6 +273,21 @@ def send_message(recipient_id: str, text: str) -> dict:
         data = response.json()
         if response.status_code != 200:
             err = data.get("error", {})
+            # Agar inson javob berayotgan bo'lsa va 24 soatlik oyna xatosi bersa -> HUMAN_AGENT tag bilan urinib ko'rish
+            if is_human:
+                try:
+                    human_payload = {
+                        "recipient": {"id": recipient_id},
+                        "message": {"text": text},
+                        "messaging_type": "MESSAGE_TAG",
+                        "tag": "HUMAN_AGENT"
+                    }
+                    human_resp = requests.post(get_graph_messages_url(token), json=human_payload, headers=headers, timeout=10)
+                    if human_resp.status_code == 200:
+                        return human_resp.json()
+                except Exception:
+                    pass
+
             if err.get("code") in [1, 2] or "unknown error" in str(err.get("message", "")).lower():
                 time.sleep(1)
                 try:

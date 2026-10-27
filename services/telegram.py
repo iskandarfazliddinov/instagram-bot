@@ -625,6 +625,57 @@ def notify_admin_video_message(client: dict, video_title: str = "", reply: str =
     except Exception as e:
         logger.error(f"Telegram video bildirishnomasida xatolik: {e}")
 
+def notify_operator_direct_reply(client: dict, message_text: str, is_voice: bool = False):
+    """
+    Mutaxassis bilan muloqotdagi mijoz Instagram Directda yangi xabar yozganda
+    Telegram guruhiga va mutaxassisga tezkor xabarnoma yuborish (AI to'xtatilgan holatda)
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
+        return
+
+    full_name = client.get("full_name") or "Noma'lum"
+    username = client.get("username") or ""
+    phone = client.get("phone_number") or "—"
+    manager_name = client.get("manager_name") or "Mutaxassis"
+    ig_id = client.get("instagram_id") or ""
+    campaign = client.get("campaign") or "Umumiy"
+
+    ig_line = f"📸 <b>Instagram:</b> <a href='https://instagram.com/{username}'>@{username}</a>\n" if username else ""
+    phone_line = f"📞 <b>Telefon:</b> <code>{phone}</code>\n" if phone and phone != "—" else ""
+    voice_tag = "🗣️ <b>Ovozli xabar matni (AI):</b>" if is_voice else "💬 <b>Mijoz javobi:</b>"
+
+    text = (
+        "⚡ <b>DIRECT: MUTAXASSIS SUHBATIDAGI MIJOZDAN XABAR!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Mijoz:</b> {full_name}\n"
+        f"{ig_line}"
+        f"{phone_line}"
+        f"🎯 <b>Yo'nalish:</b> {campaign}\n"
+        f"👤 <b>Mas'ul mutaxassis:</b> <b>{manager_name}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"{voice_tag}\n"
+        f"<i>«{message_text}»</i>\n\n"
+        f"⚠️ <i>Mijoz bilan inson suhbatlashayotgani sababli AI aralashmadi (to'xtatilgan). CRM orqali yoki Directda javob bering!</i>"
+    )
+
+    keyboard = []
+    quick_links = []
+    if username:
+        quick_links.append({"text": f"📸 @{username} Direct", "url": f"https://instagram.com/{username}"})
+    quick_links.append({"text": "💬 CRM Chat", "url": "https://instagram-bot-zohg.onrender.com/admin"})
+    keyboard.append(quick_links)
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    try:
+        requests.post(url, json={
+            "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": keyboard}
+        }, timeout=8)
+    except Exception as e:
+        logger.error(f"notify_operator_direct_reply xatoligi: {e}")
+
 def setup_telegram_webhook(host_url: str):
     """Render domenini Telegram Webhook sifatida ro'yxatdan o'tkazish"""
     if not settings.TELEGRAM_BOT_TOKEN:

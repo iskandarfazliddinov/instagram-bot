@@ -352,7 +352,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             "manager_name": c.get("manager_name") or "",
             "manager_comment": c.get("manager_comment") or "",
             "created_at": (c.get("created_at") or "")[:16].replace("T", " "),
-            "instagram_id": str(c.get("instagram_id") or "")
+            "instagram_id": str(c.get("instagram_id") or ""),
+            "ai_paused": 1 if c.get("ai_paused") else 0
         })
     clients_json_data = json.dumps(clients_for_export, ensure_ascii=False).replace("</script>", "<\\/script>")
 
@@ -394,6 +395,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         is_fol = client.get('is_follower')
         ai_summary = client.get('ai_summary') or ""
         manager_comment = client.get('manager_comment') or ""
+        ai_paused = 1 if client.get('ai_paused') else 0
 
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
@@ -472,7 +474,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             """
 
         comment_btn = f"""
-        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
+        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
             💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
         </button>
         """
@@ -485,9 +487,17 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </form>
             """
 
+        chat_pulse = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="AI to&#39;xtatilgan (Inson nazoratida)"></span>' if ai_paused else ''
+        chat_btn_td = f"""
+        <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')" class="text-xs bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 px-2 py-1 rounded-lg transition font-bold inline-flex items-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati & Xabar yozish">
+            📸 Chat {chat_pulse}
+        </button>
+        """
+
         action_td = f"""
         <td class="px-5 py-3.5 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5">
+                {chat_btn_td}
                 <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
                     <select name="status" onchange="this.form.submit()" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
                         <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
@@ -500,7 +510,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <input type="hidden" name="manager_name" value="{curr_display_name}">
                     <noscript><button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button></noscript>
                 </form>
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium" title="Bog'lanish & Izoh">💬</button>
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium cursor-pointer" title="Bog'lanish & Izoh">💬</button>
                 {delete_btn}
             </div>
         </td>
@@ -703,11 +713,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 {kanban_comment_block}
             </div>
 
-            <!-- Card Actions footer: Bog'lanish modal button + Quick status move dropdown -->
+            <!-- Card Actions footer: Direct Chat + Izoh modal button + Quick status move dropdown -->
             <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}')"
-                        class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
-                    💬 Bog'lanish
+                <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')"
+                        class="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati">
+                    📸 Chat {'<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>' if ai_paused else ''}
+                </button>
+                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')"
+                        class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Bog'lanish & Izoh">
+                    💬 Izoh
                 </button>
                 <select onchange="quickMoveLead('{client_id}', this.value)" class="text-[11px] py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-2xs" title="Boshqa ustunga ko'chirish">
                     <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
@@ -1662,6 +1676,77 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     """
 
     common_modals_html = f"""
+    <!-- Instagram Direct Suhbat Modali -->
+    <div id="instagramChatModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full h-[88vh] max-h-[720px] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-5 py-3.5 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white flex items-center justify-center text-lg shadow-sm">
+                        📸
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-900" id="chatModalClientName">Mijoz Ismi</h3>
+                            <span id="chatModalUsername" class="text-xs font-semibold text-pink-600 font-mono">@username</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span id="chatModalCourseBadge" class="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">Yo'nalish: Front Office</span>
+                            <span id="chatModalAiBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-md">⚡ AI Faol</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="chatModalToggleAiBtn" onclick="toggleClientAi()" class="text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer shadow-xs" title="AI javoblarini to'xtatish yoki qayta yoqish">
+                        <!-- JS orqali to'ldiriladi -->
+                    </button>
+                    <button type="button" onclick="closeChatModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">&times;</button>
+                </div>
+            </div>
+
+            <!-- AI Ogohlantirish Paneli -->
+            <div id="chatModalAiNotice" class="px-5 py-2 bg-amber-50 border-b border-amber-200/80 text-[11px] text-amber-900 flex items-center justify-between hidden">
+                <div class="flex items-center gap-1.5">
+                    <span>🛑</span>
+                    <span><b>AI To'xtatilgan:</b> Ushbu mijozga sun'iy intellekt avtomatik javob bermaydi. Barcha xabarlarga faqat mutaxassis javob beradi.</span>
+                </div>
+                <button type="button" onclick="toggleClientAi()" class="text-[11px] font-bold text-purple-700 underline hover:text-purple-900 ml-2 whitespace-nowrap cursor-pointer">AI ni yoqish</button>
+            </div>
+
+            <!-- Xabarlar Tarixi Box (Scrollable) -->
+            <div id="chatMessagesBox" class="flex-1 p-4 sm:p-5 overflow-y-auto space-y-3 bg-slate-50/70">
+                <!-- Xabarlar yuklanmoqda spinner -->
+                <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
+                    <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <span class="text-xs font-medium">Suhbat tarixi yuklanmoqda...</span>
+                </div>
+            </div>
+
+            <!-- Tezkor Javob Shabonlari -->
+            <div class="px-4 py-1.5 bg-slate-100/80 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto text-[11px] text-slate-600 shrink-0">
+                <span class="font-bold text-slate-400 shrink-0">⚡ Shablonlar:</span>
+                <button type="button" onclick="insertQuickReply('Assalomu alaykum! Kursimiz haqida batafsil ma\\'lumot berishimni xohlaysizmi?')" class="px-2.5 py-1 bg-white hover:bg-slate-200 border border-slate-200 rounded-lg whitespace-nowrap text-slate-700 transition cursor-pointer shadow-2xs">👋 Salom & Ma'lumot</button>
+                <button type="button" onclick="insertQuickReply('Telefon raqamingizni qoldirsangiz, mutaxassisimiz sizga qo\\'ng\\'iroq qilib barcha savollaringizga javob beradi.')" class="px-2.5 py-1 bg-white hover:bg-slate-200 border border-slate-200 rounded-lg whitespace-nowrap text-slate-700 transition cursor-pointer shadow-2xs">📞 Raqam so'rash</button>
+                <button type="button" onclick="insertQuickReply('Sizga qaysi vaqtda qo\\'ng\\'iroq qilsak qulay bo\\'ladi?')" class="px-2.5 py-1 bg-white hover:bg-slate-200 border border-slate-200 rounded-lg whitespace-nowrap text-slate-700 transition cursor-pointer shadow-2xs">⏰ Qulay vaqt</button>
+                <button type="button" onclick="insertQuickReply('Darslarimiz amaliyotga asoslangan bo\\'lib, kurs yakunida xalqaro sertifikat beriladi.')" class="px-2.5 py-1 bg-white hover:bg-slate-200 border border-slate-200 rounded-lg whitespace-nowrap text-slate-700 transition cursor-pointer shadow-2xs">🎓 Sertifikat</button>
+            </div>
+
+            <!-- Xabar Yuborish Formasi (Footer) -->
+            <form id="chatSendForm" onsubmit="sendDirectMessage(event)" class="p-3.5 bg-white border-t border-slate-200 shrink-0">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="chatInputText" autocomplete="off" placeholder="Mijozga Instagram Direct orqali xabar yozing..." class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-slate-400">
+                    <button type="submit" id="chatSendBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50">
+                        <span>Yuborish</span> <span>🚀</span>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 px-1">
+                    <span>💡 Xabar yuborilgan zahoti <b>AI avtomatik to'xtatiladi</b> (inson nazorati faollashadi).</span>
+                    <span class="hidden sm:inline">Enter bosish orqali yuborish</span>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Bog'lanish & Mutaxassis Izohi Modali -->
     <div id="commentModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
@@ -1960,7 +2045,296 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     <!-- JavaScript: Qidiruv, Tab almashtirish va Chart.js -->
     <script>
-        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager) {{
+        // ------------------ INSTAGRAM DIRECT CHAT VA AI BOSHQARUVI ------------------
+        let currentChatClientId = null;
+        let currentChatAiPaused = false;
+        let currentChatInstagramId = null;
+
+        function escapeChatHtml(str) {{
+            if (!str) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }}
+
+        function openInstagramChatModal(clientId, clientName, username, campaign, aiPaused, instagramId) {{
+            currentChatClientId = clientId;
+            currentChatAiPaused = Boolean(Number(aiPaused) === 1);
+            currentChatInstagramId = instagramId;
+
+            const nameEl = document.getElementById("chatModalClientName");
+            if (nameEl) nameEl.textContent = clientName || "Mijoz";
+
+            const userEl = document.getElementById("chatModalUsername");
+            if (userEl) userEl.textContent = username ? "@" + username : (instagramId ? "ID: " + instagramId : "");
+
+            const courseEl = document.getElementById("chatModalCourseBadge");
+            if (courseEl) courseEl.textContent = "Yo'nalish: " + (campaign || "Umumiy");
+
+            updateChatModalAiBadge(currentChatAiPaused);
+
+            const modal = document.getElementById("instagramChatModal");
+            if (modal) modal.classList.remove("hidden");
+
+            const input = document.getElementById("chatInputText");
+            if (input) {{
+                input.value = "";
+                input.focus();
+            }}
+
+            loadChatMessages(clientId);
+        }}
+
+        function closeChatModal() {{
+            const modal = document.getElementById("instagramChatModal");
+            if (modal) modal.classList.add("hidden");
+            currentChatClientId = null;
+        }}
+
+        function updateChatModalAiBadge(isPaused) {{
+            currentChatAiPaused = Boolean(isPaused);
+            const badge = document.getElementById("chatModalAiBadge");
+            const btn = document.getElementById("chatModalToggleAiBtn");
+            const notice = document.getElementById("chatModalAiNotice");
+
+            if (isPaused) {{
+                if (badge) {{
+                    badge.className = "text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200";
+                    badge.innerHTML = "🛑 AI To'xtatilgan (Inson nazorati)";
+                }}
+                if (btn) {{
+                    btn.className = "text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer shadow-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200";
+                    btn.innerHTML = "<span>▶️</span> <span>AI ni qayta yoqish</span>";
+                }}
+                if (notice) notice.classList.remove("hidden");
+            }} else {{
+                if (badge) {{
+                    badge.className = "text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200";
+                    badge.innerHTML = "⚡ AI Faol (Avtomatik)";
+                }}
+                if (btn) {{
+                    btn.className = "text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer shadow-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200";
+                    btn.innerHTML = "<span>⏸️</span> <span>AI ni to'xtatish</span>";
+                }}
+                if (notice) notice.classList.add("hidden");
+            }}
+        }}
+
+        async function loadChatMessages(clientId) {{
+            const box = document.getElementById("chatMessagesBox");
+            if (!box) return;
+
+            box.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
+                    <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <span class="text-xs font-medium">Suhbat tarixi yuklanmoqda...</span>
+                </div>
+            `;
+
+            try {{
+                const resp = await fetch("/admin/clients/" + clientId + "/chat");
+                if (!resp.ok) {{
+                    box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Suhbat tarixini yuklab bo\\'lmadi.</div>';
+                    return;
+                }}
+                const data = await resp.json();
+                if (!data.success) {{
+                    box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">' + (data.error || "Xatolik yuz berdi") + '</div>';
+                    return;
+                }}
+
+                updateChatModalAiBadge(data.ai_paused);
+                renderChatMessages(data.chat_history || []);
+            }} catch (err) {{
+                console.error("loadChatMessages error:", err);
+                box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Server bilan bog\\'lanishda xatolik.</div>';
+            }}
+        }}
+
+        function renderChatMessages(history) {{
+            const box = document.getElementById("chatMessagesBox");
+            if (!box) return;
+
+            if (!history || history.length === 0) {{
+                box.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12 text-center">
+                        <div class="text-4xl mb-2">💬</div>
+                        <div class="text-xs font-semibold text-slate-600">Hozircha suhbat xabarlari yo'q</div>
+                        <div class="text-[11px] text-slate-400 max-w-xs mt-1">Quyidagi maydon orqali mijozga Instagram Directda birinchi xabarni yozishingiz mumkin.</div>
+                    </div>
+                `;
+                return;
+            }}
+
+            let html = "";
+            history.forEach(msg => {{
+                const role = msg.role || "user";
+                const text = escapeChatHtml(msg.text || "").replace(/\\n/g, "<br>");
+                const time = msg.time || "";
+                const manager = escapeChatHtml(msg.manager || "Mutaxassis");
+
+                if (role === "user" || role === "client") {{
+                    html += `
+                        <div class="flex items-start gap-2 max-w-[85%]">
+                            <div class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                👤
+                            </div>
+                            <div>
+                                <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-3.5 py-2.5 text-xs text-slate-800 shadow-2xs leading-relaxed">
+                                    ${{text}}
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5 pl-1">${{time ? time + " • " : ""}}Mijoz</div>
+                            </div>
+                        </div>
+                    `;
+                }} else if (role === "manager" || role === "operator") {{
+                    html += `
+                        <div class="flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
+                            <div class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                👨‍💼
+                            </div>
+                            <div class="text-right">
+                                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-xs px-3.5 py-2.5 text-xs shadow-sm leading-relaxed text-left">
+                                    ${{text}}
+                                </div>
+                                <div class="text-[10px] text-purple-600 font-semibold mt-0.5 pr-1">${{time ? time + " • " : ""}}${{manager}}</div>
+                            </div>
+                        </div>
+                    `;
+                }} else {{
+                    html += `
+                        <div class="flex items-start gap-2 max-w-[85%]">
+                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                🤖
+                            </div>
+                            <div>
+                                <div class="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl rounded-tl-xs px-3.5 py-2.5 text-xs text-indigo-950 shadow-2xs leading-relaxed">
+                                    ${{text}}
+                                </div>
+                                <div class="text-[10px] text-indigo-500 font-medium mt-0.5 pl-1">${{time ? time + " • " : ""}}AI Bot</div>
+                            </div>
+                        </div>
+                    `;
+                }}
+            }});
+
+            box.innerHTML = html;
+            box.scrollTop = box.scrollHeight;
+        }}
+
+        async function sendDirectMessage(e) {{
+            if (e) e.preventDefault();
+            if (!currentChatClientId) return;
+
+            const input = document.getElementById("chatInputText");
+            const btn = document.getElementById("chatSendBtn");
+            const text = input ? input.value.trim() : "";
+            if (!text) return;
+
+            if (input) input.disabled = true;
+            if (btn) {{
+                btn.disabled = true;
+                btn.innerHTML = '<span>Yuborilmoqda...</span> <div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+            }}
+
+            try {{
+                const formData = new FormData();
+                formData.append("message", text);
+
+                const resp = await fetch("/admin/clients/" + currentChatClientId + "/send-message", {{
+                    method: "POST",
+                    body: formData
+                }});
+
+                const data = await resp.json();
+                if (data.success) {{
+                    if (input) input.value = "";
+                    updateChatModalAiBadge(true);
+                    showToast("✅ Xabar Instagram Directga yuborildi! AI ushbu mijoz uchun to'xtatildi.");
+
+                    const box = document.getElementById("chatMessagesBox");
+                    if (box) {{
+                        const emptyPlaceholder = box.querySelector(".text-4xl");
+                        if (emptyPlaceholder) box.innerHTML = "";
+
+                        const nowTime = new Date().toLocaleTimeString().slice(0, 5);
+                        const cleanHtml = escapeChatHtml(text).replace(/\\n/g, "<br>");
+                        const newMsgHtml = `
+                            <div class="flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
+                                <div class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                    👨‍💼
+                                </div>
+                                <div class="text-right">
+                                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-xs px-3.5 py-2.5 text-xs shadow-sm leading-relaxed text-left">
+                                        ${{cleanHtml}}
+                                    </div>
+                                    <div class="text-[10px] text-purple-600 font-semibold mt-0.5 pr-1">${{nowTime}} • Siz</div>
+                                </div>
+                            </div>
+                        `;
+                        box.insertAdjacentHTML("beforeend", newMsgHtml);
+                        box.scrollTop = box.scrollHeight;
+                    }}
+                }} else {{
+                    alert("Xatolik: " + (data.error || "Xabarni yuborib bo'lmadi"));
+                }}
+            }} catch (err) {{
+                console.error("sendDirectMessage error:", err);
+                alert("Server bilan bog'lanishda xatolik yuz berdi");
+            }} finally {{
+                if (input) {{
+                    input.disabled = false;
+                    input.focus();
+                }}
+                if (btn) {{
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Yuborish</span> <span>🚀</span>';
+                }}
+            }}
+        }}
+
+        async function toggleClientAi() {{
+            if (!currentChatClientId) return;
+            const newPausedState = !currentChatAiPaused;
+
+            try {{
+                const formData = new FormData();
+                formData.append("ai_paused", newPausedState ? 1 : 0);
+
+                const resp = await fetch("/admin/clients/" + currentChatClientId + "/toggle-ai", {{
+                    method: "POST",
+                    body: formData
+                }});
+
+                const data = await resp.json();
+                if (data.success) {{
+                    updateChatModalAiBadge(data.ai_paused);
+                    if (data.ai_paused) {{
+                        showToast("🛑 AI to'xtatildi! Mijozga faqat mutaxassis javob beradi.");
+                    }} else {{
+                        showToast("⚡ AI qayta yoqildi! Sun'iy intellekt mijozga avtomatik javob beradi.");
+                    }}
+                }} else {{
+                    showToast("⚠️ Xatolik: " + (data.error || "Holatni o'zgartirib bo'lmadi"));
+                }}
+            }} catch (err) {{
+                console.error("toggleClientAi error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        function insertQuickReply(text) {{
+            const input = document.getElementById("chatInputText");
+            if (input) {{
+                input.value = text;
+                input.focus();
+            }}
+        }}
+
+        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager, aiPaused, instagramId) {{
             const form = document.getElementById('modalCommentForm');
             if (!form) return;
             form.action = '/admin/clients/' + clientId + '/comment';
@@ -2005,8 +2379,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 }} else {{
                     btnsHtml += '<span class="text-xs text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200">📞 Raqam kiritilmagan</span>';
                 }}
+                if (clientId) {{
+                    const safeName = (clientName || '').replace(/'/g, "\\\\'");
+                    const safeCamp = (campaign || '').replace(/'/g, "\\\\'");
+                    btnsHtml += '<button type="button" onclick="closeCommentModal(); openInstagramChatModal(\\'' + clientId + '\\', \\'' + safeName + '\\', \\'' + (username || '') + '\\', \\'' + safeCamp + '\\', ' + (aiPaused ? 1 : 0) + ', \\'' + (instagramId || '') + '\\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold shadow-sm transition cursor-pointer">📸 CRM Direct Chat</button>';
+                }}
                 if (username) {{
-                    btnsHtml += '<a href="https://instagram.com/' + username + '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold shadow-sm transition">📸 Instagram Direct ↗</a>';
+                    btnsHtml += '<a href="https://instagram.com/' + username + '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold shadow-sm transition">📸 Instagram Profil ↗</a>';
                 }}
                 btnBox.innerHTML = btnsHtml;
             }}
@@ -2052,6 +2431,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const opModal = document.getElementById('opPasswordModal');
             if (opModal && e.target === opModal) {{
                 closeOpPasswordModal();
+            }}
+            const chatModal = document.getElementById('instagramChatModal');
+            if (chatModal && e.target === chatModal) {{
+                closeChatModal();
             }}
         }});
 

@@ -23,7 +23,11 @@ from database import (
     delete_client_by_id,
     clear_all_clients,
     update_client_by_id,
-    update_client_manager_comment
+    update_client_manager_comment,
+    get_client_by_id,
+    append_client_chat_history,
+    get_client_chat_history,
+    set_client_ai_paused
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -31,7 +35,7 @@ from services.dialog_manager import (
     process_incoming_audio_message,
     process_incoming_video_message
 )
-from services.instagram import get_recent_media, resolve_media_id_from_url
+from services.instagram import get_recent_media, resolve_media_id_from_url, send_message
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
 from services.telegram import (
     handle_telegram_callback,
@@ -892,6 +896,129 @@ def update_comment_from_admin(
         url="/admin?notice=Mijoz+ma%27lumotlari+va+izohi+muvaffaqiyatli+saqlandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+# ----------------- CRM INSTAGRAM DIRECT CHAT VA AI BOSHQARUVI -----------------
+
+@app.get("/admin/clients/{client_id}/chat")
+def get_client_chat(client_id: int, request: Request):
+    """Mijozning Direct suhbat tarixi va AI holatini olish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+    
+    client = get_client_by_id(client_id)
+    if not client:
+        return JSONResponse({"success": False, "error": "Mijoz topilmadi"}, status_code=404)
+    
+    ig_id = client.get("instagram_id", "")
+    history = get_client_chat_history(ig_id) if ig_id else []
+    ai_paused = bool(client.get("ai_paused"))
+
+    return JSONResponse({
+        "success": True,
+        "client_id": client_id,
+        "instagram_id": ig_id,
+        "username": client.get("username", ""),
+        "full_name": client.get("full_name") or "Mijoz",
+        "campaign": client.get("campaign") or "Umumiy",
+        "ai_paused": ai_paused,
+        "chat_history": history
+    })
+
+@app.post("/admin/clients/{client_id}/send-message")
+def send_direct_message_from_crm(
+    client_id: int,
+    request: Request,
+    message: str = Form(...)
+):
+    """
+    CRM dan mijozning Instagram Directiga xabar yuborish.
+    MUHIM: Mutaxassis xabar yuborgan zahoti ushbu mijoz uchun AI avtomatik to'xtatiladi,
+    shunda Sun'iy intellekt va inson aralashib ketmaydi!
+    """
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    msg_text = (message or "").strip()
+    if not msg_text:
+        return JSONResponse({"success": False, "error": "Xabar matni bo'sh bo'lishi mumkin emas"}, status_code=400)
+
+    client = get_client_by_id(client_id)
+    if not client:
+        return JSONResponse({"success": False, "error": "Mijoz topilmadi"}, status_code=404)
+
+    ig_id = client.get("instagram_id", "")
+    if not ig_id:
+        return JSONResponse({"success": False, "error": "Mijozning Instagram ID si topilmadi"}, status_code=400)
+
+    # 1. Instagram Graph API orqali xabar yuborish (is_human=True)
+    res = send_message(recipient_id=ig_id, text=msg_text, is_human=True)
+    if res.get("error"):
+        err_msg = str(res.get("error", "Noma'lum xatolik"))
+        if "outside of allowed window" in err_msg.lower() or "2534027" in err_msg or "code 10" in err_msg:
+            err_msg = "Meta cheklovi: Mijoz oxirgi marta yozganiga 24 soatdan oshgan yoki 7 kunlik xizmat oynasi tugagan."
+        return JSONResponse({"success": False, "error": err_msg})
+
+    manager_name = user.get("display_name", "Mutaxassis")
+    from datetime import datetime
+    now_time = datetime.now().strftime("%H:%M")
+    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    # 2. Xabarni suhbat tarixiga yozish
+    append_client_chat_history(ig_id, role="manager", text=msg_text, manager_name=manager_name)
+
+    # 3. Ushbu mijoz uchun AI ni AVTOMATIK TO'XTATISH (Inson muloqotda, AI aralashmasligi kerak)
+    set_client_ai_paused(client_id, paused=True)
+
+    # 4. Mijoz ma'lumotlarini yangilash (last_message, manager_name, ai_paused)
+    update_client_by_id(
+        client_id,
+        last_message=f"Mutaxassis: {msg_text[:60]}",
+        manager_name=manager_name,
+        manager_time=now_str,
+        ai_paused=1
+    )
+
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "success": True,
+        "ai_paused": True,
+        "sent_message": {
+            "role": "manager",
+            "text": msg_text,
+            "time": now_time,
+            "manager": manager_name
+        }
+    })
+
+@app.post("/admin/clients/{client_id}/toggle-ai")
+def toggle_client_ai(
+    client_id: int,
+    request: Request,
+    ai_paused: int = Form(...)
+):
+    """Mijoz uchun AI javoblarini yoqish yoki to'xtatish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    client = get_client_by_id(client_id)
+    if not client:
+        return JSONResponse({"success": False, "error": "Mijoz topilmadi"}, status_code=404)
+
+    is_paused = bool(ai_paused == 1)
+    set_client_ai_paused(client_id, paused=is_paused)
+
+    return JSONResponse({
+        "success": True,
+        "client_id": client_id,
+        "ai_paused": is_paused
+    })
 
 # ----------------- ADMIN: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -----------------
 

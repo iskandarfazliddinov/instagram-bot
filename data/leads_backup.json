@@ -21,7 +21,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"03:26\"}, {\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"03:26\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Стоимость обучения зависит от выбранного курса: переподготовка гидов — 5 500 000 сум (4 месяца, диплом + бейдж для работы по всему Узбекистану), повышение квалификации гидов — 2 350 000 сум (1 месяц), курсы турагента или туроператора — 2 350 000 сум (1 месяц, сертификат). Также у нас есть официальная онлайн-платформа https://tourism-edu.uz с курсами Front Office и Housekeeping. Чтобы мы могли забронировать за вами место или отправить подробную информацию, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"03:27\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Стоимость наших курсов зависит от выбранного направления: переподготовка гидов-экскурсоводов (4 месяца, с дипломом и бейджем) — 5 500 000 сум; повышение квалификации гидов (1 месяц) — 2 350 000 сум; курсы турагентства и туроператора (1 месяц) — по 2 350 000 сум. Кроме того, у нас есть официальная онлайн-платформа https://tourism-edu.uz для дистанционного обучения. Чтобы мы помогли вам подобрать курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"03:27\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы по курсам или вы хотите забронировать место, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам подробную учебную программу!\", \"time\": \"04:00\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы по нашим курсам, пожалуйста, поделитесь вашим номером телефона, и мы с радостью отправим вам подробную учебную программу!\", \"time\": \"05:19\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы или вы хотите забронировать место в группе, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам всю подробную информацию и учебную программу!\", \"time\": \"05:22\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы по нашим курсам или вы хотите забронировать место, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам подробную учебную программу!\", \"time\": \"05:53\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы по нашим курсам или вы хотите выбрать подходящее направление, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам подробную учебную программу!\", \"time\": \"06:20\"}, {\"role\": \"assistant\", \"text\": \"Лейла, здравствуйте! 😊 Если у вас еще остались вопросы или вы хотите забронировать место, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам подробную учебную программу!\", \"time\": \"06:41\"}, {\"role\": \"assistant\", \"text\": \"Лейла, добрый день! 😊 Если вы еще не определились с выбором или у вас остались вопросы, просто оставьте свой номер телефона, и наш менеджер с радостью отправит вам подробную учебную программу и ответит на все вопросы!\", \"time\": \"06:43\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 30,
@@ -45,7 +46,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"🔹 Housekeeping va sanitariya-gigiyena\", \"time\": \"01:50\"}, {\"role\": \"user\", \"text\": \"🔹 Mehmonxona qabulxonasi — Front Office\", \"time\": \"01:50\"}, {\"role\": \"user\", \"text\": \"🔹 Umumiy ovqatlantirish xizmatlari\", \"time\": \"01:50\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Mehmonxona sohasi menejerlari va rahbarlari uchun mo'ljallangan nufuzli **«Hotel Operations and Innovation»** dasturimizda «Front Office» yo'nalishi ham alohida o'rin tutadi. Dasturning to'liq rejasini Telegram orqali yuklab olishingiz mumkin: https://t.me/MyMarketingAndPrBot?start=hotel yoki to'g'ridan-to'g'ri PDF formatda ko'ring: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf. \\n\\nRo'yxatdan o'tish uchun ariza formasi: https://survey.zohopublic.com/zs/jQCZao. Kurs haqida batafsil ma'lumot berishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"01:51\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Housekeeping yo'nalishi bo'yicha mashg'ulotlarimiz bizning rasmiy https://tourism-edu.uz onlayn ta'lim platformamizda masofaviy tarzda olib boriladi va yakunda rasmiy sertifikat taqdim etiladi. Istalgan joydan turib o'qish imkoniyatiga ega bo'lasiz. Ro'yxatdan o'tishda yordam berishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"01:51\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Mehmonxonalarda restoran ishi, servis va umumiy ovqatlanish xizmatlarini (F&B Service) o'rganish bo'yicha ham amaliy kurslarimiz mavjud. Shuningdek, mehmonxona sohasidagi rahbarlar uchun UN Tourism bilan hamkorlikdagi nufuzli «Hotel Operations and Innovation» dasturimiz ham bor, uning doirasida restoran va banket xizmatlari moduli ham o'rgatiladi. Dasturning batafsil PDF faylini https://t.me/MyMarketingAndPrBot?start=hotel orqali yuklab olishingiz yoki https://survey.zohopublic.com/zs/jQCZao havolasi orqali to'g'ridan-to'g'ri ariza topshirishingiz mumkin. Kurslarga ro'yxatdan o'tish va batafsil ma'lumot olish uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"01:51\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Mehmonxona ishini mukammal o'rganish va kelajakda o'z faoliyatingizni boshlash uchun sizga yordam berishni juda istardik, shu sababli qulay vaqtingizda telefon raqamingizni qoldirsangiz, mutaxassislarimiz tezda bog'lanib barcha savollaringizga javob berishadi 😊\", \"time\": \"02:25\"}, {\"role\": \"assistant\", \"text\": \"Asadbek, yaxshimisiz? Tanlovda adashmasligingiz va barcha savollaringizga batafsil javob berishimiz uchun qulay vaqtingizda telefon raqamingizni yozib qoldirsangiz, mutaxassislarimiz zudlik bilan siz bilan bog'lanishadi 😊\", \"time\": \"05:19\"}, {\"role\": \"assistant\", \"text\": \"Asadbek, yaxshimisiz? Kelajakdagi rejalaringizda kichik bir yordamimiz tegishi va kurslarimiz bo'yicha barcha savollaringizga javob berishimiz uchun o'zingizga qulay paytda telefon raqamingizni qoldirib ketsangiz, juda xursand bo'lar edik 😊\", \"time\": \"05:22\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Sizni yo'qotib qo'ygandek bo'ldik, kurslarimizga oid savollaringizga shaxsan javob berib, ro'yxatdan o'tishingizda yordam qilishimiz uchun faqatgina telefon raqamingizni yozib yuborsangiz kifoya 😊\", \"time\": \"05:53\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Sizni yo'qotib qo'ygandek bo'ldik, kurslarimiz bo'yicha yana qandaydir savollaringiz bormi? Mutaxassislarimiz sizga qulay vaqtda bog'lanishlari uchun telefon raqamingizni qoldirib ketsangiz, mamnuniyat bilan yordam bergan bo'lardik 😊\", \"time\": \"06:20\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Sizni yo'qotib qo'ygandek bo'ldik, kurslarimizga oid savollaringizga shaxsan javob berishimiz uchun telefon raqamingizni qoldirishingiz mumkinmi, sizga yordam berishni juda istardik 😊\", \"time\": \"06:41\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Asadbek! Sizni yo'qotib qo'ygandek bo'ldik, kurslarimiz bo'yicha yana qandaydir savollaringiz bormi? Mutaxassisimiz batafsil ma'lumot berishi uchun telefon raqamingizni qoldirishingiz kifoya, sizga albatta bog'lanamiz 😊\", \"time\": \"06:43\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 31,
@@ -69,7 +71,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! «Hotel Operations and Innovation 2026–2027» xalqaro dasturimizga qiziqish bildirganingiz uchun tashakkur! \\n\\nBatafsil o'quv dasturi, dars jadvali va shartlar haqida to'liq ma'lumotni to'g'ridan-to'g'ri sizga yuborishimiz uchun, iltimos, ismingizni va telefon raqamingizni yozib qoldiring 😊\", \"time\": \"22:35\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 32,
@@ -93,7 +96,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! E'tiboringiz uchun katta rahmat 😊 \\n\\nMehmonxona menejerlari va bo'lim boshliqlari uchun mo'ljallangan nufuzli xalqaro dasturimiz va boshqa kurslarimiz bo'yicha batafsil o'quv dasturi, dars jadvali hamda narxlarni to'liq taqdim etishimiz uchun ismingiz va telefon raqamingizni yozib qoldirishingizni so'raymiz!\", \"time\": \"16:10\"}, {\"role\": \"user\", \"text\": \"Temirova Iroda +998956672200\", \"time\": \"16:12\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 33,
@@ -117,7 +121,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! 😊\\n\\nProfessional gid-ekskursovod kursimizga bildirgan qiziqishingiz uchun rahmat!\\n\\n📍 Kurs yo‘nalishlari va narxlari:\\n• Samarqand–Shahrisabz yo‘nalishi — 4 500 000 so‘m\\n• Butun O‘zbekiston yo‘nalishi — 5 500 000 so‘m\\n\\n📅 Kurs boshlanish sanasi: 10-avgust\\n\\n🎓 Kurs davomida siz nazariy bilimlar bilan bir qatorda tarixiy va turistik obyektlarda amaliy mashg‘ulotlarda ham ishtirok etasiz. Kurs yakunida sertifikat hamda professional gid beydjigi taqdim etiladi.\\n\\n✅ Ro‘yxatdan o‘tish uchun quyidagi ma’lumotlarni yuboring:\\n• F.I.Sh.\\n• Telefon raqamingiz\\n\\nMutaxassisimiz siz bilan bog‘lanib, kurs bo‘yicha batafsil ma’lumot beradi hamda ro‘yxatdan o‘tish jarayonida yordam ko‘rsatadi.\\n\\n📲 Telegram: @itasamarkand  \\n📞 Telefon: +998 90 103 30 00\\n\\n⚠️ Guruhdagi joylar soni cheklangan. Birinchi ro‘yxatdan o‘tgan nomzodlar guruhga ustuvor ravishda qabul qilinadi.\\n\\nSizni kursimizda kutib qolamiz!\", \"time\": \"18:39\"}, {\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"15:09\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Sardor! \\n\\nXalqaro Turizm Akademiyasining nufuzli «Hotel Operations and Innovation» xalqaro dasturi bilan to'liq tanishish uchun sizga maxsus PDF faylni taqdim etamiz: uni Telegram botimiz orqali https://t.me/MyMarketingAndPrBot?start=hotel havolasi orqali yoki to'g'ridan-to'g'ri https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf orqali yuklab olishingiz mumkin. Shuningdek, 7 ta moduldan iborat ushbu xalqaro dasturga onlayn ariza topshirish uchun https://survey.zohopublic.com/zs/jQCZao havolasidan foydalanishingiz mumkin. \\n\\nKursga ro'yxatdan o'tish yoki sizga batafsil ma'lumot yuborishimiz uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"15:09\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Sardor! Dastur materiallari bilan tanishib ulgurdingizmi yoki sizni qiziqtirgan boshqa savollar bormi? 😊 Qulay vaqtda telefon raqamingizni qoldirsangiz, mutaxassislarimiz siz bilan bog'lanib, barcha savollaringizga batafsil javob berishdan mamnun bo'lishadi!\", \"time\": \"15:40\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Sardor! 😊 Dasturimiz bo'yicha yana qandaydir savollaringiz tug'ildimi yoki o'zingizga qulay vaqtda telefon raqamingizni qoldirasizmi, mutaxassisimiz barcha savollaringizga javob berishdan mamnun bo'ladi?\", \"time\": \"05:18\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Sardor! 😊 Dasturimiz bo'yicha yana qandaydir savollaringiz tug'ildimi yoki joyingizni band qilish uchun telefon raqamingizni qoldirasizmi?\", \"time\": \"05:21\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, o7svt! 😊 Dasturimiz bo'yicha yana qandaydir savollaringiz tug'ildi mi? Mutaxassisimiz sizga qulay vaqtda qo'ng'iroq qilib, batafsil ma'lumot berishi uchun telefon raqamingizni yozib qoldirishingizni iltimos qilardim.\", \"time\": \"05:52\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, o7svt! 😊 Dasturimiz ma'qul keldimi yoki sizni qiziqtirgan boshqa savollar bormi? Mutaxassisimiz sizga qulay vaqtda qo'ng'iroq qilishi uchun telefon raqamingizni yozib qoldirsangiz, juda xursand bo'lardik!\", \"time\": \"06:19\"}, {\"role\": \"assistant\", \"text\": \"Sardor, assalomu alaykum! 😊 Dasturimiz bo'yicha yana qandaydir savollaringiz qoldimi yoki siz bilan bog'lanishimiz uchun telefon raqamingizni yozib qoldirasizmi?\", \"time\": \"06:41\"}, {\"role\": \"assistant\", \"text\": \"Sardor, assalomu alaykum! 😊 Dasturimiz bo'yicha yana qandaydir savollaringiz qolmadimi ishqilib? Joylarimiz oz qolgani uchun, siz bilan tezroq bog'lanib barcha ma'lumotlarni berishimiz uchun iltimos, telefon raqamingizni qoldirib ketsangiz juda xursand bo'lardik! 🌸\", \"time\": \"06:43\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 34,
@@ -141,7 +146,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"09:00\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Стоимость обучения зависит от выбранного курса: переподготовка гидов — 5 500 000 сум (4 месяца, диплом и бейдж гида по всему Узбекистану); повышение квалификации гидов, курсы турагента и туроператора — по 2 350 000 сум (1 месяц, сертификат). \\n\\nЧтобы мы помогли вам подобрать подходящее направление и зарегистрироваться, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"09:00\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Если у вас остались вопросы или вам нужна подробная программа обучения, пожалуйста, напишите ваш номер телефона, и мы с радостью свяжемся с вами 😊\", \"time\": \"09:34\"}, {\"role\": \"user\", \"text\": \"998904517877\", \"time\": \"10:21\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 35,
@@ -165,7 +171,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"15:53\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! У нас есть несколько профессиональных курсов: 4-месячный курс переподготовки на гида (5 500 000 сум, с дипломом и бейджем для работы по всему Узбекистану), 1-месячные курсы повышения квалификации гидов, а также курсы турагентства и туроператора (каждый по 2 350 000 сум с выдачей сертификата). Также доступна престижная международная программа «Hotel Operations and Innovation» от UN Tourism и нашей Академии, подробную программу которой в PDF вы можете скачать здесь: https://t.me/MyMarketingAndPrBot?start=hotel (или напрямую: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf), а подать заявку можно по ссылке: https://survey.zohopublic.com/zs/jQCZao. \\n\\nЧтобы мы могли помочь вам с выбором программы и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"15:54\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Сам! 😊 Вы успели посмотреть программу курса? Оставьте, пожалуйста, ваш номер телефона, чтобы мы могли помочь вам определиться с выбором и ответить на все вопросы.\", \"time\": \"16:26\"}, {\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"04:16\"}, {\"role\": \"assistant\", \"text\": \"Конечно! Вы можете скачать подробную программу престижной международной программы «Hotel Operations and Innovation» в формате PDF по этой ссылке: https://t.me/MyMarketingAndPrBot?start=hotel (или напрямую: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf), а подать заявку можно здесь: https://survey.zohopublic.com/zs/jQCZao. А для наших других курсов (гид — 5 500 000 сум, турагент и туроператор — по 2 350 000 сум) вся информация предоставляется индивидуально. \\n\\nЧтобы мы могли отправить вам учебный план и помочь с выбором, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"04:16\"}, {\"role\": \"user\", \"text\": \"Сухроб\", \"time\": \"07:46\"}, {\"role\": \"assistant\", \"text\": \"Сухроб, рад знакомству! 😊 Большое спасибо за предоставленные данные. Скажите, пожалуйста, какой именно курс вас интересует — переподготовка гидов (4 месяца, 5 500 000 сум), повышение квалификации, турагент/туроператор (по 1 месяцу, 2 350 000 сум) или международная программа «Hotel Operations and Innovation»? Мы свяжемся с вами в ближайшее время и ответим на все вопросы!\", \"time\": \"07:46\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 36,
@@ -189,7 +196,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Расскажите подробнее о вашей компании.\", \"time\": \"04:33\"}, {\"role\": \"assistant\", \"text\": \"Kurs narxi qancha?\", \"time\": \"04:33\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Международная академия туризма — Самаркандий кампус создана при поддержке UN Tourism на базе Университета «Шелковый путь» для подготовки профессиональных кадров в сфере туризма и гостеприимства. У нас вы можете пройти курсы переподготовки и повышения квалификации гидов, а также обучиться на турагента и туроператора. Чтобы мы могли отправить вам подробную информацию о курсах и помочь с регистрацией, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"04:33\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! 😊 Мы заметили, что вы не успели оставить свой номер телефона. Пожалуйста, напишите его в ответном сообщении, чтобы мы могли отправить вам подробную учебную программу и ответить на все вопросы!\", \"time\": \"05:04\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 37,
@@ -213,7 +221,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"17:10\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Конечно! У нас действуют различные профессиональные курсы: 4-месячный курс переподготовки гидов (5 500 000 сум, включает диплом и профессиональный бейдж) и 1-месячные курсы туроператора, турагента или повышения квалификации гидов (каждый по 2 350 000 сум). \\n\\nТакже для руководителей отелей доступна престижная международная программа от UN Tourism — *«Hotel Operations and Innovation»* (состоит из 7 модулей). Вы можете скачать полную PDF-программу [по этой ссылке](https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) (или через нашего [Telegram-бота](https://t.me/MyMarketingAndPrBot?start=hotel)), а подать заявку можно [здесь](https://survey.zohopublic.com/zs/jQCZao). \\n\\nЧтобы мы помогли вам выбрать подходящий курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"17:10\"}, {\"role\": \"assistant\", \"text\": \"Мухамадрасул, здравствуйте! 😊 Вижу, вы не успели оставить свой номер телефона, но я с радостью отвечу на все вопросы и помогу подобрать подходящий курс. Пожалуйста, напишите ваш контактный номер, чтобы мы могли отправить вам полную учебную программу и забронировать за вами место!\", \"time\": \"17:44\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 38,
@@ -237,7 +246,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"16:01\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Стоимость обучения зависит от выбранного курса: переподготовка гидов — 5 500 000 сум (4 месяца, диплом и бейдж гида), повышение квалификации гидов, турагентство и туроператор — по 2 350 000 сум (1 месяц, сертификат). Также у нас есть официальная онлайн-платформа https://tourism-edu.uz для дистанционного обучения. Чтобы мы помогли вам подобрать курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"16:01\"}, {\"role\": \"assistant\", \"text\": \"Гули, здравствуйте! 😊 Если у вас еще остались вопросы по курсам или вы хотите забронировать место, пожалуйста, оставьте ваш номер телефона, и мы с радостью отправим вам полную учебную программу!\", \"time\": \"16:34\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 39,
@@ -261,7 +271,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"13:45\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, UN Tourism tashkiloti bilan hamkorlikda ishlab chiqilgan nufuzli **«Hotel Operations and Innovation 2026–2027»** dasturimiz 7 ta asosiy modulni o'z ichiga oladi. Dasturning to'liq PDF formatini [Telegram botimiz](https://t.me/MyMarketingAndPrBot?start=hotel) yoki [to'g'ridan-to'g'ri PDF havolasi](https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) orqali yuklab olishingiz mumkin. Kursga onlayn ro'yxatdan o'tish uchun esa [ariza havolasidan](https://survey.zohopublic.com/zs/jQCZao) foydalanishingiz mumkin 😊 \\n\\nKursga ro'yxatdan o'tish yoki batafsil ma'lumot olish uchun, iltimos, ismingiz va telefon raqamingizni qoldiring!\", \"time\": \"13:45\"}, {\"role\": \"assistant\", \"text\": \"Shaxnoza, assalomu alaykum! Kurs dasturimiz va PDF ma'lumotlarimiz sizga manzur bo'ldimi degan xayolga borib qoldim 😊 Ro'yxatdan o'tishingiz yoki savollaringizga javob berishim uchun telefon raqamingizni qoldirishingiz mumkinmi, siz bilan bog'lanib barcha ma'lumotlarni berishdan mamnun bo'lamiz!\", \"time\": \"14:18\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 40,
@@ -285,7 +296,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum Dilzar! Qiziqishingiz uchun katta rahmat! \\n\\n«Hotel Operations and Innovation 2026–2027» dasturimiz UN Tourism hamkorligida mehmonxona sohasi rahbarlari uchun maxsus ishlab chiqilgan bo'lib, 7 ta nufuzli modulni o'z ichiga oladi. Batafsil o'quv dasturi, dars jadvali va narxlarni to'liq yuborishimiz uchun iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"12:15\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 41,
@@ -309,7 +321,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"10:16\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Вы можете скачать подробную программу нашего престижного международного курса «Hotel Operations and Innovation» в формате PDF по этой ссылке: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf или через наш бот в Telegram: https://t.me/MyMarketingAndPrBot?start=hotel 📄 \\n\\nТакже подать официальную онлайн-заявку можно здесь: https://survey.zohopublic.com/zs/jQCZao \\n\\nЧтобы забронировать место или получить дополнительную информацию, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"10:16\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Дони! Мы заметили, что вы не успели оставить свой номер телефона. Пожалуйста, поделитесь контактом, чтобы мы могли отправить вам подробную учебную программу и забронировать за вами место в академии! 😊\", \"time\": \"10:48\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 42,
@@ -333,7 +346,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"09:35\"}, {\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"09:35\"}, {\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"09:35\"}, {\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"09:35\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного направления:\\n- Курс переподготовки гидов-экскурсоводов (4 месяца, диплом и бейдж) — 5 500 000 сум;\\n- Повышение квалификации гидов (1 месяц) — 2 350 000 сум;\\n- Курсы Турагентства или Туроператора (1 месяц, сертификат) — 2 350 000 сум. \\n\\nЧтобы мы помогли вам выбрать подходящий курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"09:35\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: переподготовка на гида-экскурсовода (4 месяца, с дипломом и бейджем) — 5 500 000 сум; повышение квалификации гидов (1 месяц) — 2 350 000 сум; курсы турагентства или туроператора (1 месяц, с сертификатом) — по 2 350 000 сум. Чтобы мы помогли вам выбрать подходящий курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"09:35\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! У нас есть несколько профессиональных направлений: курс переподготовки гидов (4 месяца, 5 500 000 сум, диплом и бейдж), повышение квалификации гидов (1 месяц, 2 350 000 сум), а также курсы турагентства и туроператора (по 1 месяцу, 2 350 000 сум). Кроме того, доступна международная программа «Hotel Operations and Innovation» при поддержке UN Tourism, подробную программу которой вы можете скачать в PDF здесь: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf или через нашего бота: https://t.me/MyMarketingAndPrBot?start=hotel 😊 \\n\\nЧтобы мы помогли вам с выбором направления и зарегистрировали на курс, пожалуйста, оставьте ваше имя и номер телефона!\", \"time\": \"09:35\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного направления: курс переподготовки гидов (4 месяца) — 5 500 000 сум (с выдачей диплома и профессионального бейджа), а курсы повышения квалификации гидов, турагентства или туроператора (по 1 месяцу) — 2 350 000 сум. Кроме того, у нас есть международная программа «Hotel Operations and Innovation» при поддержке UN Tourism. \\n\\nЧтобы мы могли зарегистрировать вас на курс и отправить подробную программу, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"09:35\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Jonibek! Скажите, удалось ли вам ознакомиться с нашими курсами и какая именно программа вас заинтересовала? Пожалуйста, оставьте ваш номер телефона, чтобы мы могли отправить вам подробную учебную программу и забронировать за вами место 😊\", \"time\": \"10:07\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 43,
@@ -357,7 +371,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Расскажите подробнее о вашей компании.\", \"time\": \"09:47\"}, {\"role\": \"assistant\", \"text\": \"Kurs narxi qancha?\", \"time\": \"09:47\"}, {\"role\": \"assistant\", \"text\": \"Добрый день, Фируз! Международная туристская академия (Самаркандекий кампус) создана при поддержке UN Tourism и Туристического комитета Узбекистана на основании постановления Президента PQ-350. Мы готовим квалифицированных специалистов по международным стандартам для сферы туризма и гостеприимства. \\n\\nУ нас действуют профессиональные курсы: переподготовка гидов (4 месяца — 5 500 000 сум с дипломом и бейджем), повышение квалификации гидов (1 месяц — 2 350 000 сум), а также курсы турагентств и туроператоров (по 1 месяцу — 2 350 000 сум). Кроме того, на нашей официальной платформе https://tourism-edu.uz доступны дистанционные онлайн-курсы по направлениям Front Office и Housekeeping.\\n\\nЧтобы мы могли проконсультировать вас подробнее и помочь с выбором курса, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"09:48\"}, {\"role\": \"user\", \"text\": \"938340222\", \"time\": \"09:49\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 44,
@@ -381,7 +396,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"06:49\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: профессиональная переподготовка гидов (4 месяца, с дипломом и бейджем) стоит 5 500 000 сум, повышение квалификации гидов (1 месяц) — 2 350 000 сум, а курсы турагента и туроператора (1 месяц) — по 2 350 000 сум. Также у нас есть онлайн-платформа https://tourism-edu.uz с курсами по гостиничному делу. \\n\\nЧтобы мы помогли вам выбрать курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"06:50\"}, {\"role\": \"user\", \"text\": \"Скажите пожалуйста возрастная категория\", \"time\": \"06:52\"}, {\"role\": \"assistant\", \"text\": \"Для обучения на наших курсах нет никаких возрастных ограничений! К нам могут поступать все желающие, независимо от возраста, кто хочет освоить новую профессию или повысить свою квалификацию в сфере туризма и гостеприимства 😊 \\n\\nЧтобы мы помогли вам выбрать подходящий курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона!\", \"time\": \"06:52\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Вы интересовались нашими программами обучения. Чтобы мы могли прислать вам расписание занятий и забронировать место, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"07:22\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 45,
@@ -405,7 +421,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"23:54\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusining rasmiy virtual maslahatchisiman. Sizga qaysi yo'nalishdagi kurslarimiz (gid-ekskursiyachi, turagentlik, turoperatorlik yoki mehmonxona xo'jaligi) va ularning shartlari haqida ma'lumot berishim mumkin? 😊\", \"time\": \"23:54\"}, {\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"23:54\"}, {\"role\": \"assistant\", \"text\": \"Для того чтобы получить подробную учебную программу курса, вы можете скачать официальный документ в формате PDF по этой ссылке: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf 📄 Также ознакомиться с программой и забрать материалы можно через нашего Telegram-бота: https://t.me/MyMarketingAndPrBot?start=hotel \\n\\nПодать официальную заявку на обучение можно здесь: https://survey.zohopublic.com/zs/jQCZao 📝 \\n\\nЧтобы мы помогли вам с регистрацией и ответили на все вопросы, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"23:54\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: переподготовка гидов — 5 500 000 сум (4 месяца, диплом и профессиональный бейдж), повышение квалификации гидов, курсы турагентств и туроператоров — по 2 350 000 сум (1 месяц, официальный сертификат). Чтобы мы помогли вам выбрать подходящий курс и зарегистрироваться, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"23:54\"}, {\"role\": \"user\", \"text\": \"Mehmonxona\", \"time\": \"23:55\"}, {\"role\": \"assistant\", \"text\": \"Для сферы гостиничного бизнеса у нас есть отличная международная программа «Hotel Operations and Innovation 2026–2027», организованная совместно с UN Tourism для руководителей и менеджеров отелей! Также на нашей официальной платформе https://tourism-edu.uz доступны дистанционные онлайн-курсы по направлениям Front Office и Housekeeping с выдачей официального сертификата. Подробную программу курса и PDF-материалы вы можете скачать через нашего Telegram-бота: https://t.me/MyMarketingAndPrBot?start=hotel или напрямую: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf, а подать заявку можно здесь: https://survey.zohopublic.com/zs/jQCZao 📄 \\n\\nЧтобы мы помогли вам с регистрацией, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"23:55\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! «Hotel Operations and Innovation» yo'nalishimiz bo'yicha barcha savollaringizga javob berishdan va ro'yxatdan o'tishda yordam berishdan mamnun bo'lardik. 😊 Buning uchun telefon raqamingizni yozib qoldirsangiz, mutaxassislarimiz qisqa fursatda siz bilan bog'lanishadi!\", \"time\": \"00:27\"}, {\"role\": \"user\", \"text\": \"Instagramdan malumot berishni iloji bormi hozirgi vaqtda Uzbekistonda emasman\", \"time\": \"07:11\"}, {\"role\": \"assistant\", \"text\": \"Да, конечно! Вы можете пройти обучение дистанционно через нашу официальную платформу https://tourism-edu.uz, где доступны онлайн-курсы по направлениям Front Office и Housekeeping с получением официального сертификата. А для престижной программы «Hotel Operations and Innovation» вы можете подробно ознакомиться с материалами и подать заявку онлайн по ссылке: https://survey.zohopublic.com/zs/jQCZao 📄 \\n\\nЧтобы мы помогли вам с регистрацией и ответили на все вопросы, пожалуйста, оставьте ваше имя и номер телефона 😊\\n\\n📄 Dasturning to'liq PDF faylini (27 sahifalik o'quv rejasi) Telegram orqali yuklab olishingiz mumkin:\\n👉 https://t.me/MyMarketingAndPrBot?start=hotel\\n\\n📥 Brauzerda to'g'ridan-to'g'ri yuklab olish:\\nhttps://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\\n\\n📝 Ro'yxatdan o'tish (Zoho ariza):\\nhttps://survey.zohopublic.com/zs/jQCZao\", \"time\": \"07:12\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 46,
@@ -429,7 +446,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Video ostida qoldirgan ijobiy izohingiz uchun tashakkur 😊 \\n\\nUN Tourism va Xalqaro Turizm Akademiyasi hamkorligidagi nufuzli «Hotel Operations and Innovation 2026–2027» mehmonxona menejerlari uchun qayta tayyorlash dasturimizga qiziqish bildirganingizdan xursandmiz.\\n\\nBatafsil o'quv dasturi, modullar, dars jadvali va narxlar haqida to'liq ma'lumotni to'g'ridan-to'g'ri Directga yuborishimiz uchun ismingiz va telefon raqamingizni qoldirishingiz mumkin 👇\", \"time\": \"03:37\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 47,
@@ -453,7 +471,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно инфа насчёт обучение\", \"time\": \"18:14\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Международная туристская академия (Самаркандский кампус) предлагает профессиональные курсы: переподготовка гидов (4 месяца, 5 500 000 сум, диплом и бейдж), повышение квалификации гидов (1 месяц, 2 350 000 сум), а также курсы турагента и туроператора (по 1 месяцу, 2 350 000 сум). Кроме того, у нас действует онлайн-платформа https://tourism-edu.uz с курсами по гостиничному делу. \\n\\nЧтобы мы могли проконсультировать вас подробнее и помочь с выбором курса, пожалуйста, укажите ваше имя и номер телефона 😊\", \"time\": \"18:15\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! <3, подскажите, хотели бы вы продолжить выбор курса? Оставьте, пожалуйста, ваш номер телефона, и мы с радостью отправим вам подробную учебную программу! 😊\", \"time\": \"18:47\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 48,
@@ -477,7 +496,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum Azimjon! Izohingiz uchun katta rahmat 🔥 \\nMehmonxona boshqaruvi va turizm sohasidagi kurslarimiz, dars jadvali hamda narxlar haqida to'liq ma'lumotni shu yerda yuborishimiz uchun ismingiz va telefon raqamingizni qoldirsangiz, mutaxassislarimiz tez orada siz bilan bog'lanishadi 😊\", \"time\": \"18:06\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 49,
@@ -501,7 +521,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Здравствуйте, @sardor.sukhrobovich! Спасибо за интерес к нашему видео. 😊\\n\\nЧтобы мы могли отправить вам подробную учебную программу и условия поступления, пожалуйста, напишите ваше имя:\", \"time\": \"17:12\"}, {\"role\": \"user\", \"text\": \"Здрасьте\", \"time\": \"17:12\"}, {\"role\": \"user\", \"text\": \"Сардор\", \"time\": \"17:12\"}, {\"role\": \"assistant\", \"text\": \"Сардор, очень приятно! Программа «Hotel Operations and Innovation 2026–2027» от UN Tourism и нашей Академии включает 7 модулей для руководителей отелей. Вы можете ознакомиться с подробной программой в PDF по ссылке https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf или через нашего бота https://t.me/MyMarketingAndPrBot?start=hotel, а подать заявку можно здесь: https://survey.zohopublic.com/zs/jQCZao. Чтобы мы могли связаться с вами для консультации и регистрации, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"17:13\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! «Hotel Operations and Innovation 2026–2027» — официальная международная программа переподготовки руководителей гостиничной сферы от UN Tourism и Самаркандского кампуса Международной академии туризма.\\n\\n📄 Программу курса (PDF, 27 страниц) вы можете скачать в Telegram:\\n👉 https://t.me/MyMarketingAndPrBot?start=hotel\\n\\n📥 Прямая ссылка на PDF:\\nhttps://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\\n\\n📝 Форма регистрации (Zoho):\\nhttps://survey.zohopublic.com/zs/jQCZao\\n\\nЧтобы забронировать за вами место, пожалуйста, оставьте ваше имя и контактный номер телефона 😊\", \"time\": \"17:13\"}, {\"role\": \"user\", \"text\": \"Можете сказать сколько стоит курс?\", \"time\": \"17:22\"}, {\"role\": \"assistant\", \"text\": \"Стоимость программы «Hotel Operations and Innovation 2026–2027» составляет 15 000 000 сумов. В эту сумму входит обучение по 7 модулям, все учебные материалы и получение международного сертификата от UN Tourism и Академии.\\n\\nПодробную программу в PDF можно скачать здесь: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf или через нашего бота: https://t.me/MyMarketingAndPrBot?start=hotel. Чтобы мы могли забронировать за вами место и помочь с регистрацией, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"17:22\"}, {\"role\": \"assistant\", \"text\": \"Сардор, курс стоимостью 15 млн сумов включает все 7 модулей и международный сертификат. Скажите, на какой номер телефона вам удобнее принять наш звонок, чтобы мы могли забронировать за вами место? 😊\", \"time\": \"17:56\"}, {\"role\": \"user\", \"text\": \"Дайте подумать\", \"time\": \"18:00\"}, {\"role\": \"assistant\", \"text\": \"Конечно, Сардор! Подумайте спокойно, вся подробная информация и программа курса есть в нашем Telegram-боте https://t.me/MyMarketingAndPrBot?start=hotel и в PDF-файле https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf. Если у вас возникнут вопросы или решите подать заявку, просто напишите нам, и мы с радостью поможем 😊\", \"time\": \"18:01\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 50,
@@ -525,7 +546,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"16:16\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: программа переподготовки гидов-экскурсоводов стоит 5 500 000 сум (4 месяца, с дипломом и бейджем), а курсы турагентств, туроператоров или повышения квалификации гидов — 2 350 000 сум (1 месяц, с сертификатом). Также у нас есть официальная онлайн-платформа https://tourism-edu.uz для дистанционного обучения. Чтобы мы помогли вам выбрать подходящий курс и забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"16:16\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Мукаддасой Талатовна! Если у вас еще остались вопросы по обучению, я с радостью на них отвечу и помогу подобрать подходящий курс. Пожалуйста, оставьте ваш номер телефона, чтобы мы могли отправить вам подробную учебную программу 😊\", \"time\": \"16:46\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 28,
@@ -549,7 +571,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"09:56\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Санжар! Стоимость наших курсов зависит от выбранного направления: курс переподготовки гидов-экскурсоводов (4 месяца, с дипломом и официальным бейджем) стоит 5 500 000 сумов, а повышение квалификации гидов, курсы турагентств и туроператоров (по 1 месяцу) — по 2 350 000 сумов каждый. Чтобы мы могли забронировать за вами место или отправить подробную программу, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"09:56\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Санжар! 😊 Будем рады помочь вам определиться с выбором направления и ответить на любые вопросы. Пожалуйста, оставьте ваш номер телефона, чтобы мы могли отправить вам подробную программу обучения и забронировать за вами место!\", \"time\": \"10:31\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-23T10:31:09.825675"
+    "last_followup_at": "2026-10-23T10:31:09.825675",
+    "ai_paused": 0
   },
   {
     "id": 27,
@@ -573,7 +596,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"09:24\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! У нас есть несколько профессиональных курсов: 4-месячный курс переподготовки на гида-экскурсовода (5 500 000 сум, включает диплом и бейдж гида для работы по всему Узбекистану), 1-месячные курсы повышения квалификации для гидов, а также курсы турагентства и туроператора (каждый по 2 350 000 сум с выдачей сертификата). \\n\\nЧтобы мы могли отправить вам подробную программу и помочь выбрать подходящее направление, пожалуйста, укажите ваше имя и контактный номер телефона 😊\", \"time\": \"09:24\"}, {\"role\": \"user\", \"text\": \"Я сама обучалась в Туризме и сейчас рпботаю в отеле хочу работать\", \"time\": \"09:25\"}, {\"role\": \"assistant\", \"text\": \"Отлично! С вашим опытом в сфере туризма и работы в отеле идеально подойдет курс переподготовки гидов-экскурсоводов (4 месяца, 5 500 000 сум — диплом и бейдж для работы по всему Узбекистану) или курсы турагентства / туроператора (1 месяц, 2 350 000 сум — сертификат). Также для вас будут интересны наши онлайн-курсы по управлению отелями на платформе https://tourism-edu.uz. \\n\\nЧтобы мы могли отправить вам подробную программу обучения и помочь подобрать лучший вариант, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"09:25\"}, {\"role\": \"assistant\", \"text\": \"Райхона, мы будем рады помочь вам развиваться в сфере туризма и дальше! Пожалуйста, оставьте ваш номер телефона, и мы с удовольствием отправим вам подробную программу обучения. 😊\", \"time\": \"09:55\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-23T09:55:44.451134"
+    "last_followup_at": "2026-10-23T09:55:44.451134",
+    "ai_paused": 0
   },
   {
     "id": 26,
@@ -597,7 +621,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Katta rahmat 🙏\", \"time\": \"08:17\"}, {\"role\": \"assistant\", \"text\": \"Arzimaydi, Nigin Murad! Biz doimo sizga yordam berishdan mamnunmiz 😊. \\n\\nAkademiyamiz kurslari yoki onlayn platformamiz bo'yicha boshqa savollaringiz bormi?\", \"time\": \"08:17\"}, {\"role\": \"assistant\", \"text\": \"Nigin Murad, agar vaqti kelib qulay bo'lsa, siz bilan tezroq bog'lanishimiz va barcha savollaringizga qulay tarzda javob berishimiz uchun telefon raqamingizni yozib qoldirishingiz mumkinmi? 😊\", \"time\": \"08:50\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-23T08:50:13.582259"
+    "last_followup_at": "2026-10-23T08:50:13.582259",
+    "ai_paused": 0
   },
   {
     "id": 51,
@@ -621,7 +646,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"07:29\"}, {\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"07:29\"}, {\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"07:29\"}, {\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"07:29\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: \\n\\n• Курс переподготовки гидов (4 месяца, с дипломом и официальным бейджем) — 5 500 000 сум;\\n• Повышение квалификации гидов (1 месяц) — 2 350 000 сум;\\n• Курс турагентства (1 месяц) — 2 350 000 сум;\\n• Курс туроператорства (1 месяц) — 2 350 000 сум.\\n\\nЧтобы мы могли подробнее рассказать о программе и записать вас на курс, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"07:29\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! В Международной академии туризма (Самаркандский кампус) стоимость и длительность курсов зависят от выбранного направления: \\n\\n• Курс переподготовки гидов-экскурсоводов (4 месяца, диплом + профессиональный бейдж для работы по всему Узбекистану) — 5 500 000 сум;\\n• Повышение квалификации гидов (1 месяц) — 2 350 000 сум;\\n• Курс турагентства или туроператора (1 месяц, сертификат) — 2 350 000 сум.\\n\\nТакже у нас есть официальная онлайн-платформа https://tourism-edu.uz, где можно дистанционно обучиться направлениям Front Office и Housekeeping. Чтобы мы помогли вам записаться на курс или отправить подробную программу, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"07:29\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! У нас есть несколько востребованных направлений: 4-месячный курс переподготовки на гида-экскурсовода (дает право легально работать по всему Узбекистану, стоимость 5 500 000 сум), а также месячные курсы для турагентов, туроператоров и курс повышения квалификации гидов (стоимость каждого — 2 350 000 сум). Кроме того, на нашей официальной платформе https://tourism-edu.uz можно дистанционно пройти онлайн-курсы по направлениям Front Office и Housekeeping. Чтобы мы могли отправить вам подробную программу обучения и помочь с выбором, пожалуйста, укажите ваше имя и номер телефона 😊\", \"time\": \"07:30\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! У нас есть несколько профессиональных направлений: 4-месячный курс переподготовки гидов (стоимость 5 500 000 сум, выдается диплом и профессиональный бейдж) и 1-месячные курсы турагентства, туроператорства или повышения квалификации гидов (стоимость каждого 2 350 000 сум с выдачей официального сертификата). Также работают онлайн-курсы на платформе https://tourism-edu.uz. Чтобы мы могли отправить вам подробную программу и помочь с регистрацией, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"07:30\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 52,
@@ -645,7 +671,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Можно узнать программу курса?\", \"time\": \"05:49\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Конечно, с радостью расскажу о наших программах. \\n\\nВ Международной туристской академии (Самаркандский кампус) открыт набор на несколько направлений: 4-месячный курс переподготовки на гида-экскурсовода (5 500 000 сум, выдается диплом и профессиональный бейдж для работы по всему Узбекистану), 1-месячные курсы повышения квалификации гидов (2 350 000 сум), а также курсы турагентства и туроператора (по 1 месяцу, стоимость каждого 2 350 000 сум, с выдачей сертификата). Также у нас есть официальная онлайн-платформа https://tourism-edu.uz для дистанционного обучения. \\n\\nЧтобы мы отправили вам полную программу обучения и помогли зарегистрироваться на курс, пожалуйста, укажите ваш номер телефона 😊\", \"time\": \"05:49\"}, {\"role\": \"user\", \"text\": \"Спасибо 👍\", \"time\": \"05:55\"}, {\"role\": \"assistant\", \"text\": \"Пожалуйста! Если у вас возникнут любые вопросы по поводу курсов, стоимости или графика занятий, я всегда на связи. \\n\\nЧтобы мы могли отправить вам подробную программу обучения и помочь с записью, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"05:55\"}, {\"role\": \"assistant\", \"text\": \"Ибрагим, если вы хотите получить подробную программу курса или у вас остались вопросы, просто оставьте свой номер телефона, и я с радость вам всё отправлю! 😊 Будем рады видеть вас среди наших студентов!\", \"time\": \"06:27\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 53,
@@ -669,7 +696,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Dilnoza! Video ostida qoldirgan ijobiy izohingiz uchun katta rahmat! \\n\\n«Hotel Operations and Innovation 2026–2027» hamda mehmonxona xo'jaligi va boshqa kurslarimiz bo'yicha batafsil o'quv dasturi, dars jadvali va narxlarni sizga to'liq taqdim etishimiz uchun iltimos, o'z ismingiz va telefon raqamingizni yozib qoldiring 😊\", \"time\": \"06:41\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 54,
@@ -693,7 +721,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Izohingiz uchun katta rahmat. \\n\\nXalqaro Turizm Akademiyasining «Hotel Operations and Innovation» hamda mehmonxona boshqaruvi yo'nalishidagi boshqa o'quv dasturlarimiz, dars jadvali va narxlari haqida to'liq ma'lumotni shaxsiy xabaringizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"04:32\"}, {\"role\": \"assistant\", \"text\": \"Shohruhbek, assalomu alaykum! Mehmonxona boshqaruvi yo'nalishimiz sizga manzur bo'lganidan xursandmiz, barcha batafsil ma'lumotlarni yuborishimiz uchun telefon raqamingizni yozib qoldirishingizni iltimos qilgan bo'lardim 😊\", \"time\": \"05:07\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 55,
@@ -717,7 +746,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Salom kurslar bormi\", \"time\": \"04:29\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Ha, albatta, Xalqaro Turizm Akademiyasi Samarqand kampusida gid-ekskursiyachilar uchun qayta tayyorlash va malaka oshirish, shuningdek, turoperatorlik va turagentlik yo'nalishlari bo'yicha qabul boshlangan. Kurslar 1 oydan 4 oygacha davom etib, yakunda rasmiy diplom yoki sertifikat hamda professional beyjik beriladi. Kurslarga ro'yxatdan o'tish yoki batafsil ma'lumot olish uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"04:29\"}, {\"role\": \"assistant\", \"text\": \"A., assalomu alaykum! Kurslarimiz va bo'sh joylarimiz haqida batafsil ma'lumot berib yuborishim uchun telefon raqamingizni yozib qoldira olasizmi? 😊\", \"time\": \"05:02\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 25,
@@ -741,7 +771,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"03:49\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Стоимость обучения зависит от выбранного курса: программа переподготовки гидов-экскурсоводов стоит 5 500 000 сум (4 месяца, диплом и профессиональный бейдж), а курсы повышения квалификации гидов, турагентства или туроператора — по 2 350 000 сум (1 месяц, сертификат). Чтобы мы могли подробно проконсультировать вас и помочь с записью на курс, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"03:49\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-23T10:36:26.063834"
+    "last_followup_at": "2026-10-23T10:36:26.063834",
+    "ai_paused": 0
   },
   {
     "id": 24,
@@ -765,7 +796,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"01:37\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Добро пожаловать в Самаркандский кампус Международной академии туризма. 😊\\n\\nЧтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона:\", \"time\": \"01:37\"}, {\"role\": \"assistant\", \"text\": \"Noila, здравствуйте! 😊 Мы бы очень хотели продолжить наше общение и отправить вам подробную учебную программу вместе с актуальной стоимостью обучения. Пожалуйста, оставьте ваш номер телефона, чтобы наш специалист мог связаться с вами и ответить на все вопросы!\", \"time\": \"02:12\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-23T02:12:07.245615"
+    "last_followup_at": "2026-10-23T02:12:07.245615",
+    "ai_paused": 0
   },
   {
     "id": 23,
@@ -789,7 +821,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Расскажите подробнее о вашей компании.\", \"time\": \"21:21\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Добro пожаловать в Международную академию туризма (Самаркандский кампус), созданную при поддержке UN Tourism. Мы готовим востребованных специалистов в сфере туризма и гостеприимства, предлагая курсы по переподготовке гидов, туроператорской и турагентской деятельности, а также дистанционное обучение на нашей официальной платформе https://tourism-edu.uz. Чтобы мы могли отправить вам подробную информацию о курсах и помочь с выбором, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"21:21\"}, {\"role\": \"user\", \"text\": \"[Video izohi]: 🔥\", \"time\": \"21:21\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Video ostida qoldirgan iliq munosabatingiz uchun katta rahmat! 😊 \\n\\nXalqaro Turizm Akademiyasi Samarqand kampusining mehmonxona boshqaruvi va boshqa professional yo'nalishlardagi kurslarimiz, dars jadvali hamda narxlari haqida batafsil ma'lumotni to'g'ridan-to'g'ri sizga yuborishimiz uchun ismingiz va telefon raqamingizni yozib qoldirishingizni so'raymiz.\", \"time\": \"21:21\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Будем рады продолжить наше общение и помочь вам с выбором подходящей программы обучения. Пожалуйста, оставьте ваш номер телефона, чтобы мы могли отправить вам подробную учебную программу и ответить на все вопросы! 😊\", \"time\": \"21:52\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T21:52:02.490448"
+    "last_followup_at": "2026-10-22T21:52:02.490448",
+    "ai_paused": 0
   },
   {
     "id": 22,
@@ -813,7 +846,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"18:22\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, Xalqaro Turizm Akademiyasining barcha yo'nalishlari bo'yicha batafsil o'quv dasturlarimiz mavjud. Gid-ekskursiyachilik, turagentlik, turoperatorlik kurslari hamda https://tourism-edu.uz onlayn platformamizdagi masofaviy darslarimiz amaliy bilim va xalqaro standartlarga asoslangan. \\n\\nKurslarga ro'yxatdan o'tish yoki sizga mos dastur va narxlar haqida to'liq ma'lumot yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"18:22\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, 𝑆♕! 🙂 Kurslarimiz va siz uchun eng qulay shartlar haqida batafsil ma'lumot berib yuborishim uchun telefon raqamingizni yozib qoldira olasizmi?\", \"time\": \"18:56\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T18:56:56.024209"
+    "last_followup_at": "2026-10-22T18:56:56.024209",
+    "ai_paused": 0
   },
   {
     "id": 21,
@@ -837,7 +871,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"🎬 [Yuborilgan video / Reels]\", \"time\": \"17:45\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Yuborgan videongizni qabul qildik. 😊\\n\\nAkademiyamiz kurslari bo'yicha sizga qanday yordam bera olamiz? Sizni qaysi ta'lim yo'nalishi va ma'lumotlar qiziqtiryapti?\", \"time\": \"17:45\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! 😊 Videomiz sizga manzur bo'ldi degan umiddamiz. Savollaringizga yanada qulayroq javob berishimiz va kurslarimiz haqida batafsil ma'lumot ulashishimiz uchun telefon raqamingizni qoldirsangiz, mutaxassislarimiz tez fursatda siz bilan bog'lanishadi.\", \"time\": \"18:16\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T18:16:46.322286"
+    "last_followup_at": "2026-10-22T18:16:46.322286",
+    "ai_paused": 0
   },
   {
     "id": 20,
@@ -861,7 +896,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"17:18\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Abdulhay! \\n\\nAkademiyamizda turizm va mehmondo'stlik yo'nalishlari bo'yicha 4 oylik Gid-ekskursiyachi qayta tayyorlash (5 500 000 so'm, diplom va beyjik bilan), 1 oylik Gid malaka oshirish (2 350 000 so'm), shuningdek Turagentlik va Turoperatorlik kurslari (har biri 1 oy, 2 350 000 so'm) mavjud. Shuningdek, https://tourism-edu.uz rasmiy onlayn platformamizda Front Office va Housekeeping bo'yicha masofaviy o'qishingiz mumkin.\\n\\nSizni qaysi yo'nalish ko'proq qiziqtirmoqda? Batafsil o'quv dasturini yuborishimiz uchun telefon raqamingizni qoldirishingizni so'raymiz 😊\", \"time\": \"17:18\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Abdulhay! Kuningiz xayrli o'tsin! 😊 Oldingi suhbatimiz oxirigacha yetmay qolgan edi, o'quv dasturlarimiz vaqtida sizga qo'shimcha ma'lumotlar berib yuborishimiz uchun telefon raqamingizni yozib qoldira olasizmi?\", \"time\": \"17:51\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T17:51:41.879155"
+    "last_followup_at": "2026-10-22T17:51:41.879155",
+    "ai_paused": 0
   },
   {
     "id": 19,
@@ -885,7 +921,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"[Video izohi]: 👏\", \"time\": \"16:59\"}, {\"role\": \"assistant\", \"text\": \"Salom @jasminakadirova05! Videomizga bildirgan e'tiboringiz uchun tashakkur. 😊\\n\\nSiz so'ragan batafsil o'quv dasturi va qabul tafsilotlarini yuborishimiz uchun ismingizni yozib qoldiring:\", \"time\": \"16:59\"}, {\"role\": \"user\", \"text\": \"[Video izohi]: 👏\", \"time\": \"16:59\"}, {\"role\": \"assistant\", \"text\": \"Salom @jasminakadirova05! Videomizga bildirgan e'tiboringiz uchun tashakkur. 😊\\n\\nSiz so'ragan batafsil o'quv dasturi va qabul tafsilotlarini yuborishimiz uchun ismingizni yozib qoldiring:\", \"time\": \"16:59\"}, {\"role\": \"user\", \"text\": \"Jasmina\", \"time\": \"16:59\"}, {\"role\": \"assistant\", \"text\": \"Gid-ekskursiyachi qayta tayyorlash kursi 4 oy davom etadi va narxi 5 500 000 so'mni tashkil qiladi. Kursni muvaffaqiyatli tamomlaganingizdan so'ng, sizga rasmiy diplom va butun O'zbekiston bo'ylab ishlash huquqini beruvchi professional gid beyjigi taqdim etiladi.\\n\\nRo'yxatdan o'tish yoki batafsil o'quv dasturini yuborishimiz uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"16:59\"}, {\"role\": \"assistant\", \"text\": \"Salom! Boya Gid-ekskursiyachi kursi haqida ma'lumot so'ragan edingiz. Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? Sizga yordam berishdan mamnun bo'lamiz! 😊\", \"time\": \"17:31\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T17:31:33.847109"
+    "last_followup_at": "2026-10-22T17:31:33.847109",
+    "ai_paused": 0
   },
   {
     "id": 18,
@@ -909,7 +946,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Yuborgan videongizni qabul qildik. 😊\\n\\nAkademiyamiz kurslari bo'yicha sizga qanday yordam bera olamiz? Sizni qaysi ta'lim yo'nalishi va ma'lumotlar qiziqtiryapti?\", \"time\": \"16:20\"}, {\"role\": \"user\", \"text\": \"Tirnoq quyaman\", \"time\": \"16:20\"}, {\"role\": \"user\", \"text\": \"Quyay\", \"time\": \"16:21\"}, {\"role\": \"user\", \"text\": \"Nimaga\", \"time\": \"16:21\"}, {\"role\": \"user\", \"text\": \"Nimasi shuncha vaqtdan beri quyardimku\", \"time\": \"16:22\"}, {\"role\": \"user\", \"text\": \"Quygandim\", \"time\": \"16:23\"}, {\"role\": \"user\", \"text\": \"Shu uchun quyaman 😅\", \"time\": \"16:23\"}, {\"role\": \"user\", \"text\": \"Eee sizdan qoʻrqyapman man\", \"time\": \"16:24\"}, {\"role\": \"user\", \"text\": \"Haa\", \"time\": \"16:24\"}, {\"role\": \"user\", \"text\": \"Hazilashdim\", \"time\": \"16:25\"}, {\"role\": \"user\", \"text\": \"Quymayman hay\", \"time\": \"16:25\"}, {\"role\": \"user\", \"text\": \"Nima qilayapsiz\", \"time\": \"16:26\"}, {\"role\": \"user\", \"text\": \"...\", \"time\": \"16:27\"}, {\"role\": \"user\", \"text\": \"15 minutda oʻchirdiz boya koʻchaga edimda deb\", \"time\": \"16:28\"}, {\"role\": \"user\", \"text\": \"Haa bunga vaqt bor ish qilib 1,2 soatlab\", \"time\": \"16:28\"}, {\"role\": \"user\", \"text\": \"Ha\", \"time\": \"16:28\"}, {\"role\": \"user\", \"text\": \"Man bilan ham har zotga gaplashasizku\", \"time\": \"16:29\"}, {\"role\": \"user\", \"text\": \"Eee\", \"time\": \"16:29\"}, {\"role\": \"user\", \"text\": \"Ha\", \"time\": \"16:29\"}, {\"role\": \"assistant\", \"text\": \"Salom! Boya Umumiy haqida ma'lumot so'ragan edingiz. Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? Sizga yordam berishdan mamnun bo'lamiz! 😊\", \"time\": \"17:01\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T17:01:18.424270"
+    "last_followup_at": "2026-10-22T17:01:18.424270",
+    "ai_paused": 0
   },
   {
     "id": 17,
@@ -933,7 +971,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"[Video izohi]: Gid\", \"time\": \"16:17\"}, {\"role\": \"assistant\", \"text\": \"Salom @_umidovv__1! Videomizga bildirgan e'tiboringiz uchun tashakkur. 😊\\n\\nSiz so'ragan batafsil o'quv dasturi va qabul tafsilotlarini yuborishimiz uchun ismingizni yozib qoldiring:\", \"time\": \"16:17\"}, {\"role\": \"user\", \"text\": \"[Video izohi]: @ita_samarkand kelmadi, zaprosda ham yoʻq\", \"time\": \"16:22\"}, {\"role\": \"assistant\", \"text\": \"Salom @_umidovv__1! Videomizga bildirgan e'tiboringiz uchun tashakkur. 😊\\n\\nSiz so'ragan batafsil o'quv dasturi va qabul tafsilotlarini yuborishimiz uchun ismingizni yozib qoldiring:\", \"time\": \"16:22\"}, {\"role\": \"assistant\", \"text\": \"Salom! Boya «Xalqaro turizm akademiyasining “Professional gid-ekskursovod” kur...» haqida ma'lumot so'ragan edingiz. Dars jadvali va qabul shartlarini yuborishimiz uchun telefon raqamingizni qoldirishga ulgurmadingizmi? Sizga yordam berishdan mamnun bo'lamiz! 😊\", \"time\": \"16:56\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T16:56:03.959621"
+    "last_followup_at": "2026-10-22T16:56:03.959621",
+    "ai_paused": 0
   },
   {
     "id": 16,
@@ -957,7 +996,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"14:33\"}, {\"role\": \"assistant\", \"text\": \"Добрый день! Стоимость наших курсов зависит от выбранного направления: Переподготовка гидов (4 месяца, диплом и профессиональный бейдж) — 5 500 000 сум; Повышение квалификации гидов (1 месяц) — 2 350 000 сум; Турагентство (1 месяц) — 2 350 000 сум; Туроператорство (1 месяц) — 2 350 000 сум. Кроме того, на нашей официальной платформе https://tourism-edu.uz доступны дистанционные курсы Front Office и Housekeeping. Чтобы мы помогли вам выбрать курс и зарегистрироваться, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"14:33\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте! Вы интересовались нашими программами обучения. Чтобы мы могли прислать вам расписание занятий и забронировать место, пожалуйста, оставьте ваш номер телефона 😊\", \"time\": \"15:05\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T15:05:49.435646"
+    "last_followup_at": "2026-10-22T15:05:49.435646",
+    "ai_paused": 0
   },
   {
     "id": 15,
@@ -981,7 +1021,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Nechpul\", \"time\": \"14:14\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Akademiyamizdagi kurslar narxi yo'nalishiga qarab quyidagicha: Gidni qayta tayyorlash — 5 500 000 so'm (4 oy, diplom va beyjik beriladi), gidlar uchun malaka oshirish, turagentlik va turoperatorlik kurslari esa har biri 2 350 000 so'm (1 oy). Ro'yxatdan o'tish yoki batafsil ma'lumot olish uchun ismingiz va telefon raqamingizni qoldirishingiz mumkin 😊\", \"time\": \"14:14\"}, {\"role\": \"user\", \"text\": \"Menegerlikchi\", \"time\": \"14:15\"}, {\"role\": \"user\", \"text\": \"Hotelga\", \"time\": \"14:15\"}, {\"role\": \"assistant\", \"text\": \"Akademiyamizda turizm menejmenti yo'nalishi bo'yicha ham maxsus dasturlar mavjud bo'lib, ular sohani boshqarish va zamonaviy marketing ko'nikmalarini o'z ichiga oladi. Kurslarimiz haqida batafsil ma'lumot olish hamda ro'yxatdan o'tish uchun ismingiz va telefon raqamingizni qoldirishingizni so'raymiz, biz siz bilan bog'lanamiz 😊\", \"time\": \"14:15\"}, {\"role\": \"assistant\", \"text\": \"Mehmonxona boshqaruvi (Front Office va Housekeeping) bo‘yicha bizning https://\", \"time\": \"14:15\"}, {\"role\": \"assistant\", \"text\": \"Diyorbek, avvalgi xabarim oxirida biroz uzr, texnik sababga ko'ra to'xtab qolgan ekan 😊 Mehmonxona boshqaruvi bo'yicha barcha batafsil ma'lumotlarni va qulay vaqtlarni sizga to'g'ridan-to'g'ri yetkazishimiz uchun telefon raqamingizni qoldirib ketsangiz, mutaxassislarimiz tez fursatda bog'lanishadi!\", \"time\": \"14:50\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T14:50:38.826790"
+    "last_followup_at": "2026-10-22T14:50:38.826790",
+    "ai_paused": 0
   },
   {
     "id": 14,
@@ -1005,7 +1046,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs haqida malumot\", \"time\": \"14:09\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Dilshod! Xalqaro Turizm Akademiyasi Samarqand kampusining qabul kurslari haqida mamnuniyat bilan ma'lumot beraman. \\n\\nBizda gid-ekskursiyachi (4 oy — 5 500 000 so'm), turagentlik va turoperatorlik (1 oy — 2 350 000 so'm) hamda amaldagi gidlar uchun malaka oshirish kurslari faoliyat yuritmoqda. Shuningdek, https://tourism-edu.uz rasmiy platformamiz orqali Front Office va Housekeeping yo'nalishlarida masofadan (onlayn) o'qib, sertifikat olishingiz ham mumkin. \\n\\nKursga ro'yxatdan o'tish yoki batafsil ma'lumot olish uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"14:09\"}, {\"role\": \"assistant\", \"text\": \"Dilshodbek, assalomu alaykum! Kurslarimiz yoki dars jarayonlari bo'yicha boshqa savollaringiz bormi, o'zingizga qulay vaqtda bog'lanishimiz uchun telefon raqamingizni yozib qoldirsangiz, mutaxassislarimiz batafsil ma'lumot berishadi 😊\", \"time\": \"14:40\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T14:40:28.267532"
+    "last_followup_at": "2026-10-22T14:40:28.267532",
+    "ai_paused": 0
   },
   {
     "id": 13,
@@ -1029,7 +1071,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Rahmat\", \"time\": \"14:05\"}, {\"role\": \"assistant\", \"text\": \"Arzimaydi! Xalqaro Turizm Akademiyasi Samarqand kampusi kurslari bo'yicha yana qanday savollaringiz bor? \\n\\nKurslarga ro'yxatdan o'tish yoki batafsil ma'lumot olish uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"14:06\"}, {\"role\": \"assistant\", \"text\": \"Iskandar aka, vaqtingiz bo'lganda yozib yuboring, kurslarimiz haqida batafsil ma'lumot berish va joyingizni band qilish uchun telefon raqamingizni qoldirsangiz, o'zim siz bilan bog'lanaman 😊\", \"time\": \"14:40\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Iskandar! 😊\\n\\n«Hotel Operations and Innovation 2026–2027» xalqaro qayta tayyorlash dasturining to'liq 27 sahifalik rasmiy o'quv rejasini (PDF) hoziroq yuklab olishingiz mumkin:\\n\\n👉 Telegram bot orqali faylni olish:\\nhttps://t.me/MyMarketingAndPrBot?start=hotel\\n\\n📥 Brauzerda to'g'ridan-to'g'ri yuklab olish (PDF):\\nhttps://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\\n\\n📝 Rasmiy ro'yxatdan o'tish (Zoho ariza):\\nhttps://survey.zohopublic.com/zs/jQCZao\\n\\nSavollaringiz bo'lsa yoki kurs koordinatori bog'lanishini istasangiz, bemalol yozishingiz mumkin!\", \"time\": \"19:12\"}]",
     "followup_count": 1,
-    "last_followup_at": "2026-10-22T14:40:18.269997"
+    "last_followup_at": "2026-10-22T14:40:18.269997",
+    "ai_paused": 0
   },
   {
     "id": 56,
@@ -1053,7 +1096,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga qiziqish bildirganingiz uchun rahmat. Batafsil o'quv dasturi, dars jadvali va narxlarni sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"10:54\"}, {\"role\": \"assistant\", \"text\": \"Akademiyamizda turizm, mehmonxona boshqaruvi, gidlik va restoran ishi yo'nalishlarida zamonaviy onlayn va amaliy kurslar yo'lga qo'yilgan. O'qishni muvaffaqiyatli tamomlaganlarga davlat namunasidagi va xalqaro sertifikatlar beriladi. \\n\\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"10:56\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Jasur! Albatta, bizda turizm va mehmondo'stlik yo'nalishlari bo'yicha xalqaro standartlarga asoslangan zamonaviy o'quv dasturlari mavjud.\\n\\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, telefon raqamingizni qoldiring 😊\", \"time\": \"04:12\"}, {\"role\": \"assistant\", \"text\": \"Jasur, o‘quv dasturimiz sizda qiziqish uyg‘otganidan juda xursandmiz, barcha ma’lumotlarni qulay tarzda yetkazishimiz uchun telefon raqamingizni yozib yubora olasizmi? Mutaxassisimiz sizga dars rejasini mamnuniyat bilan taqdim etadi 😊\", \"time\": \"04:43\"}, {\"role\": \"user\", \"text\": \"Assalomu alaykum\", \"time\": \"12:30\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusining rasmiy virtual maslahatchisiman. Sizga qaysi kursimiz — gid-ekskursiyachilik, turagentlik, turoperatorlik yoki onlayn platformadagi mehmonxona boshqaruvi yo'nalishlari qiziqtiryapti?\\n\\nKurslarimiz narxlari va batafsil ma'lumotlarni yuborishimiz uchun, iltimos, bog'lanish uchun telefon raqamingizni qoldiring 😊\", \"time\": \"12:30\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 57,
@@ -1077,7 +1121,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Расскажите подробнее о вашей компании.\", \"time\": \"10:33\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Asadbek! Международная академия туризма в Самарканде создана на основе постановления Президента Республики Узбекистан (ПҚ-350) при поддержке Комитета по туризму и предоставляет современные программы переподготовки и повышения квалификации в сфере туризма и гостеприимства. Наши учебные направления включают гостиничный менеджмент, гид-сопровождение, ресторанное дело, туроператорские услуги и цифровой маркетинг в туризме, а по окончании обучения выдаются официальные государственные и международные сертификаты. Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"10:33\"}, {\"role\": \"assistant\", \"text\": \"Mehmonxona boshqaruvi yo'nalishi bo'yicha qiziqish bildirganingizdan xursandmiz! Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"10:33\"}, {\"role\": \"assistant\", \"text\": \"Asadbek, если у вас еще остались вопросы по программе гостиничного менеджмента, мы с радостью на них ответим! Пожалуйста, оставьте свой номер телефона, чтобы мы могли отправить вам подробную учебную программу и всю информацию об обучении 😊\", \"time\": \"11:06\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 58,
@@ -1101,7 +1146,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"09:59\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, bizda gid-ekskursovodlar, mehmonxona va restoran boshqaruvi, turoperatorlik hamda turizm menejmenti yo'nalishlari bo'yicha zamonaviy kurslar mavjud. Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"09:59\"}, {\"role\": \"assistant\", \"text\": \"Raykhona, assalomu alaykum! Kurslarimiz sizni ham qiziqtirib qoldi shekilli, batafsil ma'lumotlarni yuborishimiz uchun telefon raqamingizni yozib qoldira olasizmi? 😊\", \"time\": \"10:31\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 59,
@@ -1125,7 +1171,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"ostonov maruf 934753599\", \"time\": \"07:13\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 60,
@@ -1149,7 +1196,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"07:05\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, akademiyamizda gid-eks时候rsovodlar, mehmonxona xo'jaligi, turoperatorlik, restoran ishi va turizm menejmenti kabi zamonaviy yo'nalishlar bo'yicha qisqa muddatli va chuqurlashtirilgan o'quv dasturlari mavjud. Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"07:05\"}, {\"role\": \"user\", \"text\": \"Rabbimov Bekzod\\n+998507056762\", \"time\": \"07:06\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 61,
@@ -1173,7 +1221,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz. 😊\\n\\nSizni qiziqtirgan barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot, o'quv dasturi hamda narxlarni taqdim etishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring:\", \"time\": \"15:13\"}, {\"role\": \"assistant\", \"text\": \"Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:\", \"time\": \"15:14\"}, {\"role\": \"assistant\", \"text\": \"Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:\", \"time\": \"15:15\"}, {\"role\": \"assistant\", \"text\": \"Turizm va mehmondo'stlik yo'nalishimiz bo'yicha batafsil ma'lumot, o'quv dasturi va narxlarni sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"15:15\"}, {\"role\": \"assistant\", \"text\": \"We can certainly communicate in English! To send you detailed information about our courses, schedule, and prices, please leave your name and phone number 😊\", \"time\": \"15:15\"}, {\"role\": \"assistant\", \"text\": \"Turizm va mehmondo'stlik yo'nalishimiz bo'yicha batafsil ma'lumot, o'quv dasturi va narxlarni sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"15:15\"}, {\"role\": \"assistant\", \"text\": \"Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:\", \"time\": \"15:16\"}, {\"role\": \"assistant\", \"text\": \"Akademiyamizda turizm va mehmondo'stlik yo'nalishida yuqori malakali mutaxassislar tayyorlanadi. Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"15:17\"}, {\"role\": \"assistant\", \"text\": \"Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:\", \"time\": \"15:17\"}, {\"role\": \"assistant\", \"text\": \"Ovozli xabaringizni qabul qildik! 😊 Sizni qiziqtirgan kurs bo'yicha batafsil ma'lumot va narxlarni yuborishimiz uchun telefon raqamingizni qoldiring:\", \"time\": \"15:19\"}, {\"role\": \"assistant\", \"text\": \"Akademiyamizda turizm va mehmondo'stlik bo'yicha gid-ekskursovodlar, mehmonxona xo'jaligi, restoran ishi hamda turoperatorlik yo'nalishlarida zamonaviy kurslar mavjud. Batafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"15:20\"}, {\"role\": \"assistant\", \"text\": \"We are glad that you are interested in our academy! Please leave your name and phone number so that we can send you detailed information about the courses, prices, and schedule 😊\", \"time\": \"15:20\"}, {\"role\": \"assistant\", \"text\": \"We offer professional hotel operation and management courses following international standards. Please leave your name and phone number so we can send you the detailed curriculum and pricing 😊\", \"time\": \"15:34\"}, {\"role\": \"user\", \"text\": \"Thanks\", \"time\": \"15:35\"}, {\"role\": \"assistant\", \"text\": \"You're very welcome! If you have any further questions about our hotel management courses or anything else, feel free to ask. To send you the detailed curriculum, schedule, and tuition fees, please leave your name and phone number 😊\", \"time\": \"15:35\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 12,
@@ -1197,7 +1246,8 @@
     "manager_comment": "",
     "chat_history": "[]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 7,
@@ -1221,7 +1271,8 @@
     "manager_comment": "",
     "chat_history": "[]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 62,
@@ -1245,7 +1296,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"08:37\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, Xalqaro Turizm Akademiyasining Samarqand kampusida gidlar, mehmonxona va restoran boshqaruvi, turoperatorlik hamda zamonaviy turizm menejmenti yo'nalishlari bo'yicha amaliy kurslar faoliyat yuritadi. \\n\\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"08:37\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum, Ozodbek! Kurs dasturlarimiz va sizni qiziqtirgan barcha ma'lumotlarni to'liq taqdim etishimiz uchun telefon raqamingizni yozib qoldirishingizni iltimos qilardim, o'zingizga qulay vaqtda siz bilan bog'lanamiz 😊\", \"time\": \"09:12\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 4,
@@ -1269,7 +1321,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Kurs dasturi bilan tanishish mumkinmi?\", \"time\": \"08:37\"}, {\"role\": \"assistant\", \"text\": \"Assalomu alaykum! Albatta, Xalqaro Turizm Akademiyasining Samarqand kampusida gidlar, mehmonxona va restoran boshqaruvi, turoperatorlik hamda zamonaviy turizm menejmenti yo'nalishlari bo'yicha amaliy kurslar faoliyat yuritadi. \\n\\nBatafsil o'quv dasturi, qabul shartlari va dars jadvalini sizga yuborishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊\", \"time\": \"08:37\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 3,
@@ -1293,7 +1346,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Сколько стоит обучение?\", \"time\": \"08:21\"}, {\"role\": \"assistant\", \"text\": \"Здравствуйте, Lika! Стоимость обучения зависит от выбранного вами направления и формата занятий в Международной академии туризма (Самаркандский кампус). Чтобы мы могли отправить вам подробную учебную программу, расписание занятий и актуальную стоимость обучения, пожалуйста, оставьте ваше имя и номер телефона 😊\", \"time\": \"08:21\"}, {\"role\": \"user\", \"text\": \"+998886155141\", \"time\": \"08:22\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 1,
@@ -1317,7 +1371,8 @@
     "manager_comment": "",
     "chat_history": "[{\"role\": \"user\", \"text\": \"Hello\", \"time\": \"07:51\"}, {\"role\": \"assistant\", \"text\": \"Hello! Welcome to the International Tourism Academy - Samarkand Campus, established under Presidential Decree PQ-350. How can I assist you with our professional tourism and hospitality programs today?\", \"time\": \"07:51\"}, {\"role\": \"user\", \"text\": \"I need course\", \"time\": \"07:51\"}, {\"role\": \"assistant\", \"text\": \"We offer professional training in Tourist Guiding, Hotel Management, Tour Operations, Restaurant Service, and Tourism Management. To send you the detailed curriculum, schedule, and fees, please share your phone number 😊\", \"time\": \"07:51\"}]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 11,
@@ -1341,7 +1396,8 @@
     "manager_comment": "",
     "chat_history": "[]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 10,
@@ -1365,7 +1421,8 @@
     "manager_comment": "@shirin_yakubovna",
     "chat_history": "[]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   },
   {
     "id": 5,
@@ -1389,6 +1446,7 @@
     "manager_comment": "",
     "chat_history": "[]",
     "followup_count": 0,
-    "last_followup_at": ""
+    "last_followup_at": "",
+    "ai_paused": 0
   }
 ]
