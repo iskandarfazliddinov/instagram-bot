@@ -2434,12 +2434,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         const statusTitles = {{
-            'yangi': '⚪ Yangi Lid',
-            'jarayonda': '🟡 Jarayonda',
-            'boglandi': '🟢 Bog\'lanildi',
-            'oylanyapti': '💭 O\'ylayapti',
-            'zahira': '📦 Zahira (Keyingi oqim)',
-            'rad': '🔴 Rad / Ko\'tarmadi'
+            "yangi": "⚪ Yangi Lid",
+            "jarayonda": "🟡 Jarayonda",
+            "boglandi": "🟢 Bog'lanildi",
+            "oylanyapti": "💭 O'ylayapti",
+            "zahira": "📦 Zahira (Keyingi oqim)",
+            "rad": "🔴 Rad / Ko'tarmadi"
         }};
 
         function setViewMode(mode) {{
@@ -2566,13 +2566,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 }});
 
                 if (resp.ok) {{
-                    showToast('✅ Lid holati yangilandi: ' + (statusTitles[newStatus] || newStatus));
+                    showToast("✅ Lid holati yangilandi: " + (statusTitles[newStatus] || newStatus));
                 }} else {{
-                    showToast('⚠️ Holatni saqlashda xatolik yuz berdi');
+                    showToast("⚠️ Holatni saqlashda xatolik yuz berdi");
                 }}
             }} catch (err) {{
                 console.error('quickMoveLead error:', err);
-                showToast('⚠️ Server bilan bog\'lanishda xatolik');
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
             }}
         }}
 
