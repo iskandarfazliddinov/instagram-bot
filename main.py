@@ -1010,7 +1010,7 @@ def send_direct_message_from_crm(
     if res.get("error"):
         err_msg = str(res.get("error", "Noma'lum xatolik"))
         if "outside of allowed window" in err_msg.lower() or "2534027" in err_msg or "code 10" in err_msg:
-            err_msg = "Meta cheklovi: Mijoz oxirgi marta yozganiga 24 soatdan oshgan yoki 7 kunlik xizmat oynasi tugagan."
+            err_msg = "Meta cheklovi: Mijoz Directda hali javob qaytarmagan (Reels izohidan tushgan) yoki oxirgi yozganiga 24 soatdan oshgan."
         return JSONResponse({"success": False, "error": err_msg})
 
     manager_name = user.get("display_name", "Mutaxassis")

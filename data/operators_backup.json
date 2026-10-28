@@ -1,86 +1,86 @@
 [
   {
-    "id": 1,
+    "id": 3,
     "username": "baxodir",
+    "password_hash": "fe53ddf975e6edb17ccbba057f3ba22a24508ac4667bc50a4c5349f796bbd15d",
     "display_name": "Baxodir Xusanov",
     "phone": "",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.318325",
-    "last_login": "28.10.2026 09:49",
-    "allowed_directions": "gid_qayta,gid_malaka",
-    "password_hash": "fe53ddf975e6edb17ccbba057f3ba22a24508ac4667bc50a4c5349f796bbd15d"
+    "last_login": "27.10.2026 20:33",
+    "allowed_directions": "gid_qayta,gid_malaka"
   },
   {
-    "id": 2,
+    "id": 4,
     "username": "shohjahon",
+    "password_hash": "f53723583710c4d6cc914ef98d93685a58dc203a3ef6d3603398d0bccbbe0606",
     "display_name": "Shohjahon",
     "phone": "",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.319710",
     "last_login": "27.10.2026 20:33",
-    "allowed_directions": "hotel",
-    "password_hash": "f53723583710c4d6cc914ef98d93685a58dc203a3ef6d3603398d0bccbbe0606"
+    "allowed_directions": "hotel"
   },
   {
-    "id": 3,
+    "id": 5,
     "username": "sanjar",
+    "password_hash": "1375a85867d3bc58052334a86592f2b805cf93b8552a380eb6dd209b14bba931",
     "display_name": "Sanjar Jumanazarov",
     "phone": "",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.321218",
     "last_login": "27.10.2026 20:33",
-    "allowed_directions": "hotel",
-    "password_hash": "578174abf893d13ef7e4248bf4e9c9699d2a34b607c7230dd269f59897c4b0d2"
+    "allowed_directions": "hotel"
   },
   {
-    "id": 4,
+    "id": 6,
     "username": "shirin",
+    "password_hash": "9e7d8f43253d9eb4fd66510e5f33a1908b4f29b8bd96da32fac0e14ebd5ffe16",
     "display_name": "Shirin Yakubovna",
     "phone": "",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.322549",
-    "last_login": "28.10.2026 09:49",
-    "allowed_directions": "turagent,turoperator,narx,dastur,konsultatsiya,umumiy",
-    "password_hash": "9e7d8f43253d9eb4fd66510e5f33a1908b4f29b8bd96da32fac0e14ebd5ffe16"
+    "last_login": "27.10.2026 20:33",
+    "allowed_directions": "turagent,turoperator,narx,dastur,konsultatsiya,umumiy"
   },
   {
-    "id": 5,
+    "id": 7,
     "username": "iskandar",
+    "password_hash": "c80d3b1e10425b598c2067cec4172f75982bc48f7c74fdae55191124fd17e463",
     "display_name": "Iskandar",
     "phone": "",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.323541",
     "last_login": "27.10.2026 20:33",
-    "allowed_directions": "front_office",
-    "password_hash": "c80d3b1e10425b598c2067cec4172f75982bc48f7c74fdae55191124fd17e463"
+    "allowed_directions": "front_office"
   },
   {
-    "id": 6,
+    "id": 8,
     "username": "jasurraxmanov",
+    "password_hash": "7ce641787394c25b8c0f58bbfdfb545a9b795f7f7db9329f7aa04db49ef43fc1",
     "display_name": "Jasur Raxmanov",
     "phone": "",
     "role": "supervisor",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.324466",
-    "last_login": "28.10.2026 09:49",
-    "allowed_directions": "all",
-    "password_hash": "7ce641787394c25b8c0f58bbfdfb545a9b795f7f7db9329f7aa04db49ef43fc1"
+    "last_login": "27.10.2026 20:33",
+    "allowed_directions": "all"
   },
   {
-    "id": 7,
+    "id": 9,
     "username": "dilshod_narzikulov",
+    "password_hash": "4741d3ca5dc9137144cc62c684d6273979621ff3e079c05e651a110dce9884f0",
     "display_name": "Dilshod Narzikulov",
     "phone": "+998902120402",
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-28T07:47:23.265754",
     "last_login": "28.10.2026 07:54",
-    "allowed_directions": "all",
-    "password_hash": "4741d3ca5dc9137144cc62c684d6273979621ff3e079c05e651a110dce9884f0"
+    "allowed_directions": "all"
   }
 ]

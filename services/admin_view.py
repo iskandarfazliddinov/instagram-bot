@@ -2212,7 +2212,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="text-sm font-bold text-slate-900" id="chatModalClientName">Mijoz Ismi</h3>
-                            <span id="chatModalUsername" class="text-xs font-semibold text-pink-600 font-mono">@username</span>
+                            <a id="chatModalUsername" href="#" target="_blank" class="text-xs font-bold text-pink-600 hover:text-pink-700 hover:underline font-mono" title="Instagramda ochish">@username</a>
                         </div>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span id="chatModalCourseBadge" class="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">Yo'nalish: Front Office</span>
@@ -2221,6 +2221,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <a id="chatModalOpenIgBtn" href="#" target="_blank" class="text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-xs transition flex items-center gap-1 cursor-pointer" title="Ushbu mijozni to'g'ridan-to'g'ri Instagram ilovasida ochish">
+                        <span>📸 Instagram</span>
+                    </a>
                     <button type="button" id="chatModalToggleAiBtn" onclick="toggleClientAi()" class="text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer shadow-xs" title="AI javoblarini to'xtatish yoki qayta yoqish">
                         <!-- JS orqali to'ldiriladi -->
                     </button>
@@ -2599,6 +2602,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         let currentChatClientId = null;
         let currentChatAiPaused = false;
         let currentChatInstagramId = null;
+        let currentChatUsername = "";
 
         function escapeChatHtml(str) {{
             if (!str) return "";
@@ -2614,12 +2618,27 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             currentChatClientId = clientId;
             currentChatAiPaused = Boolean(Number(aiPaused) === 1);
             currentChatInstagramId = instagramId;
+            currentChatUsername = username || "";
 
             const nameEl = document.getElementById("chatModalClientName");
             if (nameEl) nameEl.textContent = clientName || "Mijoz";
 
             const userEl = document.getElementById("chatModalUsername");
-            if (userEl) userEl.textContent = username ? "@" + username : (instagramId ? "ID: " + instagramId : "");
+            if (userEl) {{
+                userEl.textContent = username ? "@" + username : (instagramId ? "ID: " + instagramId : "");
+                userEl.href = username ? "https://instagram.com/" + username : "#";
+                if (!username) userEl.removeAttribute("href");
+            }}
+
+            const igBtn = document.getElementById("chatModalOpenIgBtn");
+            if (igBtn) {{
+                if (username) {{
+                    igBtn.href = "https://instagram.com/" + username;
+                    igBtn.classList.remove("hidden");
+                }} else {{
+                    igBtn.classList.add("hidden");
+                }}
+            }}
 
             const courseEl = document.getElementById("chatModalCourseBadge");
             if (courseEl) courseEl.textContent = "Yo'nalish: " + (campaign || "Umumiy");
@@ -2829,7 +2848,20 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         box.scrollTop = box.scrollHeight;
                     }}
                 }} else {{
-                    alert("Xatolik: " + (data.error || "Xabarni yuborib bo'lmadi"));
+                    const err = data.error || "Xabarni yuborib bo'lmadi";
+                    if (err.includes("Meta cheklovi") || err.includes("24 soat") || err.includes("oynasi tugagan")) {{
+                        const igUrl = currentChatUsername ? ("https://instagram.com/" + currentChatUsername) : "";
+                        const openIg = confirm(
+                            "⚠️ " + err + "\\n\\n" +
+                            "💡 Yechim: Ushbu mijozga Instagram ilovasi orqali to'g'ridan-to'g'ri yozishingiz mumkin (ilovada 24 soatlik API cheklovi yo'q).\\n\\n" +
+                            (igUrl ? "Mijoz profilini Instagramda ochishni xohlaysizmi?" : "")
+                        );
+                        if (openIg && igUrl) {{
+                            window.open(igUrl, "_blank");
+                        }}
+                    }} else {{
+                        alert("Xatolik: " + err);
+                    }}
                 }}
             }} catch (err) {{
                 console.error("sendDirectMessage error:", err);
