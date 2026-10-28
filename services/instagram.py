@@ -509,6 +509,7 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
         sync_leads_backup
     )
 
+    from datetime import datetime, timedelta
     page_token = get_access_token()
     if not page_token:
         return {"ok": False, "error": "Token topilmadi"}
@@ -523,8 +524,12 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
         "access_token": page_token
     }
 
+    # Faqat so'nggi 14 kunlik (target yoqilgandan keyingi) suhbatlarni olish
+    cutoff_date = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    reached_cutoff = False
+
     pages_fetched = 0
-    while current_url and pages_fetched < max_pages:
+    while current_url and pages_fetched < max_pages and not reached_cutoff:
         try:
             r_conv = requests.get(current_url, params=params if pages_fetched == 0 else None, timeout=12)
             if r_conv.status_code != 200:
@@ -546,6 +551,10 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
                 break
             
             for th in batch:
+                up_time = (th.get("updated_time") or "")[:10]
+                if up_time and up_time < cutoff_date:
+                    reached_cutoff = True
+                    break
                 cid = th.get("id")
                 if cid and cid not in seen_conv_ids:
                     seen_conv_ids.add(cid)

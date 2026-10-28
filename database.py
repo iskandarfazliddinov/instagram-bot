@@ -470,6 +470,17 @@ def init_db():
         except Exception:
             pass
 
+    # Target davridan oldingi arxivlangan eski yozishmalarni tozalash (faqat target davridagi faol lidlar qoladi)
+    if os.path.exists(BACKUP_FILE):
+        try:
+            with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+                valid_ig_ids = [str(b.get("instagram_id")) for b in json.load(f) if b.get("instagram_id")]
+            if valid_ig_ids:
+                placeholders = ",".join(["?"] * len(valid_ig_ids))
+                cursor.execute(f"DELETE FROM clients WHERE instagram_id NOT IN ({placeholders}) AND (manager_name IS NULL OR manager_name = '' OR manager_name = '—')", valid_ig_ids)
+        except Exception:
+            pass
+
     # Operatorlarni zaxiradan tiklash (agar mavjud bo'lsa)
     if os.path.exists(OPERATORS_BACKUP_FILE):
         try:
@@ -504,7 +515,7 @@ def init_db():
                             phone = COALESCE(NULLIF(?, ''), phone),
                             role = ?,
                             is_active = COALESCE(?, is_active),
-                            allowed_directions = CASE WHEN (allowed_directions IS NOT NULL AND allowed_directions != '') THEN allowed_directions ELSE COALESCE(?, 'all') END,
+                            allowed_directions = COALESCE(NULLIF(?, ''), allowed_directions, 'all'),
                             password_hash = CASE WHEN (password_hash IS NOT NULL AND password_hash != '') THEN password_hash ELSE ? END
                         WHERE username = ?
                     """, (
