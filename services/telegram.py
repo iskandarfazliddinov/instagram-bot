@@ -28,10 +28,7 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
 
     status_icon = "⚪"
     status_label = "Yangi (Bog'lanish kutilmoqda ⏳)"
-    if status == "jarayonda":
-        status_icon = "🟡"
-        status_label = f"Aloqaga chiqilmoqda 📞\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Qabul qildi:</b> {manager_time}"
-    elif status == "boglandi":
+    if status in ["boglandi", "jarayonda"]:
         status_icon = "🟢"
         status_label = f"Muvaffaqiyatli bog'lanildi ✅\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
     elif status == "oylanyapti":
@@ -110,18 +107,7 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
         keyboard.append([
             {"text": "📦 Zahiraga qo'shish (Keyingi oqim)", "callback_data": f"reserve_{client_id}"}
         ])
-    elif status == "jarayonda":
-        keyboard.append([
-            {"text": "✅ Muvaffaqiyatli gaplashildi", "callback_data": f"done_{client_id}"}
-        ])
-        keyboard.append([
-            {"text": "🤔 O'ylayapti", "callback_data": f"thinking_{client_id}"},
-            {"text": "📦 Zahira", "callback_data": f"reserve_{client_id}"}
-        ])
-        keyboard.append([
-            {"text": "❌ Ko'tarmadi / Rad", "callback_data": f"reject_{client_id}"}
-        ])
-    elif status in ["boglandi", "rad", "oylanyapti", "zahira"]:
+    elif status in ["boglandi", "jarayonda", "rad", "oylanyapti", "zahira"]:
         keyboard.append([
             {"text": "🔄 Holatni o'zgartirish", "callback_data": f"claim_{client_id}"},
             {"text": "📦 Zahiraga olish", "callback_data": f"reserve_{client_id}"}
@@ -382,10 +368,10 @@ def handle_telegram_callback(update: dict):
 
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
     alert_text = "Holat yangilandi! ✅"
-    new_status = client.get("lead_status", "yangi") if client else "jarayonda"
+    new_status = client.get("lead_status", "yangi") if client else "boglandi"
 
     if action == "claim":
-        new_status = "jarayonda"
+        new_status = "boglandi"
         alert_text = f"Siz ushbu lidga mas'ul bo'ldingiz! 📞"
     elif action == "done":
         new_status = "boglandi"

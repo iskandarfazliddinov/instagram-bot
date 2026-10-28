@@ -115,12 +115,68 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         operators_filter_options_html += f'<option value="{d_name.lower()}">👤 {d_name}</option>'
 
     current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
+
+    from database import AVAILABLE_DIRECTIONS
+    dir_dict = {d["key"]: d for d in AVAILABLE_DIRECTIONS}
+
+    # Operator yo'nalishlari va filtrlash
+    op_allowed_dirs_raw = (current_user.get("allowed_directions") or "all").strip() if current_user else "all"
+    is_restricted_operator = (is_operator and op_allowed_dirs_raw != "all" and op_allowed_dirs_raw != "")
+    allowed_dirs_set = set([k.strip() for k in op_allowed_dirs_raw.split(",") if k.strip()]) if is_restricted_operator else set()
+
+    # Kurslar filtri (lead_filter_course) select variantlari
+    if is_restricted_operator:
+        course_filter_options_html = '<option value="all">📚 Mening biriktirilgan yo\'nalishlarim</option>'
+        for d in AVAILABLE_DIRECTIONS:
+            if d["key"] in allowed_dirs_set:
+                course_filter_options_html += f'<option value="{d["key"]}">{d["name"]}</option>'
+    else:
+        course_filter_options_html = '<option value="all">📚 Barcha yo\'nalishlar</option>'
+        for d in AVAILABLE_DIRECTIONS:
+            course_filter_options_html += f'<option value="{d["key"]}">{d["name"]}</option>'
+
+    # Xodim uchun yo'nalishlar xabarnomasi banneri
+    operator_directions_banner = ""
+    if is_restricted_operator:
+        b_pills = []
+        for k in op_allowed_dirs_raw.split(","):
+            k = k.strip()
+            if k in dir_dict:
+                b_pills.append(f'<span class="px-2 py-0.5 rounded-lg bg-purple-100 text-purple-800 font-bold border border-purple-200">{dir_dict[k]["short"]}</span>')
+        pills_html = " ".join(b_pills)
+        operator_directions_banner = f"""
+        <div class="mb-4 p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+            <div class="flex flex-wrap items-center gap-2 text-purple-950 font-bold">
+                <span class="text-base">🎯</span>
+                <span>Sizga biriktirilgan yo'nalishlar:</span>
+                <div class="flex flex-wrap gap-1.5">{pills_html}</div>
+            </div>
+            <span class="text-slate-500 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-purple-100">🔒 Faqat sizga tegishli lidlar ko'rsatilmoqda</span>
+        </div>
+        """
+
+    new_op_dir_checkboxes = ""
+    for d in AVAILABLE_DIRECTIONS:
+        new_op_dir_checkboxes += f"""
+        <label class="flex items-center gap-2 p-1.5 hover:bg-slate-100/70 rounded-lg cursor-pointer text-slate-700">
+            <input type="checkbox" name="directions" value="{d['key']}" class="new-op-dir-check rounded text-purple-600">
+            <span>{d['name']}</span>
+        </label>
+        """
+
+    modal_dir_checkboxes = ""
+    for d in AVAILABLE_DIRECTIONS:
+        modal_dir_checkboxes += f"""
+        <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer transition text-xs font-semibold text-slate-800">
+            <input type="checkbox" name="directions" value="{d['key']}" class="modal-dir-check w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+            <span class="truncate">{d['name']}</span>
+        </label>
+        """
     
     # ---------------- 1. LIDLAR ASOSIY HISOB-KITOBLARI ----------------
     total_leads = len(clients)
     new_leads = len([c for c in clients if c.get("lead_status") in ["yangi", None, ""]])
-    in_progress_leads = len([c for c in clients if c.get("lead_status") == "jarayonda"])
-    done_leads = len([c for c in clients if c.get("lead_status") == "boglandi"])
+    done_leads = len([c for c in clients if c.get("lead_status") in ["boglandi", "jarayonda"]])
     thinking_leads = len([c for c in clients if c.get("lead_status") == "oylanyapti"])
     reserve_leads = len([c for c in clients if c.get("lead_status") in ["zahira", "zaxira"]])
     rejected_leads = len([c for c in clients if c.get("lead_status") == "rad"])
@@ -244,7 +300,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 "today": 0,
                 "month": 0,
                 "boglandi": 0,
-                "jarayonda": 0,
                 "oylanyapti": 0,
                 "zahira": 0,
                 "rad": 0,
@@ -269,7 +324,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 "today": 0,
                 "month": 0,
                 "boglandi": 0,
-                "jarayonda": 0,
                 "oylanyapti": 0,
                 "zahira": 0,
                 "rad": 0,
@@ -306,6 +360,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         st = c.get("lead_status") or "yangi"
         if st in ["zahira", "zaxira"]:
             st = "zahira"
+        elif st == "jarayonda":
+            st = "boglandi"
         if st in manager_stats[m_key]:
             manager_stats[m_key][st] += 1
         else:
@@ -333,8 +389,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         m_name = m["name"]
         m_total = m["total"]
         m_done = m["boglandi"]
-        m_prog = m["jarayonda"]
         m_think = m["oylanyapti"]
+        m_zahira = m["zahira"]
         m_rad = m["rad"]
         m_comm = m["comments"]
         m_conv = round((m_done / m_total * 100), 1) if m_total > 0 else 0.0
@@ -359,10 +415,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{m_done}</span>
             </td>
             <td class="px-4 py-3.5 text-center">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">{m_prog}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700">{m_think}</span>
             </td>
             <td class="px-4 py-3.5 text-center">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700">{m_think}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">{m_zahira}</span>
             </td>
             <td class="px-4 py-3.5 text-center">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-rose-50 text-rose-700">{m_rad}</span>
@@ -453,7 +509,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     colspan_num = 9
     kanban_cards_dict = {
         "yangi": [],
-        "jarayonda": [],
         "boglandi": [],
         "oylanyapti": [],
         "zahira": [],
@@ -535,9 +590,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             last_msg_html = '<span class="text-xs text-slate-400">—</span>'
 
-        if lead_status == "jarayonda":
-            badge_html = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">🟡 Jarayonda</span>'
-        elif lead_status == "boglandi":
+        if lead_status in ["boglandi", "jarayonda"]:
             if is_suspicious:
                 badge_html = '<div class="flex flex-col gap-1 items-start"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">🟢 Bog\'lanildi</span><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse" title="Anti-Fraud: Telefon raqami ham, Direct yozishmasi ham yo\'q">⚠️ Shubhali</span></div>'
             else:
@@ -597,8 +650,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
                     <select name="status" onchange="this.form.submit()" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
                         <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                        <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
-                        <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'lanildi</option>
+                        <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
                         <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
                         <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                         <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
@@ -714,7 +766,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </tr>
         """
 
-        target_status = lead_status if lead_status in kanban_cards_dict else "yangi"
+        target_status = lead_status if lead_status in kanban_cards_dict else ("boglandi" if lead_status == "jarayonda" else "yangi")
 
         kanban_ai_or_msg = ""
         if ai_summary:
@@ -834,8 +886,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </button>
                 <select onchange="quickMoveLead('{client_id}', this.value)" class="text-[11px] py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-2xs" title="Boshqa ustunga ko'chirish">
                     <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                    <option value="jarayonda" {'selected' if lead_status=='jarayonda' else ''}>🟡 Jarayonda</option>
-                    <option value="boglandi" {'selected' if lead_status=='boglandi' else ''}>🟢 Bog'landi</option>
+                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'landi</option>
                     <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
                     <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                     <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
@@ -854,15 +905,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             "border": "border-slate-300",
             "header_bg": "bg-slate-100 text-slate-800 border border-slate-200",
             "badge_cls": "bg-slate-200 text-slate-800"
-        },
-        {
-            "status": "jarayonda",
-            "title": "Jarayonda",
-            "icon": "🟡",
-            "subtitle": "Aloqaga chiqilmoqda",
-            "border": "border-amber-300",
-            "header_bg": "bg-amber-100 text-amber-900 border border-amber-200",
-            "badge_cls": "bg-amber-200 text-amber-900"
         },
         {
             "status": "boglandi",
@@ -1346,10 +1388,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <span class="flex items-center gap-1 text-slate-600"><span class="w-2 h-2 rounded-full bg-slate-400"></span> Yangi:</span>
                             <span class="font-bold text-slate-800">{new_leads} ta</span>
                         </div>
-                        <div class="flex items-center justify-between p-1.5 bg-indigo-50 rounded-lg">
-                            <span class="flex items-center gap-1 text-indigo-700"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Jarayonda:</span>
-                            <span class="font-bold text-indigo-900">{in_progress_leads} ta</span>
-                        </div>
                         <div class="flex items-center justify-between p-1.5 bg-emerald-50 rounded-lg">
                             <span class="flex items-center gap-1 text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Bog'lanildi:</span>
                             <span class="font-bold text-emerald-900">{done_leads} ta</span>
@@ -1357,6 +1395,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <div class="flex items-center justify-between p-1.5 bg-amber-50 rounded-lg">
                             <span class="flex items-center gap-1 text-amber-700"><span class="w-2 h-2 rounded-full bg-amber-500"></span> O'ylayapti:</span>
                             <span class="font-bold text-amber-900">{thinking_leads} ta</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 bg-indigo-50 rounded-lg">
+                            <span class="flex items-center gap-1 text-indigo-700"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Zahira:</span>
+                            <span class="font-bold text-indigo-900">{reserve_leads} ta</span>
                         </div>
                     </div>
                 </div>
@@ -1421,8 +1463,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-5 py-3">Menejer / Xodim</th>
                                 <th class="px-4 py-3 text-center">Biriktirilgan Lidlar</th>
                                 <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
-                                <th class="px-4 py-3 text-center">🟡 Jarayonda</th>
                                 <th class="px-4 py-3 text-center">💭 O'ylayapti</th>
+                                <th class="px-4 py-3 text-center">📦 Zahira</th>
                                 <th class="px-4 py-3 text-center">🔴 Rad etildi</th>
                                 <th class="px-4 py-3 text-center">💬 Izohlar</th>
                                 <th class="px-5 py-3 text-right">Konversiya (%)</th>
@@ -1664,7 +1706,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     if not operators:
         operators_table_rows = """
         <tr>
-            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+            <td colspan="7" class="px-6 py-8 text-center text-slate-400">
                 Hozircha qo'shimcha operatorlar qo'shilmagan.
             </td>
         </tr>
@@ -1677,6 +1719,20 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         op_active = op.get("is_active", 1)
         op_last = op.get("last_login") or "Kirilmagan"
         op_leads_cnt = op_lead_counts.get(op_name, 0)
+        op_allowed = (op.get("allowed_directions") or "all").strip()
+
+        escaped_op_name = str(op_name).replace("'", "\\'")
+
+        # Yo'nalishlar nishonlari (badges)
+        if op_allowed == "all" or not op_allowed:
+            allowed_badges_html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">🌐 Barcha yo\'nalishlar</span>'
+        else:
+            badges = []
+            for k in op_allowed.split(","):
+                k = k.strip()
+                if k in dir_dict:
+                    badges.append(f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap shadow-2xs">{dir_dict[k]["short"]}</span>')
+            allowed_badges_html = f'<div class="flex flex-wrap gap-1 max-w-[240px]">{"".join(badges)}</div>' if badges else '<span class="text-xs text-slate-400 italic">Belgilanmagan</span>'
 
         status_pill = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">🟢 Faol</span>' if op_active else '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">🔴 Bloklangan</span>'
         toggle_label = "Bloklash" if op_active else "Faollashtirish"
@@ -1693,19 +1749,21 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
             </td>
-            <td class="px-4 py-3.5 text-xs font-medium text-slate-700">{op_phone}</td>
-            <td class="px-4 py-3.5 text-center">
+            <td class="px-4 py-3.5 text-xs font-medium text-slate-700 whitespace-nowrap">{op_phone}</td>
+            <td class="px-4 py-3.5">{allowed_badges_html}</td>
+            <td class="px-4 py-3.5 text-center whitespace-nowrap">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">{op_leads_cnt} ta lid</span>
             </td>
-            <td class="px-4 py-3.5 text-center">{status_pill}</td>
-            <td class="px-4 py-3.5 text-xs text-slate-500">{op_last}</td>
+            <td class="px-4 py-3.5 text-center whitespace-nowrap">{status_pill}</td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">{op_last}</td>
             <td class="px-5 py-3.5 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1.5">
-                    <button type="button" onclick="openPasswordChangeModal('{op_id}', '{op_name}', '{op_user}')" class="text-xs px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium transition cursor-pointer" title="Parolni o'zgartirish">🔑 Parol</button>
+                    <button type="button" onclick="openDirectionsModal('{op_id}', '{escaped_op_name}', '{op_allowed}')" class="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold transition cursor-pointer" title="Yo'nalishlarni biriktirish">🎯 Yo'nalishlar</button>
+                    <button type="button" onclick="openPasswordChangeModal('{op_id}', '{escaped_op_name}', '{op_user}')" class="text-xs px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium transition cursor-pointer" title="Parolni o'zgartirish">🔑 Parol</button>
                     <form method="POST" action="/admin/operators/{op_id}/toggle-status" class="inline">
                         <button type="submit" class="text-xs px-2.5 py-1 rounded-lg {toggle_btn_class} font-medium transition cursor-pointer">{toggle_label}</button>
                     </form>
-                    <form method="POST" action="/admin/operators/{op_id}/delete" onsubmit="return confirm('Haqiqatan ham {op_name} operatorini o\\'chirmoqchimisiz?')" class="inline">
+                    <form method="POST" action="/admin/operators/{op_id}/delete" onsubmit="return confirm('Haqiqatan ham {escaped_op_name} operatorini o\\'chirmoqchimisiz?')" class="inline">
                         <button type="submit" class="text-xs px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium transition cursor-pointer" title="O'chirish">🗑️</button>
                     </form>
                 </div>
@@ -1714,7 +1772,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         """
 
     op_table_col_class = "lg:col-span-2" if is_admin else "lg:col-span-3"
-    new_op_form_html = """
+    new_op_form_html = f"""
     <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div class="flex items-center gap-2 mb-3">
             <span class="text-2xl">➕</span>
@@ -1740,6 +1798,17 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Telefon raqami (ixtiyoriy)</label>
                 <input type="text" name="phone" placeholder="+998901234567" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Mas'ul Yo'nalishlar</label>
+                <div class="space-y-1 p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs max-h-36 overflow-y-auto">
+                    <label class="flex items-center gap-2 p-1 hover:bg-white rounded cursor-pointer font-bold text-purple-700">
+                        <input type="checkbox" name="directions" value="all" checked id="newOpAllDirsCheck" onchange="toggleNewOpDirs(this)">
+                        <span>🌐 Barchasi (Cheklanmagan)</span>
+                    </label>
+                    {new_op_dir_checkboxes}
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5">Xodimga faqat belgilangan yo'nalishdagi lidlar ko'rinadi</p>
             </div>
             <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition cursor-pointer">
                 ➕ Operatorni Saqlash
@@ -1775,6 +1844,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 bg-slate-50/70">
                                     <th class="px-5 py-3">Xodim</th>
                                     <th class="px-4 py-3">Telefon</th>
+                                    <th class="px-4 py-3">🎯 Biriktirilgan Yo'nalishlar</th>
                                     <th class="px-4 py-3 text-center">Lidlari</th>
                                     <th class="px-4 py-3 text-center">Holati</th>
                                     <th class="px-4 py-3">Oxirgi kirishi</th>
@@ -2201,7 +2271,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <label class="block text-xs font-bold text-slate-700 mb-1">🎯 Mijoz Holati (Status):</label>
                     <select name="status" id="modalStatusSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
                         <option value="yangi">⚪ Yangi (Bog'lanish kutilmoqda ⏳)</option>
-                        <option value="jarayonda">🟡 Jarayonda (Bog'lanilmoqda / Ma'lumot berildi)</option>
                         <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
                         <option value="oylanyapti">💭 O'ylayapti (Qaror qabul qilmoqda 🤔)</option>
                         <option value="zahira">📦 Zahira (Keyingi oqim / ochiladigan kurslar uchun 📦)</option>
@@ -2250,6 +2319,39 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <div class="flex items-center justify-end gap-2 pt-2">
                     <button type="button" onclick="closeOpPasswordModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">Bekor qilish</button>
                     <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition cursor-pointer">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mutaxassis Yo'nalishlarini Belgilash Modali -->
+    <div id="directionsModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🎯</span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900" id="dirsModalTitle">Mutaxassis Yo'nalishlari</h3>
+                        <p class="text-xs text-slate-500" id="dirsModalSubtitle">Xodimga faqat tanlangan yo'nalishdagi lidlar ko'rinadi</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeDirectionsModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition cursor-pointer">&times;</button>
+            </div>
+            <form method="POST" id="dirsForm" action="" class="space-y-4">
+                <div class="flex items-center justify-between text-xs pb-1">
+                    <span class="font-bold text-slate-700">Ruxsat etilgan kurslar:</span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="toggleAllModalDirections(true)" class="text-purple-600 hover:underline font-bold cursor-pointer">Barchasini belgilash</button>
+                        <span class="text-slate-300">|</span>
+                        <button type="button" onclick="toggleAllModalDirections(false)" class="text-slate-500 hover:underline font-bold cursor-pointer">Tozalash</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[340px] overflow-y-auto p-2 border border-slate-200/80 rounded-2xl bg-slate-50/50">
+                    {modal_dir_checkboxes}
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeDirectionsModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">Bekor qilish</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition cursor-pointer">💾 Saqlash</button>
                 </div>
             </form>
         </div>
@@ -2337,10 +2439,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="text-2xl sm:text-3xl font-extrabold text-slate-700">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">🟡 Jarayonda</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{in_progress_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
@@ -2352,7 +2450,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">📦 Zahira</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{reserve_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-rose-600 mb-1">🔴 Rad etildi</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-rose-600">{rejected_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
             </div>
+
+            {operator_directions_banner}
 
             <!-- Qidiruv va Filtrlash Paneli -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
@@ -2386,24 +2490,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="all">📋 Barcha holatlar</option>
                             <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
                             <option value="yangi">⚪ Yangi</option>
-                            <option value="jarayonda">🟡 Jarayonda</option>
                             <option value="boglandi">🟢 Bog'lanildi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
                             <option value="zahira">📦 Zahira (Keyingi oqim)</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
                         <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
-                            <option value="all">📚 Barcha yo'nalishlar</option>
-                            <option value="front_office">💻 Front Office (Onlayn)</option>
-                            <option value="hotel">🏨 Hotel Operations</option>
-                            <option value="gid_qayta">🌍 Gidlik (Qayta tayyorlash)</option>
-                            <option value="gid_malaka">🗺 Gidlik (Malaka oshirish)</option>
-                            <option value="turagent">✈️ Turagentlik</option>
-                            <option value="turoperator">✈️ Turoperatorlik</option>
-                            <option value="narx">💰 Kurslar narxi</option>
-                            <option value="dastur">📄 O'quv dasturi</option>
-                            <option value="konsultatsiya">💬 Batafsil konsultatsiya</option>
-                            <option value="umumiy">💬 Boshqa</option>
+                            {course_filter_options_html}
                         </select>
                         <select id="lead_filter_source" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
                             <option value="all">📍 Barcha manbalar</option>
@@ -2838,6 +2931,46 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             if (modal) modal.classList.add('hidden');
         }}
 
+        function openDirectionsModal(opId, opName, allowedDirs) {{
+            const form = document.getElementById('dirsForm');
+            const title = document.getElementById('dirsModalTitle');
+            const sub = document.getElementById('dirsModalSubtitle');
+            const modal = document.getElementById('directionsModal');
+            if (form) form.action = '/admin/operators/' + opId + '/update-directions';
+            if (title) title.textContent = opName + ' — Yo\\'nalishlar';
+            if (sub) sub.textContent = opName + ' uchun ko\\'rinadigan yo\\'nalishlarni belgilang';
+
+            const isAll = (!allowedDirs || allowedDirs === 'all' || allowedDirs === '');
+            const allowedList = isAll ? [] : allowedDirs.split(',').map(s => s.trim());
+            const checks = form ? form.querySelectorAll('.modal-dir-check') : [];
+            checks.forEach(ch => {{
+                ch.checked = isAll ? true : allowedList.includes(ch.value);
+            }});
+
+            if (modal) modal.classList.remove('hidden');
+        }}
+
+        function closeDirectionsModal() {{
+            const modal = document.getElementById('directionsModal');
+            if (modal) modal.classList.add('hidden');
+        }}
+
+        function toggleAllModalDirections(val) {{
+            const form = document.getElementById('dirsForm');
+            if (!form) return;
+            const checks = form.querySelectorAll('.modal-dir-check');
+            checks.forEach(ch => {{ ch.checked = val; }});
+        }}
+
+        function toggleNewOpDirs(allCheck) {{
+            const form = allCheck.closest('form');
+            if (!form) return;
+            const checks = form.querySelectorAll('.new-op-dir-check');
+            checks.forEach(ch => {{
+                if (allCheck.checked) ch.checked = false;
+            }});
+        }}
+
         function closeCommentModal() {{
             const modal = document.getElementById('commentModal');
             if (modal) modal.classList.add('hidden');
@@ -2850,6 +2983,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }}
             const opModal = document.getElementById('opPasswordModal');
             if (opModal && e.target === opModal) {{
+                closeOpPasswordModal();
+            }}
+            const dirsModal = document.getElementById('directionsModal');
+            if (dirsModal && e.target === dirsModal) {{
+                closeDirectionsModal();
+            }}
                 closeOpPasswordModal();
             }}
             const chatModal = document.getElementById('instagramChatModal');
@@ -2998,10 +3137,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 chartInstances.status = new Chart(ctxStatus, {{
                     type: 'doughnut',
                     data: {{
-                        labels: ["⚪ Yangi", "🟡 Jarayonda", "🟢 Bog'lanildi", "💭 O'ylayapti", "📦 Zahira", "🔴 Rad"],
+                        labels: ["⚪ Yangi", "🟢 Bog'lanildi", "💭 O'ylayapti", "📦 Zahira", "🔴 Rad"],
                         datasets: [{{
-                            data: [{new_leads}, {in_progress_leads}, {done_leads}, {thinking_leads}, {reserve_leads}, {rejected_leads}],
-                            backgroundColor: ['#94a3b8', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e'],
+                            data: [{new_leads}, {done_leads}, {thinking_leads}, {reserve_leads}, {rejected_leads}],
+                            backgroundColor: ['#94a3b8', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e'],
                             borderWidth: 2,
                             borderColor: '#ffffff'
                         }}]
@@ -3227,7 +3366,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         function updateKanbanCounts() {{
-            const colStatuses = ['yangi', 'jarayonda', 'boglandi', 'oylanyapti', 'zahira', 'rad'];
+            const colStatuses = ['yangi', 'boglandi', 'oylanyapti', 'zahira', 'rad'];
             colStatuses.forEach(st => {{
                 const colBox = document.getElementById('kanban_col_' + st);
                 if (colBox) {{
@@ -3249,7 +3388,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         const statusTitles = {{
             "yangi": "⚪ Yangi Lid",
-            "jarayonda": "🟡 Jarayonda",
             "boglandi": "🟢 Bog'lanildi",
             "oylanyapti": "💭 O'ylayapti",
             "zahira": "📦 Zahira (Keyingi oqim)",
@@ -3438,9 +3576,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         const statusMap = {{
                             "yangi": "⚪ Yangi",
                             "boshlangich": "⚪ Yangi",
-                            "jarayonda": "🟡 Jarayonda",
                             "boglandi": "🟢 Bog'lanildi",
                             "bog'landi": "🟢 Bog'lanildi",
+                            "jarayonda": "🟢 Bog'lanildi",
                             "oylanyapti": "💭 O'ylayapti",
                             "o'ylayapti": "💭 O'ylayapti",
                             "zahira": "📦 Zahira (Keyingi oqim)",
@@ -3503,11 +3641,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const statusMap = {{
                 "yangi": "⚪ Yangi",
                 "boshlangich": "⚪ Yangi",
-                "jarayonda": "🟡 Jarayonda",
                 "boglandi": "🟢 Bog'lanildi",
                 "bog'landi": "🟢 Bog'lanildi",
+                "jarayonda": "🟢 Bog'lanildi",
                 "oylanyapti": "💭 O'ylayapti",
                 "o'ylayapti": "💭 O'ylayapti",
+                "zahira": "📦 Zahira",
                 "rad": "🔴 Rad / Ko'tarmadi"
             }};
 

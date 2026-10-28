@@ -119,9 +119,19 @@ def init_db():
             role TEXT DEFAULT 'operator',
             is_active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP
+            last_login TIMESTAMP,
+            allowed_directions TEXT DEFAULT 'all'
         )
     """)
+    try:
+        cursor.execute("ALTER TABLE operators ADD COLUMN allowed_directions TEXT DEFAULT 'all'")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("UPDATE clients SET lead_status = 'boglandi' WHERE lead_status = 'jarayonda'")
+    except Exception:
+        pass
 
     # 5. Xodimlar faoliyat jurnali (Audit & Anti-Fraud logs)
     cursor.execute("""
@@ -470,8 +480,8 @@ def init_db():
                 row = cursor.fetchone()
                 if not row:
                     cursor.execute("""
-                        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, last_login)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, last_login, allowed_directions)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         op.get("username"),
                         op.get("password_hash"),
@@ -480,7 +490,8 @@ def init_db():
                         op.get("role", "operator"),
                         op.get("is_active", 1),
                         op.get("created_at"),
-                        op.get("last_login")
+                        op.get("last_login"),
+                        op.get("allowed_directions", "all")
                     ))
                 else:
                     cursor.execute("""
@@ -489,7 +500,8 @@ def init_db():
                             display_name = ?,
                             phone = COALESCE(NULLIF(?, ''), phone),
                             role = ?,
-                            is_active = COALESCE(?, is_active)
+                            is_active = COALESCE(?, is_active),
+                            allowed_directions = COALESCE(?, allowed_directions)
                         WHERE username = ?
                     """, (
                         op.get("password_hash"),
@@ -497,6 +509,7 @@ def init_db():
                         op.get("phone", ""),
                         op.get("role", "operator"),
                         op.get("is_active", 1),
+                        op.get("allowed_directions", "all"),
                         op.get("username")
                     ))
         except Exception:
@@ -590,11 +603,47 @@ def sync_operators_backup():
     except Exception:
         pass
 
+AVAILABLE_DIRECTIONS = [
+    {"key": "front_office", "name": "💻 Front Office (Onlayn)", "short": "Front Office"},
+    {"key": "hotel", "name": "🏨 Hotel Operations", "short": "Hotel Operations"},
+    {"key": "gid_qayta", "name": "🌏 Gidlik (Qayta tayyorlash)", "short": "Gidlik (Qayta)"},
+    {"key": "gid_malaka", "name": "🗺️ Gidlik (Malaka oshirish)", "short": "Gidlik (Malaka)"},
+    {"key": "turagent", "name": "✈️ Turagentlik", "short": "Turagentlik"},
+    {"key": "turoperator", "name": "✈️ Turoperatorlik", "short": "Turoperatorlik"},
+    {"key": "narx", "name": "💰 Kurslar narxi", "short": "Kurslar narxi"},
+    {"key": "dastur", "name": "📄 O'quv dasturi", "short": "O'quv dasturi"},
+    {"key": "konsultatsiya", "name": "💬 Batafsil konsultatsiya", "short": "Konsultatsiya"},
+    {"key": "umumiy", "name": "💬 Boshqa / Umumiy", "short": "Boshqa"},
+]
+
+def get_lead_direction_key(campaign: str) -> str:
+    """Mijoz kampaniyasi / so'roviga qarab yo'nalish kalitini aniqlash"""
+    c = (campaign or "").lower().strip()
+    if any(k in c for k in ["front", "housekeeping", "xona tozalash", "tourism-edu", "online", "onlayn"]):
+        return "front_office"
+    if any(k in c for k in ["hotel", "mehmonxona", "operations"]):
+        return "hotel"
+    if "malaka" in c:
+        return "gid_malaka"
+    if any(k in c for k in ["gid", "ekskurs"]):
+        return "gid_qayta"
+    if "turagent" in c:
+        return "turagent"
+    if "turoperator" in c:
+        return "turoperator"
+    if any(k in c for k in ["narx", "qancha", "narxi"]):
+        return "narx"
+    if any(k in c for k in ["dastur", "modul"]):
+        return "dastur"
+    if any(k in c for k in ["konsultatsiya", "batafsil"]):
+        return "konsultatsiya"
+    return "umumiy"
+
 def get_all_operators() -> list:
     """Barcha operatorlar ro'yxatini olish"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, display_name, phone, role, is_active, created_at, last_login FROM operators ORDER BY id ASC")
+    cursor.execute("SELECT id, username, display_name, phone, role, is_active, created_at, last_login, allowed_directions FROM operators ORDER BY id ASC")
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return rows
@@ -619,16 +668,16 @@ def get_operator_by_id(op_id: int) -> dict | None:
     conn.close()
     return dict(row) if row else None
 
-def create_operator(username: str, password: str, display_name: str, phone: str = "", role: str = "operator") -> int:
+def create_operator(username: str, password: str, display_name: str, phone: str = "", role: str = "operator", allowed_directions: str = "all") -> int:
     """Yangi operator qo'shish"""
     conn = get_connection()
     cursor = conn.cursor()
     pwd_hash = hash_operator_password(password)
     now_iso = datetime.now().isoformat()
     cursor.execute("""
-        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?)
-    """, (username.strip().lower(), pwd_hash, display_name.strip(), phone.strip(), role, now_iso))
+        INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, allowed_directions)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+    """, (username.strip().lower(), pwd_hash, display_name.strip(), phone.strip(), role, now_iso, allowed_directions or "all"))
     conn.commit()
     op_id = cursor.lastrowid
     conn.close()
@@ -647,7 +696,7 @@ def update_operator(op_id: int, **kwargs):
         if k == "password":
             fields.append("password_hash = ?")
             values.append(hash_operator_password(v))
-        elif k in ["display_name", "phone", "role", "is_active", "last_login"]:
+        elif k in ["display_name", "phone", "role", "is_active", "last_login", "allowed_directions"]:
             fields.append(f"{k} = ?")
             values.append(v)
     if fields:

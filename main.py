@@ -613,9 +613,25 @@ def admin_dashboard(request: Request, notice: str = ""):
     campaigns_data = get_all_campaigns()
     clients_data = get_all_clients()
     recent_media = get_recent_media(limit=25)
-    from database import get_all_operators
+    from database import get_all_operators, get_operator_by_id, get_lead_direction_key
     operators_data = get_all_operators()
     recent_logs = get_recent_activity_logs(60)
+
+    # Agar mutaxassis (operator) bo'lsa va yo'nalishlar admin tomonidan cheklangan bo'lsa:
+    if curr_user.get("role") == "operator":
+        op_info = get_operator_by_id(curr_user.get("id"))
+        if op_info:
+            allowed_dir_str = (op_info.get("allowed_directions") or "all").strip()
+            curr_user["allowed_directions"] = allowed_dir_str
+            if allowed_dir_str != "all" and allowed_dir_str:
+                allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()])
+                filtered_clients = []
+                for cl in clients_data:
+                    c_dir = get_lead_direction_key(cl.get("campaign", ""))
+                    # Ruxsat etilgan yo'nalish yoki aynan shu operatorga biriktirilgan lid
+                    if c_dir in allowed_keys or cl.get("manager_name") == curr_user.get("display_name"):
+                        filtered_clients.append(cl)
+                clients_data = filtered_clients
 
     html_content = get_admin_dashboard_html(
         settings_data, campaigns_data, clients_data,
@@ -1041,7 +1057,7 @@ def toggle_client_ai(
 # ----------------- ADMIN: OPERATORLAR VA MUTAXASSISLAR BOSHQARUVI -----------------
 
 @app.post("/admin/operators/create")
-def admin_create_operator(
+async def admin_create_operator(
     request: Request,
     display_name: str = Form(...),
     username: str = Form(...),
@@ -1052,19 +1068,63 @@ def admin_create_operator(
     if not is_admin(request):
         return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
+    form_data = await request.form()
+    selected_dirs = form_data.getlist("directions")
+    from database import AVAILABLE_DIRECTIONS, create_operator, get_operator_by_username
+    all_keys = [d["key"] for d in AVAILABLE_DIRECTIONS]
+    if not selected_dirs or set(selected_dirs) == set(all_keys) or "all" in selected_dirs:
+        dirs_val = "all"
+    else:
+        dirs_val = ",".join([k for k in selected_dirs if k in all_keys])
+
     u = username.strip().lower()
     p = password.strip()
     name = display_name.strip()
     if not u or not p or not name:
-        return RedirectResponse(url="/admin?notice=Barcha+majburiy+maydonlarni+to%27ldiring#operators", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/admin?notice=Barcha+majburiy+maydonlarni+to%27ldiring#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
-    from database import get_operator_by_username, create_operator
     if u == "admin" or get_operator_by_username(u):
-        return RedirectResponse(url="/admin?notice=Bunday+loginli+operator+allaqachon+mavjud!#operators", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/admin?notice=Bunday+loginli+operator+allaqachon+mavjud!#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
-    create_operator(u, p, name, phone=phone.strip(), role="operator")
+    create_operator(u, p, name, phone=phone.strip(), role="operator", allowed_directions=dirs_val)
     return RedirectResponse(
-        url=f"/admin?notice=Yangi+operator+{name}+muvaffaqiyatli+qo%27shildi!#operators",
+        url=f"/admin?notice=Yangi+operator+{name}+muvaffaqiyatli+qo%27shildi!#tab_operators",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/operators/{op_id}/update-directions")
+async def admin_update_operator_directions(
+    op_id: int,
+    request: Request
+):
+    """Operatorga ko'rinadigan yo'nalishlarni admin tomonidan belgilash"""
+    if not is_admin(request):
+        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+    form_data = await request.form()
+    selected_dirs = form_data.getlist("directions")
+    from database import get_operator_by_id, update_operator, AVAILABLE_DIRECTIONS, log_activity
+
+    op = get_operator_by_id(op_id)
+    if not op:
+        return RedirectResponse(url="/admin?notice=Operator+topilmadi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
+
+    all_keys = [d["key"] for d in AVAILABLE_DIRECTIONS]
+    if not selected_dirs or set(selected_dirs) == set(all_keys) or "all" in selected_dirs:
+        val = "all"
+        display_dirs = "Barcha yo'nalishlar"
+    else:
+        valid_selected = [k for k in selected_dirs if k in all_keys]
+        val = ",".join(valid_selected)
+        display_dirs = ", ".join(valid_selected) if valid_selected else "Hech biri"
+
+    update_operator(op_id, allowed_directions=val)
+    admin_user = get_current_user(request)
+    admin_name = admin_user.get("display_name") if admin_user else "Admin"
+    log_activity(None, admin_name, "update_directions", f"{op.get('display_name')} xodimiga yo'nalishlar biriktirildi: {display_dirs}")
+
+    return RedirectResponse(
+        url=f"/admin?notice={op.get('display_name')}+uchun+yo%27nalishlar+muvaffaqiyatli+saqlandi!#tab_operators",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
@@ -1079,10 +1139,10 @@ def admin_update_operator_password(
         return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
     p = new_password.strip()
     if not p:
-        return RedirectResponse(url="/admin?notice=Parol+bo%27sh+bo%27lishi+mumkin+emas#operators", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/admin?notice=Parol+bo%27sh+bo%27lishi+mumkin+emas#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
     from database import update_operator
     update_operator(op_id, password=p)
-    return RedirectResponse(url="/admin?notice=Operator+paroli+muvaffaqiyatli+yangilandi#operators", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/admin?notice=Operator+paroli+muvaffaqiyatli+yangilandi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/admin/operators/{op_id}/toggle-status")
 def admin_toggle_operator_status(
@@ -1098,8 +1158,8 @@ def admin_toggle_operator_status(
         new_st = 0 if op.get("is_active", 1) else 1
         update_operator(op_id, is_active=new_st)
         msg = "Operator+faolsizlantirildi+(bloklandi)" if new_st == 0 else "Operator+qayta+faollashtirildi"
-        return RedirectResponse(url=f"/admin?notice={msg}#operators", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(url="/admin#operators", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url=f"/admin?notice={msg}#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/admin#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/admin/operators/{op_id}/delete")
 def admin_delete_operator(
@@ -1111,7 +1171,7 @@ def admin_delete_operator(
         return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
     from database import delete_operator
     delete_operator(op_id)
-    return RedirectResponse(url="/admin?notice=Operator+muvaffaqiyatli+o%27chirildi#operators", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/admin?notice=Operator+muvaffaqiyatli+o%27chirildi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
@@ -1193,9 +1253,22 @@ def list_clients():
 
 @app.get("/api/clients/excel")
 @app.get("/api/clients/xlsx")
-def export_clients_excel():
+def export_clients_excel(request: Request):
     """Yig'ilgan mijozlar bazasini Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish"""
     clients = get_all_clients()
+    curr_user = get_current_user(request)
+    if curr_user and curr_user.get("role") == "operator":
+        from database import get_operator_by_id, get_lead_direction_key
+        op_info = get_operator_by_id(curr_user.get("id"))
+        if op_info:
+            allowed_dir_str = (op_info.get("allowed_directions") or "all").strip()
+            if allowed_dir_str != "all" and allowed_dir_str:
+                allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()])
+                clients = [
+                    cl for cl in clients
+                    if get_lead_direction_key(cl.get("campaign", "")) in allowed_keys
+                    or cl.get("manager_name") == curr_user.get("display_name")
+                ]
     
     try:
         import openpyxl
@@ -1215,9 +1288,9 @@ def export_clients_excel():
         STATUS_STYLES = {
             "yangi": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
             "boshlangich": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
-            "jarayonda": {"fill": "FEF3C7", "font_color": "92400E", "label": "🟡 Jarayonda"},
             "boglandi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
             "bog'landi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
+            "jarayonda": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
             "oylanyapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
             "o'ylayapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
             "zahira": {"fill": "E0E7FF", "font_color": "3730A3", "label": "📦 Zahira (Keyingi oqim)"},
