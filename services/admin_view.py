@@ -418,10 +418,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </td>
             <td class="px-4 py-3.5 text-center font-bold text-slate-800">{m_total}</td>
             <td class="px-4 py-3.5 text-center">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{m_done}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-sky-50 text-sky-700">{m_think}</span>
             </td>
             <td class="px-4 py-3.5 text-center">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700">{m_think}</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{m_done}</span>
             </td>
             <td class="px-4 py-3.5 text-center">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">{m_zahira}</span>
@@ -515,8 +515,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     colspan_num = 9
     kanban_cards_dict = {
         "yangi": [],
-        "boglandi": [],
         "oylanyapti": [],
+        "boglandi": [],
         "zahira": [],
         "rad": []
     }
@@ -653,8 +653,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 {chat_btn_td}
                 <select name="status" onchange="quickMoveLead('{client_id}', this.value)" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
                     <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
                     <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
                     <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                     <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                 </select>
@@ -888,8 +888,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </button>
                 <select onchange="quickMoveLead('{client_id}', this.value)" class="text-[11px] py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-2xs" title="Boshqa ustunga ko'chirish">
                     <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'landi</option>
                     <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'landi</option>
                     <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                     <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                 </select>
@@ -909,15 +909,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             "badge_cls": "bg-slate-200 text-slate-800"
         },
         {
-            "status": "boglandi",
-            "title": "Bog'lanildi",
-            "icon": "🟢",
-            "subtitle": "Muvaffaqiyatli gaplashildi",
-            "border": "border-emerald-300",
-            "header_bg": "bg-emerald-100 text-emerald-900 border border-emerald-200",
-            "badge_cls": "bg-emerald-200 text-emerald-900"
-        },
-        {
             "status": "oylanyapti",
             "title": "O'ylayapti",
             "icon": "💭",
@@ -925,6 +916,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             "border": "border-sky-300",
             "header_bg": "bg-sky-100 text-sky-900 border border-sky-200",
             "badge_cls": "bg-sky-200 text-sky-900"
+        },
+        {
+            "status": "boglandi",
+            "title": "Bog'lanildi",
+            "icon": "🟢",
+            "subtitle": "Muvaffaqiyatli gaplashildi",
+            "border": "border-emerald-300",
+            "header_bg": "bg-emerald-100 text-emerald-900 border border-emerald-200",
+            "badge_cls": "bg-emerald-200 text-emerald-900"
         },
         {
             "status": "zahira",
@@ -1464,8 +1464,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <tr>
                                 <th class="px-5 py-3">Menejer / Xodim</th>
                                 <th class="px-4 py-3 text-center">Biriktirilgan Lidlar</th>
-                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
                                 <th class="px-4 py-3 text-center">💭 O'ylayapti</th>
+                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
                                 <th class="px-4 py-3 text-center">📦 Zahira</th>
                                 <th class="px-4 py-3 text-center">🔴 Rad etildi</th>
                                 <th class="px-4 py-3 text-center">💬 Izohlar</th>
@@ -2273,8 +2273,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <label class="block text-xs font-bold text-slate-700 mb-1">🎯 Mijoz Holati (Status):</label>
                     <select name="status" id="modalStatusSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
                         <option value="yangi">⚪ Yangi (Bog'lanish kutilmoqda ⏳)</option>
-                        <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
                         <option value="oylanyapti">💭 O'ylayapti (Qaror qabul qilmoqda 🤔)</option>
+                        <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
                         <option value="zahira">📦 Zahira (Keyingi oqim / ochiladigan kurslar uchun 📦)</option>
                         <option value="rad">🔴 Rad / Ko'tarmadi (Bog'lanib bo'lmadi ❌)</option>
                     </select>
@@ -2441,12 +2441,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="text-2xl sm:text-3xl font-extrabold text-slate-700">{new_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
-                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
-                </div>
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-sky-600 mb-1">💭 O'ylayapti</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-sky-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">📦 Zahira</div>
@@ -2492,8 +2492,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="all">📋 Barcha holatlar</option>
                             <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
                             <option value="yangi">⚪ Yangi</option>
-                            <option value="boglandi">🟢 Bog'lanildi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
+                            <option value="boglandi">🟢 Bog'lanildi</option>
                             <option value="zahira">📦 Zahira (Keyingi oqim)</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
@@ -3364,10 +3364,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 chartInstances.status = new Chart(ctxStatus, {{
                     type: 'doughnut',
                     data: {{
-                        labels: ["⚪ Yangi", "🟢 Bog'lanildi", "💭 O'ylayapti", "📦 Zahira", "🔴 Rad"],
+                        labels: ["⚪ Yangi", "💭 O'ylayapti", "🟢 Bog'lanildi", "📦 Zahira", "🔴 Rad"],
                         datasets: [{{
-                            data: [{new_leads}, {done_leads}, {thinking_leads}, {reserve_leads}, {rejected_leads}],
-                            backgroundColor: ['#94a3b8', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e'],
+                            data: [{new_leads}, {thinking_leads}, {done_leads}, {reserve_leads}, {rejected_leads}],
+                            backgroundColor: ['#94a3b8', '#0284c7', '#10b981', '#8b5cf6', '#f43f5e'],
                             borderWidth: 2,
                             borderColor: '#ffffff'
                         }}]
@@ -3593,7 +3593,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         function updateKanbanCounts() {{
-            const colStatuses = ['yangi', 'boglandi', 'oylanyapti', 'zahira', 'rad'];
+            const colStatuses = ['yangi', 'oylanyapti', 'boglandi', 'zahira', 'rad'];
             colStatuses.forEach(st => {{
                 const colBox = document.getElementById('kanban_col_' + st);
                 if (colBox) {{

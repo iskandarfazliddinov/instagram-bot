@@ -1283,6 +1283,11 @@ def list_clients():
     """Yig'ilgan barcha mijozlar bazasini JSON ko'rinishida ko'rish"""
     return {"clients": get_all_clients()}
 
+@app.get("/api/operators")
+def list_operators():
+    """Barcha mutaxassislar ro'yxatini olish"""
+    return {"operators": get_all_operators()}
+
 @app.get("/api/clients/excel")
 @app.get("/api/clients/xlsx")
 def export_clients_excel(request: Request):

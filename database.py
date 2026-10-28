@@ -537,14 +537,6 @@ def init_db():
         except Exception:
             pass
 
-    # Standart operator mavjudligini ta'minlash
-    cursor.execute("SELECT COUNT(*) FROM operators")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-            INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at)
-            VALUES (?, ?, ?, '', 'operator', 1, ?)
-        """, ("operator", hash_operator_password("operator123"), "Operator 1", datetime.now().isoformat()))
-
     # Sozlamalar zaxirasini yangilab qo'yish
     try:
         cursor.execute("SELECT key, value FROM settings")
