@@ -833,9 +833,14 @@ def clear_clients(request: Request):
 def delete_single_client(client_id: int, request: Request):
     """Bitta lidni o'chirish"""
     if not is_admin(request):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Ruxsat yo'q"}, status_code=403)
         return RedirectResponse(url="/admin?notice=Xatolik:+Lidni+o%27chirishga+ruxsat+yo%27q#leads", status_code=status.HTTP_303_SEE_OTHER)
 
     delete_client_by_id(client_id)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": True, "client_id": client_id})
+
     return RedirectResponse(
         url="/admin?notice=Lid+muvaffaqiyatli+o%27chirildi#leads",
         status_code=status.HTTP_303_SEE_OTHER
@@ -895,6 +900,8 @@ def update_comment_from_admin(
     """CRM dan mutaxassis izohi, holati, mas'ul xodimi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
     user = get_current_user(request)
     if not user:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     effective_manager = (manager_name or "").strip()
@@ -924,6 +931,18 @@ def update_comment_from_admin(
         update_telegram_lead_message(client_id)
     except Exception as e:
         logger.error(f"Telegram lead update error from CRM comment: {e}")
+
+    # Agar AJAX orqali chaqirilgan bo'lsa -> sahifani refresh qilmasdan JSON qaytaramiz
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "success": True,
+            "client_id": client_id,
+            "manager_name": effective_manager,
+            "manager_comment": (comment or "").strip(),
+            "lead_status": status_val if status_val else None,
+            "phone_number": phone_val.strip() if (phone_val and phone_val != "—") else None,
+            "manager_time": now_str
+        })
 
     return RedirectResponse(
         url="/admin?notice=Mijoz+ma%27lumotlari+va+izohi+muvaffaqiyatli+saqlandi#leads",
@@ -1099,6 +1118,8 @@ async def admin_update_operator_directions(
 ):
     """Operatorga ko'rinadigan yo'nalishlarni admin tomonidan belgilash"""
     if not is_admin(request):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Ruxsat yo'q"}, status_code=403)
         return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
     form_data = await request.form()
@@ -1107,6 +1128,8 @@ async def admin_update_operator_directions(
 
     op = get_operator_by_id(op_id)
     if not op:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Operator topilmadi"}, status_code=404)
         return RedirectResponse(url="/admin?notice=Operator+topilmadi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
     all_keys = [d["key"] for d in AVAILABLE_DIRECTIONS]
@@ -1123,6 +1146,9 @@ async def admin_update_operator_directions(
     admin_name = admin_user.get("display_name") if admin_user else "Admin"
     log_activity(None, admin_name, "update_directions", f"{op.get('display_name')} xodimiga yo'nalishlar biriktirildi: {display_dirs}")
 
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": True, "op_id": op_id, "directions": val, "display_dirs": display_dirs})
+
     return RedirectResponse(
         url=f"/admin?notice={op.get('display_name')}+uchun+yo%27nalishlar+muvaffaqiyatli+saqlandi!#tab_operators",
         status_code=status.HTTP_303_SEE_OTHER
@@ -1136,12 +1162,18 @@ def admin_update_operator_password(
 ):
     """Operator parolini admin tomonidan o'zgartirish"""
     if not is_admin(request):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Ruxsat yo'q"}, status_code=403)
         return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
     p = new_password.strip()
     if not p:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Parol bo'sh bo'lishi mumkin emas"}, status_code=400)
         return RedirectResponse(url="/admin?notice=Parol+bo%27sh+bo%27lishi+mumkin+emas#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
     from database import update_operator
     update_operator(op_id, password=p)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": True, "op_id": op_id})
     return RedirectResponse(url="/admin?notice=Operator+paroli+muvaffaqiyatli+yangilandi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/admin/operators/{op_id}/toggle-status")

@@ -629,7 +629,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             """
 
         comment_btn = f"""
-        <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs" title="Bog'lanish va izoh kiritish">
+        <button type="button" id="table_row_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs cursor-pointer" title="Bog'lanish va izoh kiritish">
             💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
         </button>
         """
@@ -637,9 +637,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         delete_btn = ""
         if not is_operator:
             delete_btn = f"""
-            <form method="POST" action="/admin/clients/{client_id}/delete" onsubmit="return confirm('Haqiqatan ham ushbu lidni o\\'chirmoqchimisiz?')" class="inline">
-                <button type="submit" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition" title="Lidni o'chirish">🗑️</button>
-            </form>
+            <button type="button" onclick="deleteLeadAjax('{client_id}')" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition cursor-pointer" title="Lidni o'chirish">🗑️</button>
             """
 
         chat_pulse = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="AI to&#39;xtatilgan (Inson nazoratida)"></span>' if ai_paused else ''
@@ -653,18 +651,14 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <td class="px-5 py-3.5 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5">
                 {chat_btn_td}
-                <form method="POST" action="/admin/clients/{client_id}/status" class="inline-flex items-center gap-1">
-                    <select name="status" onchange="this.form.submit()" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
-                        <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
-                        <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
-                        <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
-                        <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
-                        <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
-                    </select>
-                    <input type="hidden" name="manager_name" value="{curr_display_name}">
-                    <noscript><button type="submit" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 text-slate-600 transition" title="Saqlash">💾</button></noscript>
-                </form>
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium cursor-pointer" title="Bog'lanish & Izoh">💬</button>
+                <select name="status" onchange="quickMoveLead('{client_id}', this.value)" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
+                    <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
+                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
+                    <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
+                    <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
+                    <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
+                </select>
+                <button type="button" id="table_action_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium cursor-pointer" title="Bog'lanish & Izoh">💬</button>
                 {delete_btn}
             </div>
         </td>
@@ -746,7 +740,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <div class="font-mono text-xs font-bold text-slate-800">{phone}</div>
+                <div class="font-mono text-xs font-bold text-slate-800" id="row_phone_{client_id}">{phone}</div>
                 <div class="flex items-center gap-1.5 mt-1">
                     {tg_btn}
                     {call_btn}
@@ -761,11 +755,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 {last_msg_html}
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">{fol_badge}</td>
-            <td class="px-5 py-3.5 whitespace-nowrap">{badge_html}</td>
+            <td class="px-5 py-3.5 whitespace-nowrap" id="row_status_badge_{client_id}">{badge_html}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <div>{manager_display_badge}</div>
-                {comment_block}
-                {comment_btn}
+                <div id="row_manager_{client_id}">{manager_display_badge}</div>
+                <div id="row_comment_wrap_{client_id}">{comment_block}</div>
+                <div id="row_comment_btn_wrap_{client_id}">{comment_btn}</div>
             </td>
             <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
             {action_td}
@@ -853,7 +847,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             <!-- Phone & Quick Contact Buttons -->
             <div class="flex items-center justify-between gap-1.5 py-1 px-2 bg-slate-50 rounded-lg border border-slate-100 mb-2">
-                <div class="text-xs font-mono font-bold text-slate-800 truncate">
+                <div class="text-xs font-mono font-bold text-slate-800 truncate" id="kanban_phone_{client_id}">
                     {phone if phone and phone != '—' else '<span class="text-slate-400 font-sans italic text-[11px] font-normal">Raqamsiz</span>'}
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
@@ -875,9 +869,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <div class="pt-2 border-t border-slate-100 flex flex-col gap-1">
                 <div class="flex items-center justify-between text-[11px]">
                     <span class="text-slate-400 text-[10px] font-medium">Mas'ul:</span>
-                    {manager_display_badge}
+                    <span id="kanban_manager_{client_id}">{manager_display_badge}</span>
                 </div>
-                {kanban_comment_block}
+                <div id="kanban_comment_wrap_{client_id}">
+                    {kanban_comment_block}
+                </div>
             </div>
 
             <!-- Card Actions footer: Direct Chat + Izoh modal button + Quick status move dropdown -->
@@ -886,7 +882,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         class="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati">
                     📸 Chat {'<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>' if ai_paused else ''}
                 </button>
-                <button type="button" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')"
+                <button type="button" id="kanban_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')"
                         class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Bog'lanish & Izoh">
                     💬 Izoh
                 </button>
@@ -1756,7 +1752,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </td>
             <td class="px-4 py-3.5 text-xs font-medium text-slate-700 whitespace-nowrap">{op_phone}</td>
-            <td class="px-4 py-3.5">{allowed_badges_html}</td>
+            <td class="px-4 py-3.5" id="op_dirs_td_{op_id}">{allowed_badges_html}</td>
             <td class="px-4 py-3.5 text-center whitespace-nowrap">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">{op_leads_cnt} ta lid</span>
             </td>
@@ -2264,7 +2260,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </div>
 
-            <form method="POST" id="modalCommentForm" action="" class="space-y-4">
+            <form method="POST" id="modalCommentForm" action="" onsubmit="saveCommentModal(event)" class="space-y-4">
                 <!-- Telefon raqam (kiritish yoki to'g'rilash) -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">📞 Telefon Raqami:</label>
@@ -2317,7 +2313,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
             <h3 class="text-base font-bold text-slate-900 mb-1" id="opPasswordTitle">Operator Parolini Yangilash</h3>
             <p class="text-xs text-slate-500 mb-4" id="opPasswordSubtitle">Yangi parol kiriting</p>
-            <form method="POST" id="opPasswordForm" action="" class="space-y-4">
+            <form method="POST" id="opPasswordForm" action="" onsubmit="saveOpPasswordModal(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Yangi Parol:</label>
                     <input type="text" name="new_password" required placeholder="Kamida 4 ta belgi" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
@@ -2343,7 +2339,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
                 <button type="button" onclick="closeDirectionsModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition cursor-pointer">&times;</button>
             </div>
-            <form method="POST" id="dirsForm" action="" class="space-y-4">
+            <form method="POST" id="dirsForm" action="" onsubmit="saveDirectionsModal(event)" class="space-y-4">
                 <div class="flex items-center justify-between text-xs pb-1">
                     <span class="font-bold text-slate-700">Ruxsat etilgan kurslar:</span>
                     <div class="flex items-center gap-2">
@@ -2853,7 +2849,21 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }}
         }}
 
+        let currentModalClientId = null;
+        let currentModalClientName = '';
+        let currentModalUsername = '';
+        let currentModalCampaign = '';
+        let currentModalAiPaused = 0;
+        let currentModalInstagramId = '';
+
         function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager, aiPaused, instagramId) {{
+            currentModalClientId = clientId;
+            currentModalClientName = clientName || '';
+            currentModalUsername = username || '';
+            currentModalCampaign = campaign || '';
+            currentModalAiPaused = aiPaused || 0;
+            currentModalInstagramId = instagramId || '';
+
             const form = document.getElementById('modalCommentForm');
             if (!form) return;
             form.action = '/admin/clients/' + clientId + '/comment';
@@ -2980,6 +2990,213 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         function closeCommentModal() {{
             const modal = document.getElementById('commentModal');
             if (modal) modal.classList.add('hidden');
+        }}
+
+        async function saveCommentModal(e) {{
+            e.preventDefault();
+            const form = document.getElementById('modalCommentForm');
+            if (!form) return;
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {{
+                submitBtn.innerHTML = '<span>⏳</span> <span>Saqlanmoqda...</span>';
+                submitBtn.disabled = true;
+            }}
+
+            const clientId = currentModalClientId;
+            try {{
+                const formData = new FormData(form);
+                const resp = await fetch(form.action, {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+
+                if (resp.ok) {{
+                    const data = await resp.json();
+                    const newStatus = data.lead_status;
+                    const newComment = data.manager_comment || '';
+                    const newPhone = data.phone_number || '';
+                    const newManager = data.manager_name || '';
+                    const newTime = data.manager_time || '';
+
+                    // 1. Holat o'zgargan bo'lsa -> Kanban va Table'da harakatlantirish
+                    if (newStatus && typeof quickMoveLead === 'function') {{
+                        await quickMoveLead(clientId, newStatus);
+                    }}
+
+                    // 2. Telefon raqamni yangilash
+                    if (newPhone) {{
+                        const kPhone = document.getElementById('kanban_phone_' + clientId);
+                        if (kPhone) kPhone.textContent = newPhone;
+                        const rPhone = document.getElementById('row_phone_' + clientId);
+                        if (rPhone) rPhone.textContent = newPhone;
+                    }}
+
+                    // 3. Mas'ul operator nomini yangilash
+                    if (newManager) {{
+                        const kMgr = document.getElementById('kanban_manager_' + clientId);
+                        if (kMgr) kMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager) + '</span>';
+                        const rMgr = document.getElementById('row_manager_' + clientId);
+                        if (rMgr) rMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager) + '</span>';
+                    }}
+
+                    // 4. Izoh blokini yangilash
+                    const kWrap = document.getElementById('kanban_comment_wrap_' + clientId);
+                    const rWrap = document.getElementById('row_comment_wrap_' + clientId);
+                    const commentHtml = newComment ? '<div class="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 text-[11px] shadow-2xs mt-1"><span class="font-bold text-amber-800">📝 Izoh:</span> ' + escapeChatHtml(newComment) + (newTime ? '<span class="block text-[10px] text-slate-400 mt-0.5 font-normal">' + newTime + '</span>' : '') + '</div>' : '';
+                    if (kWrap) kWrap.innerHTML = commentHtml;
+                    if (rWrap) rWrap.innerHTML = commentHtml;
+
+                    // 5. Tugmalardagi onclick parametrlarini yangilash
+                    const cleanPhone = newPhone || (document.getElementById('modalPhoneInput') ? document.getElementById('modalPhoneInput').value : '') || '';
+                    const safeCommentJs = newComment.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'").replace(/\\n/g, ' ');
+                    const safeNameJs = (currentModalClientName || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
+                    const safeCampJs = (currentModalCampaign || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
+                    const safeMgrJs = newManager.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
+
+                    const newOnclick = "openCommentModal('" + clientId + "', '" + safeCommentJs + "', '" + safeNameJs + "', '" + (newStatus || 'yangi') + "', '" + cleanPhone + "', '" + currentModalUsername + "', '" + safeCampJs + "', '" + safeMgrJs + "', " + currentModalAiPaused + ", '" + currentModalInstagramId + "')";
+
+                    const kBtn = document.getElementById('kanban_comment_btn_' + clientId);
+                    if (kBtn) kBtn.setAttribute('onclick', newOnclick);
+                    const rBtn = document.getElementById('table_action_comment_btn_' + clientId);
+                    if (rBtn) rBtn.setAttribute('onclick', newOnclick);
+                    const rRowBtn = document.getElementById('table_row_comment_btn_' + clientId);
+                    if (rRowBtn) {{
+                        rRowBtn.setAttribute('onclick', newOnclick);
+                        rRowBtn.innerHTML = '💬 ' + (newComment ? "Izohni o'zgartirish" : "Izoh qo'shish");
+                    }}
+
+                    closeCommentModal();
+                    showToast("✅ Ma'lumotlar saqlandi va Telegramga yuborildi!");
+                }} else {{
+                    showToast("⚠️ Saqlashda xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error('saveCommentModal error:', err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }} finally {{
+                if (submitBtn) {{
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }}
+            }}
+        }}
+
+        async function deleteLeadAjax(clientId) {{
+            if (!confirm("Haqiqatan ham ushbu lidni o'chirmoqchimisiz?")) return;
+            try {{
+                const resp = await fetch('/admin/clients/' + clientId + '/delete', {{
+                    method: 'POST',
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+                if (resp.ok) {{
+                    const card = document.getElementById('kanban_card_' + clientId);
+                    if (card) card.remove();
+                    const row = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+                    if (row) row.remove();
+                    updateKanbanCounts();
+                    showToast("🗑️ Lid muvaffaqiyatli o'chirildi");
+                }} else {{
+                    showToast("⚠️ O'chirishda xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error('deleteLeadAjax error:', err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        async function saveDirectionsModal(e) {{
+            e.preventDefault();
+            const form = document.getElementById('dirsForm');
+            if (!form) return;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {{
+                submitBtn.innerHTML = '⏳ Saqlanmoqda...';
+                submitBtn.disabled = true;
+            }}
+
+            try {{
+                const formData = new FormData(form);
+                const resp = await fetch(form.action, {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+
+                if (resp.ok) {{
+                    const data = await resp.json();
+                    const opId = data.op_id;
+                    const displayDirs = data.display_dirs || 'Barcha yo\\'nalishlar';
+                    const tdEl = document.getElementById('op_dirs_td_' + opId);
+                    if (tdEl) {{
+                        tdEl.innerHTML = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">' + escapeChatHtml(displayDirs) + '</span>';
+                    }}
+                    closeDirectionsModal();
+                    showToast("✅ Mutaxassis yo'nalishlari muvaffaqiyatli saqlandi!");
+                }} else {{
+                    showToast("⚠️ Saqlashda xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error('saveDirectionsModal error:', err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }} finally {{
+                if (submitBtn) {{
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }}
+            }}
+        }}
+
+        async function saveOpPasswordModal(e) {{
+            e.preventDefault();
+            const form = document.getElementById('opPasswordForm');
+            if (!form) return;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {{
+                submitBtn.innerHTML = '⏳ Saqlanmoqda...';
+                submitBtn.disabled = true;
+            }}
+
+            try {{
+                const formData = new FormData(form);
+                const resp = await fetch(form.action, {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+
+                if (resp.ok) {{
+                    closeOpPasswordModal();
+                    form.reset();
+                    showToast("✅ Mutaxassis paroli muvaffaqiyatli yangilandi!");
+                }} else {{
+                    showToast("⚠️ Parolni yangilashda xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error('saveOpPasswordModal error:', err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }} finally {{
+                if (submitBtn) {{
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }}
+            }}
         }}
 
         document.addEventListener('click', function(e) {{
