@@ -829,8 +829,9 @@ def append_client_chat_history(instagram_id: str, role: str, text: str, manager_
             except Exception:
                 history = []
         
-        now_time = datetime.now().strftime("%H:%M")
-        msg_obj = {"role": role, "text": text.strip(), "time": now_time}
+        now_dt = datetime.now()
+        now_time = now_dt.strftime("%d.%m %H:%M")
+        msg_obj = {"role": role, "text": text.strip(), "time": now_time, "date": now_dt.strftime("%d.%m.%Y")}
         if manager_name:
             msg_obj["manager"] = manager_name
         history.append(msg_obj)
