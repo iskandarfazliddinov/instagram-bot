@@ -29,6 +29,26 @@ def sync_live():
         data = json.loads(req.read().decode("utf-8"))
         live_clients = data.get("clients", [])
         if live_clients:
+            # Mavjud zaxiradagi haqiqiy inson ismlarini saqlab qolish
+            existing_names = {}
+            if os.path.exists(LEADS_BACKUP):
+                try:
+                    with open(LEADS_BACKUP, "r", encoding="utf-8") as f:
+                        old_leads = json.load(f)
+                        for l in old_leads:
+                            u = l.get("username")
+                            fn = l.get("full_name")
+                            if u and fn and fn != u and fn not in ["None", "Kiritilmagan", "Noma'lum"]:
+                                existing_names[u] = fn
+                except Exception:
+                    pass
+
+            for cl in live_clients:
+                u = cl.get("username")
+                fn = cl.get("full_name")
+                if u and u in existing_names and (not fn or fn == u or fn in ["None", "Kiritilmagan", "Noma'lum"]):
+                    cl["full_name"] = existing_names[u]
+
             with open(LEADS_BACKUP, "w", encoding="utf-8") as f:
                 json.dump(live_clients, f, ensure_ascii=False, indent=2)
             print(f"✅ {len(live_clients)} ta lid zaxiraga (leads_backup.json) saqlandi.")

@@ -445,8 +445,8 @@ def init_db():
                     else:
                         cursor.execute("""
                             UPDATE clients SET 
-                                phone_number = CASE WHEN (phone_number = '' OR phone_number IS NULL) THEN COALESCE(?, phone_number) ELSE phone_number END,
-                                full_name = CASE WHEN (full_name = '' OR full_name IS NULL OR full_name = 'Noma\'lum') THEN COALESCE(?, full_name) ELSE full_name END,
+                                phone_number = COALESCE(NULLIF(NULLIF(NULLIF(?, ''), '—'), 'None'), phone_number),
+                                full_name = COALESCE(NULLIF(NULLIF(NULLIF(?, ''), 'Kiritilmagan'), 'None'), full_name),
                                 campaign = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Umumiy') THEN ? WHEN (campaign = '' OR campaign IS NULL OR campaign = 'Umumiy') THEN COALESCE(?, campaign) ELSE campaign END,
                                 source = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Direct') THEN ? WHEN (source = '' OR source IS NULL OR source = 'Direct') THEN COALESCE(?, source) ELSE source END,
                                 lead_status = COALESCE(NULLIF(?, ''), lead_status),
