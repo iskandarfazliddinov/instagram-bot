@@ -79,6 +79,12 @@ def get_login_page_html(error: str = "") -> str:
 </html>
 """
 
+def safe_js_str(val) -> str:
+    if not val:
+        return ""
+    cleaned = str(val).replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\r", " ").replace("\n", " ")
+    return " ".join(cleaned.split())
+
 def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None, activity_logs: list = None) -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     is_operator = (user_role == "operator")
@@ -608,10 +614,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         call_btn = f'<a href="tel:{phone}" class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded font-medium transition" title="Qo\'ng\'iroq qilish">📞 Tel</a>' if len(digits) >= 9 else ""
 
         # Mutaxassis izohi kartasi va tugmasi
-        escaped_comment = manager_comment.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace('\n', ' ')
-        escaped_name = full_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
-        escaped_campaign = campaign.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
-        escaped_manager = manager_name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;')
+        escaped_comment = safe_js_str(manager_comment)
+        escaped_name = safe_js_str(full_name)
+        escaped_campaign = safe_js_str(campaign)
+        escaped_manager = safe_js_str(manager_name)
 
         comment_block = ""
         if manager_comment:
@@ -1065,10 +1071,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <!-- CRM Bo'limlar Navigatsiyasi (Operator rejimi) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 mb-6 text-sm font-semibold text-slate-600">
             <div class="flex items-center gap-2">
-                <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
                 </button>
-                <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     📊 2. Statistika & Tahlil
                 </button>
             </div>
@@ -1082,16 +1088,16 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         tabs_nav_html = f"""
         <!-- CRM Bo'limlar Navigatsiyasi (Supervisor / Rahbar rejimi) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1.5 mb-6 text-sm font-semibold text-slate-600">
-            <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </button>
-            <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 📊 2. Statistika (Kunlik/Oylik/Umumiy)
             </button>
-            <button onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🛡️ 3. Xodimlar Auditi & Nazorat {suspicious_nav_badge}
             </button>
-            <button onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 4. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
             </button>
         </div>
@@ -1100,28 +1106,28 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         tabs_nav_html = f"""
         <!-- CRM Bo'limlar Navigatsiyasi (Admin) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 text-sm font-semibold text-slate-600">
-            <button onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </button>
-            <button onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 📊 2. Statistika & Tahlil
             </button>
-            <button onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🛡️ 3. Xodimlar Auditi {suspicious_nav_badge}
             </button>
-            <button onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🤖 4. Sun'iy Intellekt
             </button>
-            <button onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🎬 5. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
             </button>
-            <button onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 💬 6. Direct Shabloni
             </button>
-            <button onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 7. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
             </button>
-            <button onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+            <button type="button" onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🔐 8. Login & Parol
             </button>
         </div>
@@ -2893,8 +2899,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     btnsHtml += '<span class="text-xs text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200">📞 Raqam kiritilmagan</span>';
                 }}
                 if (clientId) {{
-                    const safeName = (clientName || '').replace(/'/g, "\\\\'");
-                    const safeCamp = (campaign || '').replace(/'/g, "\\\\'");
+                    const safeName = (clientName || '').replace(/'/g, "\\\\'").replace(/\\n/g, ' ').replace(/\\r/g, ' ');
+                    const safeCamp = (campaign || '').replace(/'/g, "\\\\'").replace(/\\n/g, ' ').replace(/\\r/g, ' ');
                     btnsHtml += '<button type="button" onclick="closeCommentModal(); openInstagramChatModal(\\'' + clientId + '\\', \\'' + safeName + '\\', \\'' + (username || '') + '\\', \\'' + safeCamp + '\\', ' + (aiPaused ? 1 : 0) + ', \\'' + (instagramId || '') + '\\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold shadow-sm transition cursor-pointer">📸 CRM Direct Chat</button>';
                 }}
                 if (username) {{
@@ -2989,8 +2995,6 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             if (dirsModal && e.target === dirsModal) {{
                 closeDirectionsModal();
             }}
-                closeOpPasswordModal();
-            }}
             const chatModal = document.getElementById('instagramChatModal');
             if (chatModal && e.target === chatModal) {{
                 closeChatModal();
@@ -3031,14 +3035,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }}
         }}
 
-        // Sahifa yuklanganda URL hash bo'yicha tabni ochish
-        window.addEventListener('DOMContentLoaded', () => {{
+        // Sahifa yuklanganda yoki hash o'zgarganda tabni ochish
+        function applyHashTab() {{
             try {{
                 const hash = window.location.hash.replace('#', '');
                 if (hash && document.getElementById('tab_' + hash)) {{
                     switchTab(hash);
                 }}
             }} catch (e) {{}}
+        }}
+
+        window.addEventListener('DOMContentLoaded', () => {{
+            applyHashTab();
 
             try {{
                 const savedMode = localStorage.getItem('leads_view_mode') || 'kanban';
@@ -3047,6 +3055,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 setViewMode('kanban');
             }}
         }});
+
+        window.addEventListener('hashchange', applyHashTab);
 
         let chartsInitialized = false;
         let chartInstances = {{}};
