@@ -29,8 +29,9 @@ def sync_live():
         data = json.loads(req.read().decode("utf-8"))
         live_clients = data.get("clients", [])
         if live_clients:
-            # Mavjud zaxiradagi haqiqiy inson ismlarini saqlab qolish
+            # Mavjud zaxiradagi haqiqiy inson ismlarini va to'g'ri sanalarni saqlab qolish
             existing_names = {}
+            existing_created_at = {}
             if os.path.exists(LEADS_BACKUP):
                 try:
                     with open(LEADS_BACKUP, "r", encoding="utf-8") as f:
@@ -38,8 +39,11 @@ def sync_live():
                         for l in old_leads:
                             u = l.get("username")
                             fn = l.get("full_name")
+                            ca = l.get("created_at")
                             if u and fn and fn != u and fn not in ["None", "Kiritilmagan", "Noma'lum"]:
                                 existing_names[u] = fn
+                            if u and ca and not (ca.startswith("2026-10-28T09:2") or ca.startswith("2026-10-28T09:4")):
+                                existing_created_at[u] = ca
                 except Exception:
                     pass
 
@@ -48,6 +52,10 @@ def sync_live():
                 fn = cl.get("full_name")
                 if u and u in existing_names and (not fn or fn == u or fn in ["None", "Kiritilmagan", "Noma'lum"]):
                     cl["full_name"] = existing_names[u]
+                if u and u in existing_created_at:
+                    cl_ca = cl.get("created_at", "")
+                    if cl_ca.startswith("2026-10-28T09:2") or cl_ca.startswith("2026-10-28T09:4"):
+                        cl["created_at"] = existing_created_at[u]
 
             with open(LEADS_BACKUP, "w", encoding="utf-8") as f:
                 json.dump(live_clients, f, ensure_ascii=False, indent=2)

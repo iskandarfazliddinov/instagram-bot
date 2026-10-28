@@ -459,6 +459,7 @@ def init_db():
                                 followup_count = COALESCE(?, followup_count),
                                 last_followup_at = CASE WHEN (last_followup_at = '' OR last_followup_at IS NULL) THEN ? ELSE last_followup_at END,
                                 tg_message_id = COALESCE(?, tg_message_id),
+                                created_at = CASE WHEN (? IS NOT NULL AND ? != '' AND (created_at LIKE '2026-10-28T09:2%' OR created_at LIKE '2026-10-28T09:4%')) THEN ? ELSE created_at END,
                                 updated_at = COALESCE(NULLIF(?, ''), updated_at)
                             WHERE instagram_id = ?
                         """, (
@@ -476,6 +477,7 @@ def init_db():
                             b.get("followup_count"),
                             b.get("last_followup_at", ""),
                             b.get("tg_message_id"),
+                            b.get("created_at"), b.get("created_at"), b.get("created_at"),
                             b.get("updated_at", ""),
                             ig_id
                         ))
