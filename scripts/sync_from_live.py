@@ -100,7 +100,8 @@ def sync_live():
                 u = o.get("username")
                 if u == "operator":
                     continue  # Eski default operatorni chetlab o'tish
-                o["password_hash"] = existing_hashes.get(u, o.get("password_hash", ""))
+                if not o.get("password_hash"):
+                    o["password_hash"] = existing_hashes.get(u, "")
                 merged_ops.append(o)
 
             with open(OPS_BACKUP, "w", encoding="utf-8") as f:

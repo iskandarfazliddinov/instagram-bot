@@ -639,7 +639,7 @@ def get_all_operators() -> list:
     """Barcha operatorlar ro'yxatini olish"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, display_name, phone, role, is_active, created_at, last_login, allowed_directions FROM operators ORDER BY id ASC")
+    cursor.execute("SELECT id, username, display_name, phone, role, is_active, created_at, last_login, allowed_directions, password_hash FROM operators ORDER BY id ASC")
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return rows
