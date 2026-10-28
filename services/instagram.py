@@ -498,16 +498,24 @@ def get_media_details(media_id: str) -> dict:
         logger.error(f"Instagram media tafsilotlarini olishda xatolik ({media_id}): {e}")
     return {}
 
-def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
+def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dict:
     """
-    Instagram Direct'dagi barcha yozishmalarni Meta Graph API orqali olib,
-    CRM bazasidagi lidlarni yangilash va tiklash (Auto-recovery from Instagram)
+    Instagram Direct'dagi barcha sahifalardagi yozishmalarni Meta Graph API orqali olib,
+    CRM bazasidagi barcha lidlarni to'liq yangilash va tiklash (Auto-recovery with pagination)
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from database import (
+        get_connection, update_client, get_or_create_client, 
+        sync_leads_backup
+    )
+
     page_token = get_access_token()
     if not page_token:
         return {"ok": False, "error": "Token topilmadi"}
 
-    conv_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/conversations"
+    threads = []
+    seen_conv_ids = set()
+    current_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/me/conversations"
     params = {
         "platform": "instagram",
         "fields": "id,updated_time,participants",
@@ -515,53 +523,80 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
         "access_token": page_token
     }
 
-    try:
-        r_conv = requests.get(conv_url, params=params, timeout=12)
-        if r_conv.status_code != 200:
-            logger.error(f"Instagram conversations xatoligi: {r_conv.text}")
-            from config import _DEFAULT_PAGE_TOKEN
-            if _DEFAULT_PAGE_TOKEN and page_token != _DEFAULT_PAGE_TOKEN:
-                params["access_token"] = _DEFAULT_PAGE_TOKEN
-                page_token = _DEFAULT_PAGE_TOKEN
-                r_conv = requests.get(conv_url, params=params, timeout=12)
+    pages_fetched = 0
+    while current_url and pages_fetched < max_pages:
+        try:
+            r_conv = requests.get(current_url, params=params if pages_fetched == 0 else None, timeout=12)
             if r_conv.status_code != 200:
-                return {"ok": False, "error": r_conv.text}
-        
-        threads = r_conv.json().get("data", [])
-    except Exception as e:
-        logger.error(f"Instagram yozishmalarni yuklashda xatolik: {e}")
-        return {"ok": False, "error": str(e)}
+                logger.error(f"Instagram conversations xatoligi: {r_conv.text}")
+                from config import _DEFAULT_PAGE_TOKEN
+                if _DEFAULT_PAGE_TOKEN and page_token != _DEFAULT_PAGE_TOKEN:
+                    page_token = _DEFAULT_PAGE_TOKEN
+                    if pages_fetched == 0:
+                        params["access_token"] = _DEFAULT_PAGE_TOKEN
+                        r_conv = requests.get(current_url, params=params, timeout=12)
+                    else:
+                        r_conv = requests.get(f"{current_url}&access_token={page_token}", timeout=12)
+                if r_conv.status_code != 200:
+                    break
+            
+            res_json = r_conv.json()
+            batch = res_json.get("data", [])
+            if not batch:
+                break
+            
+            for th in batch:
+                cid = th.get("id")
+                if cid and cid not in seen_conv_ids:
+                    seen_conv_ids.add(cid)
+                    threads.append(th)
+            
+            pages_fetched += 1
+            current_url = res_json.get("paging", {}).get("next")
+            params = None
+        except Exception as e:
+            logger.error(f"Instagram yozishmalarni yuklashda xatolik (page {pages_fetched}): {e}")
+            break
 
-    recovered_count = 0
-    from database import (
-        get_connection, update_client, get_or_create_client, 
-        sync_leads_backup
-    )
-
-    for th in threads:
+    def fetch_thread_data(th):
         cid = th.get("id")
         parts = th.get("participants", {}).get("data", [])
         user_part = [p for p in parts if p.get("username") != "xalqaro_turizm_akademiyasi"]
         if not user_part:
-            continue
+            return None
         user = user_part[0]
         username = user.get("username", "")
         ig_id = str(user.get("id", ""))
         if not ig_id:
-            continue
+            return None
 
         m_url = f"https://graph.facebook.com/{settings.GRAPH_API_VERSION}/{cid}/messages"
         try:
             r_msg = requests.get(
                 m_url, 
                 params={"fields": "id,created_time,from,message", "limit": 25, "access_token": page_token}, 
-                timeout=6
+                timeout=8
             )
             if r_msg.status_code != 200:
-                continue
+                return {"ig_id": ig_id, "username": username, "msgs": []}
             msgs = r_msg.json().get("data", [])
+            return {"ig_id": ig_id, "username": username, "msgs": msgs}
         except Exception:
-            continue
+            return {"ig_id": ig_id, "username": username, "msgs": []}
+
+    thread_results = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(fetch_thread_data, th) for th in threads]
+        for f in as_completed(futures):
+            res = f.result()
+            if res:
+                thread_results.append(res)
+
+    recovered_count = 0
+    for item in thread_results:
+        ig_id = item["ig_id"]
+        username = item["username"]
+        msgs = item["msgs"]
 
         msgs.reverse()
         chat_history = []
@@ -570,7 +605,6 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
         last_msg = ""
         course = None
         source = None
-
         all_text_combined = ""
 
         for m in msgs:
@@ -650,7 +684,8 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
             updates["full_name"] = full_name
         if phone and (not client.get("phone_number") or client.get("phone_number") == ""):
             updates["phone_number"] = phone
-            updates["lead_status"] = "yangi"
+            if not client.get("lead_status") or client.get("lead_status") == "boshlangich":
+                updates["lead_status"] = "yangi"
             updates["step"] = "completed"
         if course:
             updates["campaign"] = course
@@ -660,6 +695,9 @@ def sync_leads_from_instagram_inbox(limit: int = 50) -> dict:
             updates["last_message"] = last_msg
         if chat_history:
             updates["chat_history"] = json.dumps(chat_history, ensure_ascii=False)
+        # Prevent unwanted followups to recovered leads
+        if client.get("followup_count", 0) == 0:
+            updates["followup_count"] = 1
             
         if updates:
             update_client(ig_id, **updates)
