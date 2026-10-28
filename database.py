@@ -496,20 +496,20 @@ def init_db():
                 else:
                     cursor.execute("""
                         UPDATE operators SET
-                            password_hash = ?,
                             display_name = ?,
                             phone = COALESCE(NULLIF(?, ''), phone),
                             role = ?,
                             is_active = COALESCE(?, is_active),
-                            allowed_directions = COALESCE(?, allowed_directions)
+                            allowed_directions = CASE WHEN (allowed_directions IS NOT NULL AND allowed_directions != '') THEN allowed_directions ELSE COALESCE(?, 'all') END,
+                            password_hash = CASE WHEN (password_hash IS NOT NULL AND password_hash != '') THEN password_hash ELSE ? END
                         WHERE username = ?
                     """, (
-                        op.get("password_hash"),
                         op.get("display_name", op.get("username")),
                         op.get("phone", ""),
                         op.get("role", "operator"),
                         op.get("is_active", 1),
                         op.get("allowed_directions", "all"),
+                        op.get("password_hash"),
                         op.get("username")
                     ))
         except Exception:
