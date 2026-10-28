@@ -683,7 +683,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <select name="status" onchange="quickMoveLead('{client_id}', this.value)" class="text-xs py-1 px-2 border rounded-lg bg-white border-slate-200 text-slate-700 outline-none focus:ring-1 focus:ring-purple-500 font-medium cursor-pointer shadow-xs" title="Holatni tanlang (avtomatik saqlanadi)">
                     <option value="yangi" {'selected' if lead_status=='yangi' else ''}>⚪ Yangi</option>
                     <option value="oylanyapti" {'selected' if lead_status=='oylanyapti' else ''}>💭 O'ylayapti</option>
-                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Bog'lanildi</option>
+                    <option value="boglandi" {'selected' if lead_status in ['boglandi', 'jarayonda'] else ''}>🟢 Muvaffaqiyatli</option>
                     <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                     <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                 </select>
@@ -954,7 +954,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         },
         {
             "status": "boglandi",
-            "title": "Bog'lanildi",
+            "title": "Muvaffaqiyatli",
             "icon": "🟢",
             "subtitle": "Muvaffaqiyatli gaplashildi",
             "border": "border-emerald-300",
@@ -1248,7 +1248,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <span class="font-bold text-emerald-700">{today_phones} ta</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>🟢 Bog'lanildi:</span>
+                            <span>🟢 Muvaffaqiyatli:</span>
                             <span class="font-bold text-indigo-700">{today_done} ta</span>
                         </div>
                         <div class="flex justify-between">
@@ -1273,7 +1273,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <span class="font-bold text-emerald-700">{month_phones} ta</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>🟢 Bog'lanildi:</span>
+                            <span>🟢 Muvaffaqiyatli:</span>
                             <span class="font-bold text-indigo-700">{month_done} ta</span>
                         </div>
                         <div class="flex justify-between">
@@ -1298,7 +1298,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <span class="font-bold text-emerald-700">{leads_with_phone} ta ({phone_rate}%)</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>🟢 Bog'lanildi:</span>
+                            <span>🟢 Muvaffaqiyatli:</span>
                             <span class="font-bold text-indigo-700">{done_leads} ta ({conversion_rate}%)</span>
                         </div>
                         <div class="flex justify-between">
@@ -1338,7 +1338,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <!-- Card 3: Konversiya (Bog'lanildi) -->
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Bog'lanildi</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Muvaffaqiyatli</span>
                         <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">🟢</span>
                     </div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
@@ -1426,7 +1426,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <span class="font-bold text-slate-800">{new_leads} ta</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 bg-emerald-50 rounded-lg">
-                            <span class="flex items-center gap-1 text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Bog'lanildi:</span>
+                            <span class="flex items-center gap-1 text-emerald-700"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Muvaffaqiyatli:</span>
                             <span class="font-bold text-emerald-900">{done_leads} ta</span>
                         </div>
                         <div class="flex items-center justify-between p-1.5 bg-amber-50 rounded-lg">
@@ -1498,9 +1498,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
                             <tr>
                                 <th class="px-5 py-3">Menejer / Xodim</th>
-                                <th class="px-4 py-3 text-center">Biriktirilgan Lidlar</th>
+                                <th class="px-4 py-3 text-center">Lid bilan ishlagani</th>
                                 <th class="px-4 py-3 text-center">💭 O'ylayapti</th>
-                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
+                                <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
                                 <th class="px-4 py-3 text-center">📦 Zahira</th>
                                 <th class="px-4 py-3 text-center">🔴 Rad etildi</th>
                                 <th class="px-4 py-3 text-center">💬 Izohlar</th>
@@ -1532,7 +1532,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-4 py-3">Manba Turi</th>
                                 <th class="px-4 py-3 text-center">Jami Lidlar</th>
                                 <th class="px-4 py-3 text-center">📞 Telefonli Lidlar</th>
-                                <th class="px-4 py-3 text-center">🟢 Bog'lanildi</th>
+                                <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
                                 <th class="px-5 py-3 text-right">Konversiya Darajasi</th>
                             </tr>
                         </thead>
@@ -1638,7 +1638,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div>
                         <h3 class="text-lg font-extrabold">Diqqat: Tizimda {total_suspicious} ta shubhali holat aniqlandi!</h3>
                         <p class="text-rose-100 text-xs sm:text-sm mt-1 max-w-2xl">
-                            Ushbu lidlar bo'yicha mijoz bilan telefon orqali gaplashilmagan (telefon raqami yo'q) va Instagram Direct orqali ham xabar yuborilmagan, biroq xodimlar tomonidan &quot;🟢 Bog'lanildi&quot; deb belgilangan.
+                            Ushbu lidlar bo'yicha mijoz bilan telefon orqali gaplashilmagan (telefon raqami yo'q) va Instagram Direct orqali ham xabar yuborilmagan, biroq xodimlar tomonidan &quot;🟢 Muvaffaqiyatli&quot; deb belgilangan.
                         </p>
                     </div>
                 </div>
@@ -1690,10 +1690,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-5 py-3">Mutaxassis</th>
                                 <th class="px-4 py-3 text-center">Bugungi Lidlar</th>
                                 <th class="px-4 py-3 text-center">Oylik Lidlar</th>
-                                <th class="px-4 py-3 text-center">Jami Biriktirilgan</th>
+                                <th class="px-4 py-3 text-center">Lid bilan ishlagani</th>
                                 <th class="px-4 py-3 text-center">📞 Olingan Telefonlar</th>
                                 <th class="px-4 py-3 text-center">💬 Direct Xabarlar</th>
-                                <th class="px-4 py-3 text-center">🟢 Bog'landi Belgilangan</th>
+                                <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
                                 <th class="px-4 py-3 text-center">⚠️ Shubhali Holat</th>
                                 <th class="px-5 py-3 text-right">Audit Xulosasi</th>
                             </tr>
@@ -2312,7 +2312,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <select name="status" id="modalStatusSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
                         <option value="yangi">⚪ Yangi (Bog'lanish kutilmoqda ⏳)</option>
                         <option value="oylanyapti">💭 O'ylayapti (Qaror qabul qilmoqda 🤔)</option>
-                        <option value="boglandi">🟢 Bog'lanildi (Muvaffaqiyatli gaplashildi ✅)</option>
+                        <option value="boglandi">🟢 Muvaffaqiyatli (Muvaffaqiyatli gaplashildi ✅)</option>
                         <option value="zahira">📦 Zahira (Keyingi oqim / ochiladigan kurslar uchun 📦)</option>
                         <option value="rad">🔴 Rad / Ko'tarmadi (Bog'lanib bo'lmadi ❌)</option>
                     </select>
@@ -2483,7 +2483,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="text-2xl sm:text-3xl font-extrabold text-sky-600">{thinking_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Bog'lanildi</div>
+                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🟢 Muvaffaqiyatli</div>
                     <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{done_leads} <span class="text-xs text-slate-400 font-normal">ta</span></div>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
@@ -2531,7 +2531,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
                             <option value="yangi">⚪ Yangi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
-                            <option value="boglandi">🟢 Bog'lanildi</option>
+                            <option value="boglandi">🟢 Muvaffaqiyatli</option>
                             <option value="zahira">📦 Zahira (Keyingi oqim)</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
@@ -3441,7 +3441,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 chartInstances.status = new Chart(ctxStatus, {{
                     type: 'doughnut',
                     data: {{
-                        labels: ["⚪ Yangi", "💭 O'ylayapti", "🟢 Bog'lanildi", "📦 Zahira", "🔴 Rad"],
+                        labels: ["⚪ Yangi", "💭 O'ylayapti", "🟢 Muvaffaqiyatli", "📦 Zahira", "🔴 Rad"],
                         datasets: [{{
                             data: [{new_leads}, {thinking_leads}, {done_leads}, {reserve_leads}, {rejected_leads}],
                             backgroundColor: ['#94a3b8', '#0284c7', '#10b981', '#8b5cf6', '#f43f5e'],
@@ -3692,7 +3692,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         const statusTitles = {{
             "yangi": "⚪ Yangi Lid",
-            "boglandi": "🟢 Bog'lanildi",
+            "boglandi": "🟢 Muvaffaqiyatli",
             "oylanyapti": "💭 O'ylayapti",
             "zahira": "📦 Zahira (Keyingi oqim)",
             "rad": "🔴 Rad / Ko'tarmadi"
@@ -3880,9 +3880,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         const statusMap = {{
                             "yangi": "⚪ Yangi",
                             "boshlangich": "⚪ Yangi",
-                            "boglandi": "🟢 Bog'lanildi",
-                            "bog'landi": "🟢 Bog'lanildi",
-                            "jarayonda": "🟢 Bog'lanildi",
+                            "boglandi": "🟢 Muvaffaqiyatli",
+                            "bog'landi": "🟢 Muvaffaqiyatli",
+                            "jarayonda": "🟢 Muvaffaqiyatli",
                             "oylanyapti": "💭 O'ylayapti",
                             "o'ylayapti": "💭 O'ylayapti",
                             "zahira": "📦 Zahira (Keyingi oqim)",
@@ -3945,9 +3945,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const statusMap = {{
                 "yangi": "⚪ Yangi",
                 "boshlangich": "⚪ Yangi",
-                "boglandi": "🟢 Bog'lanildi",
-                "bog'landi": "🟢 Bog'lanildi",
-                "jarayonda": "🟢 Bog'lanildi",
+                "boglandi": "🟢 Muvaffaqiyatli",
+                "bog'landi": "🟢 Muvaffaqiyatli",
+                "jarayonda": "🟢 Muvaffaqiyatli",
                 "oylanyapti": "💭 O'ylayapti",
                 "o'ylayapti": "💭 O'ylayapti",
                 "zahira": "📦 Zahira",

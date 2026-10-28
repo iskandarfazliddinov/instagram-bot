@@ -1344,9 +1344,9 @@ def export_clients_excel(request: Request):
         STATUS_STYLES = {
             "yangi": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
             "boshlangich": {"fill": "F3E8FF", "font_color": "6B21A8", "label": "⚪ Yangi"},
-            "boglandi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
-            "bog'landi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
-            "jarayonda": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Bog'lanildi"},
+            "boglandi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Muvaffaqiyatli"},
+            "bog'landi": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Muvaffaqiyatli"},
+            "jarayonda": {"fill": "DCFCE7", "font_color": "166534", "label": "🟢 Muvaffaqiyatli"},
             "oylanyapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
             "o'ylayapti": {"fill": "DBEAFE", "font_color": "1E40AF", "label": "💭 O'ylayapti"},
             "zahira": {"fill": "E0E7FF", "font_color": "3730A3", "label": "📦 Zahira (Keyingi oqim)"},
@@ -1567,7 +1567,7 @@ def export_clients_csv():
     status_map = {
         "yangi": "⚪ Yangi",
         "jarayonda": "🟡 Jarayonda",
-        "boglandi": "🟢 Bog'lanildi",
+        "boglandi": "🟢 Muvaffaqiyatli",
         "oylanyapti": "💭 O'ylayapti",
         "zahira": "📦 Zahira (Keyingi oqim)",
         "rad": "🔴 Rad / Ko'tarmadi"

@@ -31,7 +31,7 @@
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.321218",
-    "last_login": "27.10.2026 20:33",
+    "last_login": "28.10.2026 11:19",
     "allowed_directions": "hotel",
     "password_hash": "1375a85867d3bc58052334a86592f2b805cf93b8552a380eb6dd209b14bba931"
   },
@@ -55,7 +55,7 @@
     "role": "operator",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.323541",
-    "last_login": "28.10.2026 11:14",
+    "last_login": "28.10.2026 11:28",
     "allowed_directions": "front_office",
     "password_hash": "c80d3b1e10425b598c2067cec4172f75982bc48f7c74fdae55191124fd17e463"
   },
@@ -67,7 +67,7 @@
     "role": "supervisor",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.324466",
-    "last_login": "27.10.2026 20:33",
+    "last_login": "28.10.2026 11:56",
     "allowed_directions": "all",
     "password_hash": "7ce641787394c25b8c0f58bbfdfb545a9b795f7f7db9329f7aa04db49ef43fc1"
   },
