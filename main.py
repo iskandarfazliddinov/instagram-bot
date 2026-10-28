@@ -1134,13 +1134,17 @@ async def admin_update_operator_directions(
         return RedirectResponse(url="/admin?notice=Operator+topilmadi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
 
     all_keys = [d["key"] for d in AVAILABLE_DIRECTIONS]
+    dir_map = {d["key"]: d["short"] for d in AVAILABLE_DIRECTIONS}
     if not selected_dirs or set(selected_dirs) == set(all_keys) or "all" in selected_dirs:
         val = "all"
         display_dirs = "Barcha yo'nalishlar"
+        badges_html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">🌐 Barcha yo\'nalishlar</span>'
     else:
         valid_selected = [k for k in selected_dirs if k in all_keys]
         val = ",".join(valid_selected)
-        display_dirs = ", ".join(valid_selected) if valid_selected else "Hech biri"
+        display_dirs = ", ".join([dir_map.get(k, k) for k in valid_selected]) if valid_selected else "Hech biri"
+        badges = [f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap shadow-2xs">{dir_map.get(k, k)}</span>' for k in valid_selected]
+        badges_html = f'<div class="flex flex-wrap gap-1 max-w-[240px]">{"".join(badges)}</div>' if badges else '<span class="text-xs text-slate-400 italic">Belgilanmagan</span>'
 
     update_operator(op_id, allowed_directions=val)
     admin_user = get_current_user(request)
@@ -1148,7 +1152,7 @@ async def admin_update_operator_directions(
     log_activity(None, admin_name, "update_directions", f"{op.get('display_name')} xodimiga yo'nalishlar biriktirildi: {display_dirs}")
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"success": True, "op_id": op_id, "directions": val, "display_dirs": display_dirs})
+        return JSONResponse({"success": True, "op_id": op_id, "directions": val, "display_dirs": display_dirs, "badges_html": badges_html})
 
     return RedirectResponse(
         url=f"/admin?notice={op.get('display_name')}+uchun+yo%27nalishlar+muvaffaqiyatli+saqlandi!#tab_operators",

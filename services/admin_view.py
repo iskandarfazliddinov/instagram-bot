@@ -3186,7 +3186,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     const displayDirs = data.display_dirs || 'Barcha yo\\'nalishlar';
                     const tdEl = document.getElementById('op_dirs_td_' + opId);
                     if (tdEl) {{
-                        tdEl.innerHTML = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">' + escapeChatHtml(displayDirs) + '</span>';
+                        tdEl.innerHTML = data.badges_html || ('<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">' + escapeChatHtml(displayDirs) + '</span>');
                     }}
                     closeDirectionsModal();
                     showToast("✅ Mutaxassis yo'nalishlari muvaffaqiyatli saqlandi!");
