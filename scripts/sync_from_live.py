@@ -107,8 +107,77 @@ def sync_live():
             with open(OPS_BACKUP, "w", encoding="utf-8") as f:
                 json.dump(merged_ops, f, ensure_ascii=False, indent=2)
             print(f"✅ {len(merged_ops)} ta mutaxassis zaxiraga (operators_backup.json) saqlandi.")
+
+            # Mahalliy SQLite bazasini ham yangilash
+            if os.path.exists(DB_PATH):
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                for op in merged_ops:
+                    u = op.get("username")
+                    c.execute("SELECT id FROM operators WHERE username = ?", (u,))
+                    row = c.fetchone()
+                    if row:
+                        c.execute("""
+                            UPDATE operators SET
+                                display_name = ?,
+                                phone = ?,
+                                role = ?,
+                                is_active = ?,
+                                allowed_directions = ?,
+                                password_hash = COALESCE(NULLIF(?, ''), password_hash)
+                            WHERE username = ?
+                        """, (
+                            op.get("display_name"), op.get("phone", ""), op.get("role", "operator"),
+                            op.get("is_active", 1), op.get("allowed_directions", "all"),
+                            op.get("password_hash", ""), u
+                        ))
+                    else:
+                        c.execute("""
+                            INSERT INTO operators (username, password_hash, display_name, phone, role, is_active, created_at, allowed_directions)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            u, op.get("password_hash", ""), op.get("display_name", u),
+                            op.get("phone", ""), op.get("role", "operator"), op.get("is_active", 1),
+                            op.get("created_at"), op.get("allowed_directions", "all")
+                        ))
+                conn.commit()
+                conn.close()
     except Exception as e:
         print(f"⚠️ Mutaxassislar sinxronida xatolik: {e}")
+
+    # 3. Sozlamalar (Settings) sinxroni
+    SETTINGS_BACKUP = os.path.join(DATA_DIR, "settings_backup.json")
+    try:
+        req = urllib.request.urlopen(f"{LIVE_URL}/api/settings", timeout=20)
+        data = json.loads(req.read().decode("utf-8"))
+        live_settings = data.get("settings", {})
+        if live_settings:
+            with open(SETTINGS_BACKUP, "w", encoding="utf-8") as f:
+                json.dump(live_settings, f, ensure_ascii=False, indent=2)
+            print("✅ CRM sozlamalari zaxiraga (settings_backup.json) saqlandi.")
+
+            if os.path.exists(DB_PATH):
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                for k, v in live_settings.items():
+                    c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
+                conn.commit()
+                conn.close()
+    except Exception as e:
+        print(f"⚠️ Sozlamalar sinxronida xatolik: {e}")
+
+    # 4. Aksiyalar (Campaigns) sinxroni
+    CAMPAIGNS_BACKUP = os.path.join(DATA_DIR, "campaigns_backup.json")
+    try:
+        req = urllib.request.urlopen(f"{LIVE_URL}/api/campaigns", timeout=20)
+        data = json.loads(req.read().decode("utf-8"))
+        live_campaigns = data.get("campaigns", [])
+        if live_campaigns:
+            with open(CAMPAIGNS_BACKUP, "w", encoding="utf-8") as f:
+                json.dump(live_campaigns, f, ensure_ascii=False, indent=2)
+            print(f"✅ {len(live_campaigns)} ta aksiya zaxiraga (campaigns_backup.json) saqlandi.")
+    except Exception as e:
+        print(f"⚠️ Aksiyalar sinxronida xatolik: {e}")
 
     print("🎉 Sinxronizatsiya yakunlandi!")
 

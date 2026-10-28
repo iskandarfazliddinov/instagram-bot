@@ -1293,6 +1293,20 @@ def list_operators():
     """Barcha mutaxassislar ro'yxatini olish"""
     return {"operators": get_all_operators()}
 
+@app.get("/api/settings")
+def api_get_settings():
+    """Barcha CRM sozlamalarini olish (sinxronizatsiya uchun)"""
+    from database import get_all_settings
+    s = get_all_settings()
+    s.pop("gemini_api_key", None)
+    return {"settings": s}
+
+@app.get("/api/campaigns")
+def api_get_campaigns():
+    """Barcha aksiyalar (Reels/Post) ro'yxatini olish"""
+    from database import get_all_campaigns
+    return {"campaigns": get_all_campaigns()}
+
 @app.get("/api/clients/excel")
 @app.get("/api/clients/xlsx")
 def export_clients_excel(request: Request):

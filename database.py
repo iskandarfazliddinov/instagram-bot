@@ -449,22 +449,34 @@ def init_db():
                                 full_name = CASE WHEN (full_name = '' OR full_name IS NULL OR full_name = 'Noma\'lum') THEN COALESCE(?, full_name) ELSE full_name END,
                                 campaign = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Umumiy') THEN ? WHEN (campaign = '' OR campaign IS NULL OR campaign = 'Umumiy') THEN COALESCE(?, campaign) ELSE campaign END,
                                 source = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != 'Direct') THEN ? WHEN (source = '' OR source IS NULL OR source = 'Direct') THEN COALESCE(?, source) ELSE source END,
-                                lead_status = CASE WHEN (lead_status = '' OR lead_status IS NULL OR lead_status = 'boshlangich') AND ? != '' THEN ? ELSE lead_status END,
+                                lead_status = COALESCE(NULLIF(?, ''), lead_status),
+                                manager_name = COALESCE(NULLIF(?, ''), manager_name),
+                                manager_comment = COALESCE(NULLIF(?, ''), manager_comment),
+                                manager_time = COALESCE(NULLIF(?, ''), manager_time),
+                                ai_summary = COALESCE(NULLIF(?, ''), ai_summary),
+                                chat_history = CASE WHEN (? IS NOT NULL AND ? != '' AND ? != '[]') THEN ? ELSE chat_history END,
                                 step = CASE WHEN (step = '' OR step IS NULL OR step = 'new') AND ? != '' THEN 'completed' ELSE step END,
                                 followup_count = COALESCE(?, followup_count),
                                 last_followup_at = CASE WHEN (last_followup_at = '' OR last_followup_at IS NULL) THEN ? ELSE last_followup_at END,
-                                tg_message_id = COALESCE(?, tg_message_id)
+                                tg_message_id = COALESCE(?, tg_message_id),
+                                updated_at = COALESCE(NULLIF(?, ''), updated_at)
                             WHERE instagram_id = ?
                         """, (
                             b.get("phone_number"),
                             b.get("full_name"),
                             b.get("campaign"), b.get("campaign"), b.get("campaign"), b.get("campaign"), b.get("campaign"),
                             b.get("source"), b.get("source"), b.get("source"), b.get("source"), b.get("source"),
-                            b.get("phone_number", "") or "", b.get("lead_status", "yangi"),
+                            b.get("lead_status", "") or "",
+                            b.get("manager_name", "") or "",
+                            b.get("manager_comment", "") or "",
+                            b.get("manager_time", "") or "",
+                            b.get("ai_summary", "") or "",
+                            b.get("chat_history", "[]"), b.get("chat_history", "[]"), b.get("chat_history", "[]"), b.get("chat_history", "[]"),
                             b.get("phone_number", "") or "",
                             b.get("followup_count"),
                             b.get("last_followup_at", ""),
                             b.get("tg_message_id"),
+                            b.get("updated_at", ""),
                             ig_id
                         ))
         except Exception:
@@ -747,6 +759,7 @@ def get_or_create_client(instagram_id: str) -> dict:
         conn.commit()
         cursor.execute("SELECT * FROM clients WHERE instagram_id = ?", (instagram_id,))
         row = cursor.fetchone()
+        sync_leads_backup()
 
     client_dict = dict(row)
     conn.close()
