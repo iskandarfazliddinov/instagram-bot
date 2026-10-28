@@ -152,7 +152,7 @@ def init_db():
         "final_message": "Rahmat, tez orada siz bilan bog'lanamiz! 😊\n\nQuyidagi havola orqali akademiyamiz platformasidagi ta'lim yo'nalishlari bilan batafsil tanishishingiz mumkin:",
         "default_promo_link": "https://tourism-edu.uz",
         "admin_username": "admin",
-        "admin_password": "admin",
+        "admin_password": "Isak2002",
         "operator_username": "operator",
         "operator_password": "operator123",
         "ai_enabled": "1",
@@ -516,7 +516,7 @@ def init_db():
                             role = ?,
                             is_active = COALESCE(?, is_active),
                             allowed_directions = COALESCE(NULLIF(?, ''), allowed_directions, 'all'),
-                            password_hash = CASE WHEN (password_hash IS NOT NULL AND password_hash != '') THEN password_hash ELSE ? END
+                            password_hash = COALESCE(NULLIF(?, ''), password_hash)
                         WHERE username = ?
                     """, (
                         op.get("display_name", op.get("username")),
@@ -661,7 +661,10 @@ def get_operator_by_username(username: str) -> dict | None:
         return None
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM operators WHERE LOWER(username) = LOWER(?)", (username.strip(),))
+    cursor.execute(
+        "SELECT * FROM operators WHERE LOWER(username) = LOWER(?) OR (LOWER(?) = 'jasur' AND LOWER(username) = 'jasurraxmanov')",
+        (username.strip(), username.strip())
+    )
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None

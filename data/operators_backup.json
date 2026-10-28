@@ -2,7 +2,7 @@
   {
     "id": 3,
     "username": "baxodir",
-    "password_hash": "b4c4d6b060f6f7b38e3bcb9a2d68a52887f0a6780f02eb22b0e244dc0c07d589",
+    "password_hash": "fe53ddf975e6edb17ccbba057f3ba22a24508ac4667bc50a4c5349f796bbd15d",
     "display_name": "Baxodir Xusanov",
     "phone": "",
     "role": "operator",
@@ -38,7 +38,7 @@
   {
     "id": 6,
     "username": "shirin",
-    "password_hash": "3188e359b6c6b3d8e05c9d2c12dbf8d0a3c068ddf92e68ada74daed0b8247807",
+    "password_hash": "9e7d8f43253d9eb4fd66510e5f33a1908b4f29b8bd96da32fac0e14ebd5ffe16",
     "display_name": "Shirin Yakubovna",
     "phone": "",
     "role": "operator",
@@ -62,7 +62,7 @@
   {
     "id": 8,
     "username": "jasurraxmanov",
-    "password_hash": "dfbd58d411d20fa547c838546540710829f87db7857cef47719e19b2acd639ed",
+    "password_hash": "7ce641787394c25b8c0f58bbfdfb545a9b795f7f7db9329f7aa04db49ef43fc1",
     "display_name": "Jasur Raxmanov",
     "phone": "",
     "role": "supervisor",
