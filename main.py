@@ -29,7 +29,8 @@ from database import (
     get_client_chat_history,
     set_client_ai_paused,
     log_activity,
-    get_recent_activity_logs
+    get_recent_activity_logs,
+    get_all_operators
 )
 from services.dialog_manager import (
     process_incoming_message,
