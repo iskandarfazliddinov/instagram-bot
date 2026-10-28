@@ -103,12 +103,36 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     curr_display_name = current_user.get("display_name", "Admin")
 
-    # Har bir operatorga biriktirilgan lidlar soni
+    def find_matching_operator(manager_val: str):
+        if not manager_val or manager_val in ["—", "none", "", "Biriktirilmagan (Yangi)"]:
+            return None
+        m = str(manager_val).lower().replace("@", "").strip()
+        for op in operators:
+            op_u = (op.get("username") or "").lower().strip()
+            op_d = (op.get("display_name") or "").lower().strip()
+            if m == op_u or m == op_d:
+                return op
+            if op_u and (op_u in m or m in op_u):
+                return op
+            if op_d and (op_d in m or m in op_d or op_d.replace(" ", "_") in m or m.replace("_", " ") in op_d):
+                return op
+        return None
+
+    # Har bir operatorga biriktirilgan lidlar soni (aniq va moslashtirilgan hisob)
     op_lead_counts = {}
+    for op in operators:
+        k = op.get("display_name") or op.get("username")
+        op_lead_counts[k] = 0
+
     for c in clients:
         m = (c.get("manager_name") or "").strip()
         if m:
-            op_lead_counts[m] = op_lead_counts.get(m, 0) + 1
+            matched_op = find_matching_operator(m)
+            if matched_op:
+                k = matched_op.get("display_name") or matched_op.get("username")
+                op_lead_counts[k] = op_lead_counts.get(k, 0) + 1
+            else:
+                op_lead_counts[m] = op_lead_counts.get(m, 0) + 1
 
     operators_options_html = '<option value="Admin">👑 Admin</option>'
     for op in operators:
@@ -124,6 +148,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     from database import AVAILABLE_DIRECTIONS
     dir_dict = {d["key"]: d for d in AVAILABLE_DIRECTIONS}
+    if "hotel" in dir_dict:
+        dir_dict["hotel_operations"] = dir_dict["hotel"]
 
     # Operator yo'nalishlari va filtrlash
     op_allowed_dirs_raw = (current_user.get("allowed_directions") or "all").strip() if current_user else "all"
@@ -318,7 +344,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     for c in clients:
         m_name = (c.get('manager_name') or '').strip()
-        if not m_name or m_name == "—":
+        matched_op = find_matching_operator(m_name)
+        if matched_op:
+            m_key = matched_op.get("display_name") or matched_op.get("username")
+        elif not m_name or m_name == "—":
             m_key = "Biriktirilmagan (Yangi)"
         else:
             m_key = m_name
@@ -664,12 +693,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </td>
         """
 
+        matched_op = find_matching_operator(manager_name)
+        disp_mgr = matched_op.get("display_name") if matched_op else manager_name
+        matched_d = (matched_op.get("display_name") or "").lower() if matched_op else ""
+        matched_u = (matched_op.get("username") or "").lower() if matched_op else ""
+        mgr_search_tags = f"{manager_name.lower()} {matched_d} {matched_u}".strip()
+
         if not manager_name or manager_name == "—":
             manager_display_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-slate-400 bg-slate-100">⚪ Biriktirilmagan</span>'
-        elif manager_name == curr_display_name:
-            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 shadow-2xs">⭐ {manager_name} (Men)</span>'
+        elif disp_mgr == curr_display_name or manager_name == curr_display_name:
+            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 shadow-2xs">⭐ {disp_mgr} (Men)</span>'
         else:
-            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200">👤 {manager_name}</span>'
+            manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200">👤 {disp_mgr}</span>'
 
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
@@ -726,7 +761,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             data-status="{lead_status}"
             data-course="{campaign.lower()}"
             data-source="{source.lower()}"
-            data-manager="{manager_name.lower()}"
+            data-manager="{mgr_search_tags}"
             data-suspicious="{1 if is_suspicious else 0}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
@@ -823,7 +858,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
              data-status="{lead_status}"
              data-course="{campaign.lower()}"
              data-source="{source.lower()}"
-             data-manager="{manager_name.lower()}"
+             data-manager="{mgr_search_tags}"
              data-suspicious="{1 if is_suspicious else 0}">
 
             <!-- Top row: Avatar, Name, Ig link, and Date -->
@@ -2885,6 +2920,16 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const managerSelect = document.getElementById('modalManagerSelect');
             if (managerSelect) {{
                 managerSelect.value = currentManager || '';
+                if (!managerSelect.value && currentManager) {{
+                    const clean = currentManager.toLowerCase().replace('@', '').replace('_', ' ').trim();
+                    for (let opt of managerSelect.options) {{
+                        const optVal = opt.value.toLowerCase().replace('@', '').replace('_', ' ').trim();
+                        if (optVal && (optVal === clean || optVal.includes(clean) || clean.includes(optVal))) {{
+                            managerSelect.value = opt.value;
+                            break;
+                        }}
+                    }}
+                }}
             }}
 
             const phoneInput = document.getElementById('modalPhoneInput');
