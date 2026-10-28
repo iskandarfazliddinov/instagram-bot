@@ -473,6 +473,8 @@ def init_db():
     # Operatorlarni zaxiradan tiklash (agar mavjud bo'lsa)
     if os.path.exists(OPERATORS_BACKUP_FILE):
         try:
+            cursor.execute("UPDATE operators SET username = 'jasurraxmanov' WHERE username = 'jasur'")
+            cursor.execute("DELETE FROM operators WHERE username = 'operator'")
             with open(OPERATORS_BACKUP_FILE, "r", encoding="utf-8") as f:
                 backup_ops = json.load(f)
             for op in backup_ops:

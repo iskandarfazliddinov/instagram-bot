@@ -92,9 +92,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     is_admin = (user_role == "admin")
     if current_user is None:
         current_user = {
-            "username": "admin" if user_role == "admin" else ("jasur" if user_role == "supervisor" else "operator"),
+            "username": "admin" if user_role == "admin" else ("jasurraxmanov" if user_role == "supervisor" else "operator"),
             "role": user_role,
-            "display_name": "Admin" if user_role == "admin" else ("Jasur Raxmanov" if user_role == "supervisor" else "Operator 1")
+            "display_name": "Admin" if user_role == "admin" else ("Jasur Raxmanov" if user_role == "supervisor" else "Operator")
         }
     if operators is None:
         operators = []
