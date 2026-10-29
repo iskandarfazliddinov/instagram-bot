@@ -277,7 +277,9 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
     except Exception:
         return {"status": "invalid json"}
 
-    if body.get("object") == "instagram" or "field" in body:
+    logger.info(f"Yangi Webhook so'rovi keldi: object={body.get('object')}, entry_count={len(body.get('entry', []))}")
+
+    if body.get("object") in ["instagram", "page"] or "field" in body:
         # Agar Meta test oynasidan to'g'ridan-to'g'ri test xabar yuborilgan bo'lsa
         if body.get("field") == "messages":
             val = body.get("value", {})
