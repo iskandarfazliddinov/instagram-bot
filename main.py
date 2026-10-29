@@ -280,7 +280,7 @@ async def direct_realtime_poller_worker():
     last_seen_mids = set()
     while True:
         try:
-            _check_and_reply_new_messages(last_seen_mids, PAGE_IDS)
+            await asyncio.to_thread(_check_and_reply_new_messages, last_seen_mids, PAGE_IDS)
         except Exception as e:
             logger.error(f'Direct poller xatoligi: {e}')
         await asyncio.sleep(5)

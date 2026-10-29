@@ -306,34 +306,28 @@ def process_incoming_message(sender_id: str, user_text: str):
                 any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"])
             )
 
-            if is_pdf_inquiry or (is_hotel_context and any(k in text_clean.lower() for k in ["kurs", "dastur", "haqida", "ma'lumot", "malumot", "pdf", "reja"])):
+            if is_pdf_inquiry:
                 if "t.me/MyMarketingAndPrBot" not in ai_reply and "hotel_operations.pdf" not in ai_reply:
                     lang_msg = detect_message_language(text_clean)
                     if lang_msg == "ru":
                         links_text = (
-                            "\n\n📄 Полную программу курса (PDF, 27 страниц) вы можете скачать в Telegram:\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
-                            "📥 Прямая ссылка на PDF:\n"
-                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
-                            "📝 Форма регистрации (Zoho):\n"
+                            "\n\n📄 Программа курса (PDF, 27 страниц):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📝 Форма регистрации:\n"
                             "https://survey.zohopublic.com/zs/jQCZao"
                         )
                     elif lang_msg == "en":
                         links_text = (
-                            "\n\n📄 You can download the full curriculum (PDF, 27 pages) via Telegram:\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
-                            "📥 Direct PDF download link:\n"
-                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
-                            "📝 Application form (Zoho):\n"
+                            "\n\n📄 Course curriculum (PDF, 27 pages):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📝 Application form:\n"
                             "https://survey.zohopublic.com/zs/jQCZao"
                         )
                     else:
                         links_text = (
-                            "\n\n📄 Dasturning to'liq PDF faylini (27 sahifalik o'quv rejasi) Telegram orqali yuklab olishingiz mumkin:\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n\n"
-                            "📥 Brauzerda to'g'ridan-to'g'ri yuklab olish:\n"
-                            "https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n\n"
-                            "📝 Ro'yxatdan o'tish (Zoho ariza):\n"
+                            "\n\n📄 O'quv dasturi (PDF, 27 bet):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📝 Ariza topshirish (Zoho):\n"
                             "https://survey.zohopublic.com/zs/jQCZao"
                         )
                     ai_reply = ai_reply.strip() + links_text

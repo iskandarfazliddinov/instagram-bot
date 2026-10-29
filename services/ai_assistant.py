@@ -9,11 +9,11 @@ from database import get_setting
 logger = logging.getLogger(__name__)
 
 # Eng tezkor, barqaror va yuqori kvotali Gemini modellar
-PRIMARY_MODEL = "gemini-flash-latest"
-FALLBACK_MODEL = "gemini-flash-lite-latest"
+PRIMARY_MODEL = "gemini-2.0-flash"
+FALLBACK_MODEL = "gemini-flash-latest"
 THIRD_MODEL = "gemini-3.1-flash-lite"
-AUDIO_PRIMARY_MODEL = "gemini-flash-latest"
-AUDIO_FALLBACK_MODEL = "gemini-flash-lite-latest"
+AUDIO_PRIMARY_MODEL = "gemini-2.0-flash"
+AUDIO_FALLBACK_MODEL = "gemini-flash-latest"
 
 def detect_message_language(text: str) -> str:
     """
@@ -228,7 +228,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         gen_config = {
             "temperature": 0.3,
-            "maxOutputTokens": 600
+            "maxOutputTokens": 450
         }
         if "gemini-3" in model_name:
             gen_config["thinkingConfig"] = {"thinkingBudget": 0}

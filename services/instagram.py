@@ -250,10 +250,56 @@ def refresh_long_lived_token() -> bool:
         logger.error(f"Tokenni avtomatik yangilashda xatolik: {e}")
         return False
 
-def send_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
-    """
-    Instagram Direct orqali mijozga xabar yuborish (Avtomatik yoki Inson/Mutaxassis orqali)
-    """
+def split_message_text(text: str, max_length: int = 900) -> list[str]:
+    """Meta Instagram Direct 1000 belgilik cheklovidan oshmasligi uchun xabarni abzaslar bo'yicha bo'laklash"""
+    if not text:
+        return []
+    if len(text) <= max_length:
+        return [text]
+
+    parts = []
+    current_part = []
+    current_len = 0
+
+    paragraphs = text.split("\n\n")
+    for para in paragraphs:
+        if current_len + len(para) + 2 <= max_length:
+            current_part.append(para)
+            current_len += len(para) + 2
+        else:
+            if current_part:
+                parts.append("\n\n".join(current_part))
+                current_part = []
+                current_len = 0
+
+            if len(para) > max_length:
+                lines = para.split("\n")
+                for line in lines:
+                    if current_len + len(line) + 1 <= max_length:
+                        current_part.append(line)
+                        current_len += len(line) + 1
+                    else:
+                        if current_part:
+                            parts.append("\n".join(current_part))
+                            current_part = []
+                            current_len = 0
+                        while len(line) > max_length:
+                            parts.append(line[:max_length])
+                            line = line[max_length:]
+                        if line:
+                            current_part.append(line)
+                            current_len += len(line) + 1
+            else:
+                current_part.append(para)
+                current_len += len(para) + 2
+
+    if current_part:
+        parts.append("\n\n".join(current_part))
+
+    return parts if parts else [text[:max_length]]
+
+def _send_single_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
+    """Yagona bo'lak xabarni Meta Graph API orqali yuborish"""
     token = get_access_token()
     if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         logger.warning("PAGE_ACCESS_TOKEN kiritilmagan. Xabar yuborilmadi.")
@@ -273,7 +319,6 @@ def send_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
         data = response.json()
         if response.status_code != 200:
             err = data.get("error", {})
-            # Agar inson javob berayotgan bo'lsa va 24 soatlik oyna xatosi bersa -> HUMAN_AGENT tag bilan urinib ko'rish
             if is_human:
                 try:
                     human_payload = {
@@ -304,6 +349,22 @@ def send_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
     except Exception as e:
         logger.error(f"Instagram xabar yuborishda xatolik: {e}")
         return {"error": str(e)}
+
+def send_message(recipient_id: str, text: str, is_human: bool = False) -> dict:
+    """
+    Instagram Direct orqali mijozga xabar yuborish (Avtomatik yoki Inson/Mutaxassis orqali).
+    Meta 1000 belgilik cheklovidan oshgan xabarlarni avtomatik bo'laklab yuboradi.
+    """
+    chunks = split_message_text(text, max_length=900)
+    if not chunks:
+        return {"error": "Empty text"}
+
+    last_res = {}
+    for i, chunk in enumerate(chunks):
+        if i > 0:
+            time.sleep(0.5)
+        last_res = _send_single_message(recipient_id, chunk, is_human=is_human)
+    return last_res
 
 def send_link_button(recipient_id: str, text: str, button_title: str, url: str) -> dict:
     """
