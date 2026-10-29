@@ -298,8 +298,9 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
             PAGE_IDS = {entry_id, "2036629730372506", "39179052008410053", "17841468109131133", "1314546795084427"}
             PAGE_IDS.discard("")
 
-            # 1. Standart Messenger API formati (entry -> messaging)
-            for messaging_event in entry.get("messaging", []):
+            # 1. Standart Messenger API formati (entry -> messaging yoki standby)
+            events = (entry.get("messaging") or []) + (entry.get("standby") or [])
+            for messaging_event in events:
                 sender_id = str(messaging_event.get("sender", {}).get("id", ""))
                 message = messaging_event.get("message", {})
 
@@ -385,8 +386,8 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                 field = change.get("field")
                 value = change.get("value", {})
 
-                # A) Direct xabarlar (Instagram API v26.0)
-                if field == "messages":
+                # A) Direct xabarlar (Instagram API v26.0 messages yoki standby)
+                if field in ["messages", "standby"]:
                     sender_id = str(value.get("sender", {}).get("id", ""))
                     message = value.get("message", {})
 
