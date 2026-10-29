@@ -103,10 +103,10 @@ def process_incoming_message(sender_id: str, user_text: str):
     detected_course = None
     detected_source = None
 
-    if any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "tourism-edu.uz", "платформ"]):
-        detected_course = "Onlayn ta'lim (Front Office)"
+    if any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "tourism-edu", "платформ"]):
+        detected_course = "Onlayn ta'lim (Front Office / Housekeeping)"
         detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
-    elif any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona", "отел", "гостиниц"]):
+    elif any(k in history_text for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism", "inavation", "innovation"]):
         detected_course = "Hotel Operations and Innovation"
         detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
     elif any(k in history_text for k in ["malaka", "72 soat", "sertifikatim bor", "muddat tugagan", "повышение квалификации"]):
@@ -249,6 +249,12 @@ def process_incoming_message(sender_id: str, user_text: str):
     if step == "completed":
         new_course_found = None
         for k, c_name in [
+            ("housekeeping", "Housekeeping (Onlayn)"),
+            ("frontoffice", "Front Office (Onlayn)"),
+            ("front office", "Front Office (Onlayn)"),
+            ("tourism-edu", "Onlayn ta'lim platformasi"),
+            ("online", "Onlayn ta'lim platformasi"),
+            ("onlayn", "Onlayn ta'lim platformasi"),
             ("malaka", "Gid malaka oshirish"),
             ("72 soat", "Gid malaka oshirish"),
             ("qayta tayyorla", "Gid qayta tayyorlash"),
@@ -258,13 +264,8 @@ def process_incoming_message(sender_id: str, user_text: str):
             ("turoperator", "Turoperatorlik kursi"),
             ("gid", "Gid-ekskursiyachi kursi"),
             ("ekskurs", "Gid-ekskursiyachi kursi"),
-            ("housekeeping", "Housekeeping (Onlayn)"),
-            ("frontoffice", "Front Office (Onlayn)"),
-            ("front office", "Front Office (Onlayn)"),
-            ("online", "Onlayn ta'lim platformasi"),
-            ("onlayn", "Onlayn ta'lim platformasi"),
-            ("hotel", "Mehmonxona boshqaruvi"),
-            ("mehmonxona", "Mehmonxona boshqaruvi"),
+            ("hotel operations", "Hotel Operations"),
+            ("un tourism", "Hotel Operations"),
             ("restoran", "Restoran ishi va servis"),
             ("servis", "Restoran ishi va servis"),
             ("f&b", "Restoran ishi va servis")
@@ -298,40 +299,6 @@ def process_incoming_message(sender_id: str, user_text: str):
             chat_history=chat_history
         )
         if ai_reply:
-            # Agar foydalanuvchi PDF, reja yoki o'quv dasturi haqida so'ragan bo'lsa, havolalarning mavjudligini kafolatlash
-            is_pdf_inquiry = any(k in text_clean.lower() for k in ["pdf", "dastur", "silabus", "syllabus", "reja", "modul", "fayl", "broshyura"])
-            is_hotel_context = (
-                client.get("campaign") == "Hotel Operations and Innovation" or 
-                any(k in text_clean.lower() for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"]) or
-                any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"])
-            )
-
-            if is_pdf_inquiry:
-                if "t.me/MyMarketingAndPrBot" not in ai_reply and "hotel_operations.pdf" not in ai_reply:
-                    lang_msg = detect_message_language(text_clean)
-                    if lang_msg == "ru":
-                        links_text = (
-                            "\n\n📄 Программа курса (PDF, 27 страниц):\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
-                            "📝 Форма регистрации:\n"
-                            "https://survey.zohopublic.com/zs/jQCZao"
-                        )
-                    elif lang_msg == "en":
-                        links_text = (
-                            "\n\n📄 Course curriculum (PDF, 27 pages):\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
-                            "📝 Application form:\n"
-                            "https://survey.zohopublic.com/zs/jQCZao"
-                        )
-                    else:
-                        links_text = (
-                            "\n\n📄 O'quv dasturi (PDF, 27 bet):\n"
-                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
-                            "📝 Ariza topshirish (Zoho):\n"
-                            "https://survey.zohopublic.com/zs/jQCZao"
-                        )
-                    ai_reply = ai_reply.strip() + links_text
-
             res = send_message(sender_id, ai_reply)
             if not res or not res.get("error"):
                 append_client_chat_history(sender_id, "assistant", ai_reply)
@@ -352,14 +319,13 @@ def process_incoming_message(sender_id: str, user_text: str):
                             lang_req = l_h
                             break
 
-            is_pdf_inquiry = any(k in text_clean.lower() for k in ["pdf", "dastur", "silabus", "syllabus", "reja", "modul", "fayl", "broshyura"])
-            is_hotel_context = (
-                client.get("campaign") == "Hotel Operations and Innovation" or 
-                any(k in text_clean.lower() for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"]) or
-                any(k in history_text for k in ["hotel", "operations", "inavation", "innovation", "mehmonxona"])
-            )
+            # Qaysi kurs kontekstida ekanligini aniqlash:
+            is_hotel_ops = any(k in text_clean.lower() or k in history_text for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism"])
+            is_online_platform = any(k in text_clean.lower() or k in history_text for k in ["front office", "frontoffice", "housekeeping", "tourism-edu", "onlayn", "online", "masofaviy"])
+            is_gid = any(k in text_clean.lower() or k in history_text for k in ["gid", "ekskurs", "гид", "экскурсовод", "malaka", "qayta tayyorla", "beyjik", "72 soat"])
+            is_agency = any(k in text_clean.lower() or k in history_text for k in ["turagent", "turoperator", "турагент", "туроператор"])
 
-            if is_pdf_inquiry or is_hotel_context:
+            if is_hotel_ops:
                 if lang_req == "ru":
                     fallback_msg = (
                         "Здравствуйте! «Hotel Operations and Innovation 2026–2027» — официальная международная программа переподготовки руководителей гостиничной сферы от UN Tourism и Самаркандского кампуса Международной академии туризма.\n\n"
@@ -392,6 +358,75 @@ def process_incoming_message(sender_id: str, user_text: str):
                         "📝 Ro'yxatdan o'tish (Zoho ariza):\n"
                         "https://survey.zohopublic.com/zs/jQCZao\n\n"
                         "Qabul koordinatori siz bilan bog'lanishi va joyingizni band qilish uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊"
+                    )
+            elif is_online_platform:
+                if lang_req == "ru":
+                    fallback_msg = (
+                        "Здравствуйте! На нашей официальной платформе https://tourism-edu.uz доступны онлайн-курсы по направлениям Front Office и Housekeeping. "
+                        "Обучение проходит дистанционно, а по окончании выдается официальный сертификат с QR-кодом.\n\n"
+                        "Чтобы наш специалист связался с вами и помог с регистрацией, пожалуйста, оставьте ваше имя и номер телефона 😊"
+                    )
+                elif lang_req == "en":
+                    fallback_msg = (
+                        "Hello! Online courses for Front Office and Housekeeping are available on our official e-learning platform https://tourism-edu.uz. "
+                        "You can study remotely and earn an official certificate upon completion.\n\n"
+                        "Please leave your name and contact phone number so our coordinator can assist you 😊"
+                    )
+                else:
+                    fallback_msg = (
+                        "Assalomu alaykum! Bizning rasmiy https://tourism-edu.uz onlayn platformamizda Front Office va Housekeeping yo'nalishlarida masofaviy kurslar mavjud. "
+                        "Istalgan joydan turib o'rganishingiz va yakunda QR-kodli rasmiy sertifikat olishingiz mumkin.\n\n"
+                        "Batafsil ma'lumot olish yoki ro'yxatdan o'tishda yordam berishimiz uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊"
+                    )
+            elif is_gid:
+                if lang_req == "ru":
+                    fallback_msg = (
+                        "Здравствуйте! В Международной академии туризма (Самаркандский кампус) открыт прием на курсы гидов:\n"
+                        "1. 🌍 Переподготовка гидов-экскурсоводов (4 месяца, диплом и профессиональный бейдж по всему Узбекистану) — 5 500 000 сум.\n"
+                        "2. 🗺 Повышение квалификации гидов (1 месяц / 72 часа, официальный сертификат) — 2 350 000 сум.\n\n"
+                        "📍 Самарканд, ул. Бобура Мирзо 3А. Тел: +998 (90) 103-30-00.\n\n"
+                        "Чтобы координатор подробно проконсультировал вас, пожалуйста, оставьте ваше имя и номер телефона 😊"
+                    )
+                elif lang_req == "en":
+                    fallback_msg = (
+                        "Hello! Admission is open for our Tour Guide courses at the International Tourism Academy (Samarkand Campus):\n"
+                        "1. 🌍 Tour Guide Retraining Course (4 months, official diploma & nationwide badge) — 5,500,000 UZS.\n"
+                        "2. 🗺 Tour Guide Professional Development (1 month / 72 hours, official certificate) — 2,350,000 UZS.\n\n"
+                        "📍 Samarkand, Bobur Mirzo 3A. Phone: +998 (90) 103-30-00.\n\n"
+                        "Please leave your name and phone number for detailed consultation 😊"
+                    )
+                else:
+                    fallback_msg = (
+                        "Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusida gid-ekskursiyachilik kurslariga qabul ochiq:\n"
+                        "1. 🌍 Gid-ekskursiyachi qayta tayyorlash kursi (4 oy, rasmiy diplom va butun O'zbekiston bo'ylab amal qiluvchi beyjik) — 5 500 000 so'm.\n"
+                        "2. 🗺 Gid-ekskursiyachilar malaka oshirish kursi (1 oy / 72 soat, rasmiy sertifikat) — 2 350 000 so'm.\n\n"
+                        "📍 Manzil: Samarqand shahar, Bobur Mirzo 3A. Aloqa: +998 (90) 103-30-00.\n\n"
+                        "Batafsil ma'lumot olish yoki ro'yxatdan o'tish uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊"
+                    )
+            elif is_agency:
+                if lang_req == "ru":
+                    fallback_msg = (
+                        "Здравствуйте! В Международной академии туризма открыт прием на курсы «Турагентство» и «Туроператор»:\n"
+                        "• Длительность: 1 месяц.\n"
+                        "• Стоимость: 2 350 000 сум.\n"
+                        "• По окончании выдается официальный сертификат.\n\n"
+                        "Чтобы координатор связался с вами для консультации, пожалуйста, оставьте ваше имя и номер телефона 😊"
+                    )
+                elif lang_req == "en":
+                    fallback_msg = (
+                        "Hello! Admission is open for our Travel Agent and Tour Operator courses:\n"
+                        "• Duration: 1 month.\n"
+                        "• Tuition: 2,350,000 UZS.\n"
+                        "• Official certificate awarded upon completion.\n\n"
+                        "Please leave your name and contact phone number for consultation 😊"
+                    )
+                else:
+                    fallback_msg = (
+                        "Assalomu alaykum! Xalqaro Turizm Akademiyasida «Turagentlik» va «Turoperatorlik» kurslariga qabul ochiq:\n"
+                        "• Davomiyligi: 1 oy.\n"
+                        "• Narxi: 2 350 000 so'm.\n"
+                        "• Kurs yakunida rasmiy sertifikat beriladi.\n\n"
+                        "Qabul koordinatori siz bilan bog'lanishi uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊"
                     )
             elif lang_req == "en":
                 fallback_msg = (

@@ -9,11 +9,18 @@ from database import get_setting
 logger = logging.getLogger(__name__)
 
 # Eng tezkor, barqaror va yuqori kvotali Gemini modellar
-PRIMARY_MODEL = "gemini-2.0-flash"
-FALLBACK_MODEL = "gemini-flash-latest"
-THIRD_MODEL = "gemini-3.1-flash-lite"
-AUDIO_PRIMARY_MODEL = "gemini-2.0-flash"
-AUDIO_FALLBACK_MODEL = "gemini-flash-latest"
+CANDIDATE_MODELS = [
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite"
+]
+PRIMARY_MODEL = CANDIDATE_MODELS[0]
+FALLBACK_MODEL = CANDIDATE_MODELS[1]
+THIRD_MODEL = CANDIDATE_MODELS[2]
+AUDIO_PRIMARY_MODEL = "gemini-flash-latest"
+AUDIO_FALLBACK_MODEL = "gemini-3.1-flash-lite-preview"
 
 def detect_message_language(text: str) -> str:
     """
@@ -171,7 +178,10 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         lang_rule = (
             "🚨 CRITICAL LANGUAGE RULE: The user wrote in ENGLISH! "
             "Your response MUST be 100% in natural, fluent, professional ENGLISH! Not a single word in Uzbek or Russian! "
-            "IMPORTANT: If the user asks about the course program, curriculum, or PDF, ALWAYS provide the Telegram bot link (https://t.me/MyMarketingAndPrBot?start=hotel), the direct PDF link (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf), and the Zoho form (https://survey.zohopublic.com/zs/jQCZao). NEVER withhold them! "
+            "🚨 STRICT COURSE LINK INTEGRITY RULE: "
+            "1. For Front Office, Housekeeping, or online education, provide ONLY the official platform link: https://tourism-edu.uz. "
+            "2. The 27-page curriculum PDF (Telegram: https://t.me/MyMarketingAndPrBot?start=hotel, direct: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) and Zoho form (https://survey.zohopublic.com/zs/jQCZao) belong EXCLUSIVELY to the «Hotel Operations and Innovation» program. "
+            "3. NEVER attach or mention the Hotel Operations PDF, Telegram bot, or Zoho form when the user asks about other courses (Tour Guide, Travel Agent, Tour Operator, Front Office, Housekeeping)! For those, provide their exact price, duration, and certificates. "
             "If the client hasn't provided a phone number yet, gracefully invite them at the very end: "
             "«To receive the complete curriculum, schedule, and current tuition discounts (or have our coordinator provide a personalized consultation), please share your contact number 😊»"
         )
@@ -179,14 +189,20 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         lang_rule = (
             "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
             "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского или английского слова! "
-            "ВАЖНО: Если пользователь спрашивает о программе курса, учебном плане или PDF, ОБЯЗАТЕЛЬНО предоставьте ссылку на Telegram (https://t.me/MyMarketingAndPrBot?start=hotel), прямую ссылку на PDF (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) и форму Zoho (https://survey.zohopublic.com/zs/jQCZao). НИКОГДА не требуйте номер телефона перед отправкой материалов! "
+            "🚨 СТРОГОЕ ПРАВИЛО ПО КУРСАМ И ССЫЛКАМ: "
+            "1. Для Front Office, Housekeeping или онлайн-обучения отправляйте ТОЛЬКО официальную платформу: https://tourism-edu.uz. "
+            "2. Ссылки на программу курса (Telegram: https://t.me/MyMarketingAndPrBot?start=hotel, прямой PDF: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) и форму регистрации Zoho (https://survey.zohopublic.com/zs/jQCZao) относятся ИСКЛЮЧИТЕЛЬНО к программе «Hotel Operations and Innovation» для руководителей гостиниц! "
+            "3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО отправлять ссылки на PDF Hotel Operations или форму Zoho при вопросах о курсах Гидов, Турагентов, Туроператоров, Front Office или Housekeeping! "
             "Если клиент еще не оставил номер телефона, в конце ответа тактично и тепло предложите: "
             "«Чтобы наш координатор мог отправить вам полную программу курса, расписание и закрепить за вами скидку (а также подробно проконсультировать вас), пожалуйста, укажите ваш контактный номер телефона 😊»"
         )
     else:
         lang_rule = (
             "🚨 QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni 100% o'zbek tilida (lotin alifbosida), muloyim, do'stona va professional bering. "
-            "MUHIM: Agar tinglovchi kurs dasturi, reja, modul, silabus yoki PDF haqida so'rasa, DARHOL Telegram havolasini (https://t.me/MyMarketingAndPrBot?start=hotel), to'g'ridan-to'g'ri PDF havolasini (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) va Zoho ariza shaklini (https://survey.zohopublic.com/zs/jQCZao) bering! Havolalarni HECH QACHON telefon raqam berilishini kutib ushlab turmang! "
+            "🚨 HAVOLALAR VA KURSLARNING QAT'IY CHEGARASI (O'TA MUHIM): "
+            "1. Front Office, Housekeeping yoki masofaviy/onlayn ta'lim haqida so'ralsa, FAQAT rasmiy platformamiz havolasini bering: https://tourism-edu.uz. "
+            "2. Telegram bot (https://t.me/MyMarketingAndPrBot?start=hotel), 27 sahifalik PDF dastur (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) va Zoho ariza (https://survey.zohopublic.com/zs/jQCZao) FAQAT VA FAQAT «Hotel Operations and Innovation» dasturi uchun tegishli! "
+            "3. BOSHQA HECH QANDAY KURSGA (Gid qayta tayyorlash, Gid malaka oshirish, Turagentlik, Turoperatorlik, Front Office, Housekeeping) HOTEL OPERATIONS PDF FAYLI YOKI ZOHO ARIZA HAVOLASINI ASLO QO'SHMANG! Har bir kurs uchun o'zining aniq ma'lumoti, narxi va shartlarini bering. "
             "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida samimiy va xushmuomalalik bilan: "
             "«Sizga kurs dasturi, jadval va maxsus chegirmalar bo'yicha to'liq ma'lumotni yetkazishimiz (hamda mutaxassisimiz sizga mos qulay vaqtda bog'lanib, bepul konsultatsiya berishi) uchun, iltimos, telefon raqamingizni qoldiring 😊» deb taklif qiling."
         )
@@ -224,7 +240,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
 
     headers = {"Content-Type": "application/json"}
 
-    for model_name in [PRIMARY_MODEL, FALLBACK_MODEL, THIRD_MODEL]:
+    for model_name in CANDIDATE_MODELS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         gen_config = {
             "temperature": 0.3,
