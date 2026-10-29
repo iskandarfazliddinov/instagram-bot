@@ -179,15 +179,15 @@ async def _process_debounced_messages(sender_id: str):
 
     if audio_items:
         for a_item in audio_items:
-            process_incoming_audio_message(sender_id, a_item["audio_url"])
+            await asyncio.to_thread(process_incoming_audio_message, sender_id, a_item["audio_url"])
         if text_items:
             combined_text = "\n".join(text_items)
-            process_incoming_message(sender_id, combined_text)
+            await asyncio.to_thread(process_incoming_message, sender_id, combined_text)
     else:
         combined_text = "\n".join(t for t in text_items if t)
         if combined_text:
             logger.info(f"[Debounce] Mijoz [{sender_id}] ning {len(text_items)} ta xabari bitta qilib birlashtirildi: «{combined_text[:80]}...»")
-            process_incoming_message(sender_id, combined_text)
+            await asyncio.to_thread(process_incoming_message, sender_id, combined_text)
 
 def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
     try:
@@ -200,11 +200,11 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
         ig_id = os.getenv('INSTAGRAM_ACCOUNT_ID', '17841468109131133')
         url = f'https://graph.facebook.com/v26.0/{ig_id}/conversations'
         params = {
-            'fields': 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,attachments}',
-            'limit': 5,
+            'fields': 'id,updated_time,participants,messages.limit(5){id,message,created_time,from,attachments}',
+            'limit': 2,
             'access_token': token
         }
-        r = requests.get(url, params=params, timeout=6)
+        r = requests.get(url, params=params, timeout=15)
         if r.status_code != 200:
             return
         data = r.json().get('data', [])
@@ -227,14 +227,14 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
             if not unprocessed:
                 continue
 
-            # Debounce: yangi xabar kelganiga 3.5 soniyadan kam bo'lsa, kutamiz
+            # Debounce: yangi xabar kelganiga 3 soniyadan kam bo'lsa, kutamiz
             try:
                 newest_time_str = unprocessed[0].get('created_time', '')
                 if newest_time_str:
                     msg_dt = datetime.fromisoformat(newest_time_str.replace('+0000', '+00:00'))
                     now_utc = datetime.now(timezone.utc)
                     age_seconds = (now_utc - msg_dt).total_seconds()
-                    if age_seconds < 3.5:
+                    if 0 <= age_seconds < 3.0:
                         continue
             except Exception:
                 pass

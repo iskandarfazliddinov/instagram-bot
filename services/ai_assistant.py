@@ -240,7 +240,7 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         }
 
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=12)
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 candidates = data.get("candidates", [])
@@ -313,7 +313,7 @@ def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
                 "generationConfig": gen_config
             }
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=12)
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -398,7 +398,7 @@ def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name:
             }
 
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=12)
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -493,7 +493,7 @@ def generate_ai_followup(chat_history: list, client_context: dict) -> str:
             }
 
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=12)
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -622,7 +622,7 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         }
 
         try:
-            res = requests.post(url, json=payload, headers=headers, timeout=20)
+            res = requests.post(url, json=payload, headers=headers, timeout=35)
             if res.status_code == 200:
                 data = res.json()
                 candidates = data.get("candidates", [])
