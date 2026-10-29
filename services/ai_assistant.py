@@ -129,9 +129,14 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
     has_phone = bool(phone_val and str(phone_val).strip() not in ["", "None", "—", "null"])
     phone_status = f"Berilgan ({phone_val})" if has_phone else "Hali berilmagan"
     phone_rule = (
-        "✅ MUHIM: Tinglovchi ALLAQACHON telefon raqamini taqdim etgan. Undan HECH QACHON QAYTA TELEFON RAQAMINI SO'RAMANG! Savoliga to'g'ridan-to'g'ri, samimiy va to'liq javob bering."
+        f"✅ QAT'IY QOIDA: Bu tinglovchi ALLAQACHON o'z telefon raqamini ({phone_val}) taqdim etgan va u bazamizda mavjud! "
+        f"Tinglovchidan HECH QACHON QAYTA TELEFON RAQAMI YOKI ISMINI SO'RAMANG! "
+        f"Uning barcha savollariga to'g'ridan-to'g'ri, samimiy, batafsil va professional javob bering."
         if has_phone else
-        "⚠️ DIQQAT: Tinglovchi hali telefon raqamini qoldirmagan. Tinglovchi bergan savolga (kurs narxi, davomiyligi, diplom/beyjik, qabul shartlari va b.) to'g'ridan-to'g'ri va aniq javob bering, so'ng javobingiz oxirida unga kursga ro'yxatdan o'tish yoki batafsil o'quv dasturini yuborish uchun ism va telefon raqamini so'rang."
+        "⚠️ PROFESSIONAL LID OLISH QOIDASI (O'TA MUHIM): Tinglovchi hali telefon raqamini taqdim etmagan. "
+        "1. Avvalo tinglovchi bergan barcha savollarga (kurs narxi, davomiyligi, dasturi, diplom/beyjik, dars shakli) aniq, to'liq, samimiy va professional javob bering. "
+        "2. Javobingiz oxirida unga to'liq o'quv dasturi (silabus), dars jadvali, maxsus chegirmalar haqida batafsil ma'lumot berish (hamda qabul koordinatori unga individual maslahat berishi) uchun telefon raqamini qoldirishni O'TA SAMIMIY, XUSHMUOMALA va JOZIBALI tarzda taklif qiling. "
+        "Mijozga bosim o'tkazmang, aksincha unga samimiy yordam berish istagingizni namoyon eting 😊"
     )
     campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
 
@@ -167,23 +172,23 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
             "🚨 CRITICAL LANGUAGE RULE: The user wrote in ENGLISH! "
             "Your response MUST be 100% in natural, fluent, professional ENGLISH! Not a single word in Uzbek or Russian! "
             "IMPORTANT: If the user asks about the course program, curriculum, or PDF, ALWAYS provide the Telegram bot link (https://t.me/MyMarketingAndPrBot?start=hotel), the direct PDF link (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf), and the Zoho form (https://survey.zohopublic.com/zs/jQCZao). NEVER withhold them! "
-            "If the client hasn't provided a phone number yet, politely request contact details at the very end: "
-            "«To register or secure your spot, please leave your name and phone number 😊»"
+            "If the client hasn't provided a phone number yet, gracefully invite them at the very end: "
+            "«To receive the complete curriculum, schedule, and current tuition discounts (or have our coordinator provide a personalized consultation), please share your contact number 😊»"
         )
     elif lang == "ru":
         lang_rule = (
             "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ЯЗЫКА: Пользователь написал на РУССКОМ ЯЗЫКЕ! "
-            "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского слова! "
+            "Ваш ответ ОБЯЗАН быть на 100% НА РУССКОМ ЯЗЫКЕ! Ни одного узбекского или английского слова! "
             "ВАЖНО: Если пользователь спрашивает о программе курса, учебном плане или PDF, ОБЯЗАТЕЛЬНО предоставьте ссылку на Telegram (https://t.me/MyMarketingAndPrBot?start=hotel), прямую ссылку на PDF (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) и форму Zoho (https://survey.zohopublic.com/zs/jQCZao). НИКОГДА не требуйте номер телефона перед отправкой материалов! "
-            "Если клиент еще не оставил номер телефона, в конце ответа вежливо запросите: "
-            "«Чтобы зарегистрироваться на курс или забронировать место, пожалуйста, оставьте ваше имя и номер телефона 😊»"
+            "Если клиент еще не оставил номер телефона, в конце ответа тактично и тепло предложите: "
+            "«Чтобы наш координатор мог отправить вам полную программу курса, расписание и закрепить за вами скидку (а также подробно проконсультировать вас), пожалуйста, укажите ваш контактный номер телефона 😊»"
         )
     else:
         lang_rule = (
-            "QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni o'zbek tilida, muloyim va samimiy bering. "
+            "🚨 QAT'IY TIL TALABI: Tinglovchi O'ZBEK TILIDA yozdi. Javobingizni 100% o'zbek tilida (lotin alifbosida), muloyim, do'stona va professional bering. "
             "MUHIM: Agar tinglovchi kurs dasturi, reja, modul, silabus yoki PDF haqida so'rasa, DARHOL Telegram havolasini (https://t.me/MyMarketingAndPrBot?start=hotel), to'g'ridan-to'g'ri PDF havolasini (https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf) va Zoho ariza shaklini (https://survey.zohopublic.com/zs/jQCZao) bering! Havolalarni HECH QACHON telefon raqam berilishini kutib ushlab turmang! "
-            "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida: "
-            "«Kursga ro'yxatdan o'tish yoki mutaxassisimiz bog'lanishi uchun, iltimos, ismingiz va telefon raqamingizni qoldiring 😊» deb muloyimlik bilan raqam so'rang."
+            "Agar mijoz hali telefon raqamini bermagan bo'lsa, javobingiz oxirida samimiy va xushmuomalalik bilan: "
+            "«Sizga kurs dasturi, jadval va maxsus chegirmalar bo'yicha to'liq ma'lumotni yetkazishimiz (hamda mutaxassisimiz sizga mos qulay vaqtda bog'lanib, bepul konsultatsiya berishi) uchun, iltimos, telefon raqamingizni qoldiring 😊» deb taklif qiling."
         )
 
     # Suhbat tarixini kontekstga kiritish
@@ -212,8 +217,9 @@ def generate_ai_reply(user_message: str, client_context: dict, is_first_message:
         f"{greeting_instruction}\n"
         f"{lang_rule}\n"
         f"{phone_rule}\n"
-        f"Javobingiz Instagram chatiga mos, qisqa (2-3 jumla), o'ta xushmuomala va samimiy bo'lsin. "
-        f"Hech qanday ichki reja yoki sarlavhalarsiz, to'g'ridan-to'g'ri 1 ta yaxlit xabar qaytaring."
+        f"MUHIM FORMAT TALABI: Agar tinglovchi bir nechta savol bergan bo'lsa (yoki bir nechta xabari bitta qilib birlashtirilgan bo'lsa), "
+        f"har bir savolga bitta yaxlit, chiroyli va qulay tartiblangan matnda to'liq javob bering. "
+        f"Hech qanday ichki reja, fikrlash (thinking) qadamlari yoki texnik sarlavhalarsiz, to'g'ridan-to'g'ri 1 ta yaxlit samimiy xabar qaytaring."
     )
 
     headers = {"Content-Type": "application/json"}
@@ -565,7 +571,7 @@ def process_voice_message(audio_bytes: bytes, mime_type: str = "audio/mp4", clie
         "1. Ilovadagi audio faylni diqqat bilan tinglang va uning to'liq transkripsiyasini (tinglovchi aytgan barcha so'zlarni) yozing.\n"
         "2. Audioda so'zlashilgan tilni aniqlang: O'zbek, Rus yoki Ingliz tili.\n"
         "3. Tinglovchining savoliga Xalqaro Turizm Akademiyasi koordinatori sifatida qisqa, madaniyatli, do'stona va AYNAN AUDIOLAGI TILDA (100% bir xil tilda) javob bering.\n"
-        "4. Agar tinglovchi hali telefon raqamini aytmagan bo'lsa, javobingiz oxirida unga dars jadvali va narxlarni yuborish uchun ism va telefon raqamini so'rang (audio tilida).\n"
+        "4. Agar tinglovchi hali telefon raqamini aytmagan bo'lsa (va bazada ham telefon holati 'Hali berilmagan' bo'lsa), javobingiz oxirida unga to'liq o'quv dasturi, jadval va chegirmalar haqida ma'lumot taqdim etish uchun telefon raqamini o'ta muloyimlik bilan so'rang (audio tilida). Agar telefon holati 'Berilgan' bo'lsa, QAYTA RAQAM SO'RAMANG!\n"
         "5. Agar audioda telefon raqami, ismi yoki biron yo'nalish (Gid, Mehmonxona, Restoran, Turoperator va h.k.) aytilgan bo'lsa, ularni ajratib oling.\n\n"
         "JAVOBNI FAQAT VA FAQAT QUYIDAGI TOZA JSON FORMATDA QAYTARING:\n"
         "{\n"

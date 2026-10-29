@@ -22,6 +22,48 @@ TRIGGER_KEYWORDS = [
     "link", "havola", "katalog", "qanaqa", "qiziq", "buyurtma"
 ]
 
+OFFICIAL_ACADEMY_PHONES = {"998901033000", "998915552127", "998662406770", "998662406771"}
+
+def extract_phone_number(text: str) -> str | None:
+    """
+    Har qanday formatdagi telefon raqamini (o'zbek yoki xalqaro) matndan aniqlab tozalash:
+    940949006, +998 94 094 90 06, 94-094-90-06, +7 999 123-45-67 va h.k.
+    """
+    if not text:
+        return None
+
+    # 1. Xalqaro format: agar + bilan boshlangan bo'lsa
+    intl_m = re.search(r'\+(\d[\d\s\-\(\)]{8,18}\d)', text)
+    if intl_m:
+        digits = re.sub(r'\D', '', intl_m.group(0))
+        if len(digits) >= 10 and digits not in OFFICIAL_ACADEMY_PHONES:
+            return f"+{digits}"
+
+    # 2. Standart O'zbekiston formati (+998 yoki 998 bilan)
+    m_998 = re.search(r'(?:998)[\s\-]?(\d{2})[\s\-]?(\d{3})[\s\-]?(\d{2})[\s\-]?(\d{2})', text)
+    if m_998:
+        raw = "998" + "".join(m_998.groups())
+        if raw not in OFFICIAL_ACADEMY_PHONES:
+            return f"+{raw}"
+
+    # 3. 9 ta raqamli O'zbekiston formati (masalan: 940949006 yoki 94 094 90 06)
+    m_local = re.search(r'\b(9[0-9]|88|33|77|95|99|94|93|91|90|97|98|55)[\s\-]?(\d{3})[\s\-]?(\d{2})[\s\-]?(\d{2})\b', text)
+    if m_local:
+        raw = "998" + "".join(m_local.groups())
+        if raw not in OFFICIAL_ACADEMY_PHONES:
+            return f"+{raw}"
+
+    # 4. Toza raqamlar orqali tekshirish
+    digits = re.sub(r'\D', '', text)
+    if len(digits) == 9 and digits[0] in ['9', '8', '3', '7']:
+        candidate = f"998{digits}"
+        if candidate not in OFFICIAL_ACADEMY_PHONES:
+            return f"+{candidate}"
+    elif len(digits) == 12 and digits.startswith("998") and digits not in OFFICIAL_ACADEMY_PHONES:
+        return f"+{digits}"
+
+    return None
+
 def process_incoming_message(sender_id: str, user_text: str):
     """
     Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
@@ -105,29 +147,19 @@ def process_incoming_message(sender_id: str, user_text: str):
         logger.info(f"Mijoz [{sender_id}] uchun AI to'xtatilgan (Inson / Operator rejimi). AI javob bermaydi.")
         
         # Agar telefon raqam yozgan bo'lsa, bazada saqlab qo'yamiz
-        digits = re.sub(r"\D", "", text_clean)
-        has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
-        if has_phone:
-            clean_phone = f"+998{digits[-9:]}" if len(digits) == 9 or (len(digits) == 12 and digits.startswith("998")) else f"+{digits}"
-            update_client(sender_id, phone_number=clean_phone)
-            client["phone_number"] = clean_phone
+        detected_p = extract_phone_number(text_clean)
+        if detected_p:
+            update_client(sender_id, phone_number=detected_p)
+            client["phone_number"] = detected_p
 
         from services.telegram import notify_operator_direct_reply
         notify_operator_direct_reply(client, text_clean)
         return
 
-    # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (kamida 9 ta raqam)
-    digits = re.sub(r"\D", "", text_clean)
-    has_phone = len(digits) >= 9 and ("+" in text_clean or digits.startswith("998") or len(digits) == 9)
+    # 1. Xabarda haqiqiy telefon raqam borligini aniqlash (har qanday formatda)
+    clean_phone = extract_phone_number(text_clean)
 
-    if has_phone:
-        # Telefon raqamni toza xalqaro formatga keltirish
-        if len(digits) == 9:
-            clean_phone = f"+998{digits}"
-        elif len(digits) == 12 and digits.startswith("998"):
-            clean_phone = f"+{digits}"
-        else:
-            clean_phone = f"+{digits}" if not text_clean.startswith("+") else text_clean
+    if clean_phone:
 
         # Agar mijoz ismini ham birga yozgan bo'lsa (masalan: "Iskandar 902857276")
         potential_name = re.sub(r"[\d\+\(\)\-\.,]", " ", text_clean).strip()
@@ -766,6 +798,13 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
         resp = requests.get(audio_url, headers=headers, timeout=25)
+        if resp.status_code in [401, 403]:
+            import os
+            token = os.getenv('PAGE_ACCESS_TOKEN') or get_access_token()
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+                resp = requests.get(audio_url, headers=headers, timeout=25)
+
         if resp.status_code == 200 and resp.content:
             audio_bytes = resp.content
             raw_mime = resp.headers.get("Content-Type") or "audio/mp4"

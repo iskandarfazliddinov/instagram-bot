@@ -6,7 +6,7 @@ import logging
 import hashlib
 import urllib.parse
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from fastapi import FastAPI, Request, Response, Form, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
@@ -134,6 +134,157 @@ async def token_auto_refresh_worker():
         # Har 24 soatda tekshirish
         await asyncio.sleep(86400)
 
+# ==========================================
+# 🚀 XABARLARNI JAMLOVCHI VA POLER XIZMATI
+# ==========================================
+_DEBOUNCE_DELAY = 4.0  # soniya: mijoz fikrini to'liq yozib tugatishini kutish
+_pending_user_messages = defaultdict(list)
+_debounce_timers = {}
+_debounce_lock = asyncio.Lock()
+
+async def enqueue_user_message(sender_id: str, text: str = "", mid: str = None, is_audio: bool = False, audio_url: str = None):
+    """
+    Mijoz ketma-ket bir nechta xabar (yoki audio va matn) yuborsa,
+    ularni bitta qilib jamlab, 1 ta to'liq javob qaytarish uchun buferlash.
+    """
+    async with _debounce_lock:
+        if sender_id in _debounce_timers and not _debounce_timers[sender_id].done():
+            _debounce_timers[sender_id].cancel()
+
+        _pending_user_messages[sender_id].append({
+            "text": text,
+            "mid": mid,
+            "is_audio": is_audio,
+            "audio_url": audio_url,
+            "time": time.time()
+        })
+
+        _debounce_timers[sender_id] = asyncio.create_task(_process_debounced_messages(sender_id))
+
+async def _process_debounced_messages(sender_id: str):
+    try:
+        await asyncio.sleep(_DEBOUNCE_DELAY)
+    except asyncio.CancelledError:
+        return
+
+    async with _debounce_lock:
+        batch = _pending_user_messages.pop(sender_id, [])
+        _debounce_timers.pop(sender_id, None)
+
+    if not batch:
+        return
+
+    audio_items = [b for b in batch if b.get("is_audio") and b.get("audio_url")]
+    text_items = [b.get("text", "").strip() for b in batch if b.get("text") and not b.get("is_audio")]
+
+    if audio_items:
+        for a_item in audio_items:
+            process_incoming_audio_message(sender_id, a_item["audio_url"])
+        if text_items:
+            combined_text = "\n".join(text_items)
+            process_incoming_message(sender_id, combined_text)
+    else:
+        combined_text = "\n".join(t for t in text_items if t)
+        if combined_text:
+            logger.info(f"[Debounce] Mijoz [{sender_id}] ning {len(text_items)} ta xabari bitta qilib birlashtirildi: «{combined_text[:80]}...»")
+            process_incoming_message(sender_id, combined_text)
+
+def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
+    try:
+        import os, requests
+        from datetime import datetime, timezone
+        from services.instagram import get_access_token
+        token = os.getenv('PAGE_ACCESS_TOKEN') or get_access_token()
+        if not token:
+            return
+        ig_id = os.getenv('INSTAGRAM_ACCOUNT_ID', '17841468109131133')
+        url = f'https://graph.facebook.com/v26.0/{ig_id}/conversations'
+        params = {
+            'fields': 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,attachments}',
+            'limit': 5,
+            'access_token': token
+        }
+        r = requests.get(url, params=params, timeout=6)
+        if r.status_code != 200:
+            return
+        data = r.json().get('data', [])
+        for conv in data:
+            msgs = conv.get('messages', {}).get('data', [])
+            if not msgs:
+                continue
+
+            customer_msgs = []
+            for m in msgs:
+                sender_id = str(m.get('from', {}).get('id', ''))
+                if sender_id in PAGE_IDS or sender_id == ig_id:
+                    break
+                customer_msgs.append(m)
+
+            if not customer_msgs:
+                continue
+
+            unprocessed = [m for m in customer_msgs if m.get('id') and m.get('id') not in last_seen_mids and not is_duplicate_mid(m.get('id'))]
+            if not unprocessed:
+                continue
+
+            # Debounce: yangi xabar kelganiga 3.5 soniyadan kam bo'lsa, kutamiz
+            try:
+                newest_time_str = unprocessed[0].get('created_time', '')
+                if newest_time_str:
+                    msg_dt = datetime.fromisoformat(newest_time_str.replace('+0000', '+00:00'))
+                    now_utc = datetime.now(timezone.utc)
+                    age_seconds = (now_utc - msg_dt).total_seconds()
+                    if age_seconds < 3.5:
+                        continue
+            except Exception:
+                pass
+
+            for m in unprocessed:
+                mid = m.get('id')
+                if mid:
+                    last_seen_mids.add(mid)
+                    if len(last_seen_mids) > 3000:
+                        last_seen_mids.clear()
+
+            sender_id = str(unprocessed[0].get('from', {}).get('id', ''))
+
+            # Ovozli xabarlar bormi?
+            for m in unprocessed:
+                atts = m.get('attachments', {}).get('data', []) or []
+                for att in atts:
+                    att_type = att.get('type') or att.get('mime_type', '')
+                    att_url = att.get('file_url') or att.get('payload', {}).get('url')
+                    if ('audio' in str(att_type) or 'voice' in str(att_type)) and att_url:
+                        logger.info(f'[Poller] Ovozli xabar aniqlandi [{sender_id}]: {att_url[:60]}')
+                        process_incoming_audio_message(sender_id, att_url)
+
+            # Matnlarni xronologik tartibda bitta qilish
+            text_list = []
+            for m in reversed(unprocessed):
+                t = (m.get('message') or '').strip()
+                if t:
+                    text_list.append(t)
+
+            if text_list:
+                combined_text = "\n".join(text_list)
+                logger.info(f'[Poller Auto-Sync] {len(text_list)} ta xabar birlashtirildi [{sender_id}]: «{combined_text[:80]}...»')
+                process_incoming_message(sender_id, combined_text)
+
+    except Exception as e:
+        logger.error(f'[Poller Auto-Sync] Xatolik: {e}')
+
+async def direct_realtime_poller_worker():
+    await asyncio.sleep(5)
+    logger.info('Direct Real-Time Auto-Reply va Debouncer xizmati ishga tushirildi (har 5 soniyada kuzatuvda).')
+    PAGE_IDS = {'2036629730372506', '39179052008410053', '17841468109131133', '1314546795084427'}
+    last_seen_mids = set()
+    while True:
+        try:
+            _check_and_reply_new_messages(last_seen_mids, PAGE_IDS)
+        except Exception as e:
+            logger.error(f'Direct poller xatoligi: {e}')
+        await asyncio.sleep(5)
+
 app = FastAPI(
     title="Instagram Automation & Lead Capture API",
     description="Instagram Direct va Video izohlari orqali avtomatik javob berish, havola ulashish va Telegramga lidlarni uzatish tizimi",
@@ -153,6 +304,7 @@ async def on_startup():
         logger.error(f"Telegram webhook ulashda xatolik: {e}")
     asyncio.create_task(follow_up_background_worker())
     asyncio.create_task(token_auto_refresh_worker())
+    asyncio.create_task(direct_realtime_poller_worker())
 
     # Server ishga tushganda barcha lidlarni kurs va video manbasi bo'yicha boyitish
     async def initial_leads_enrich_and_sync():
@@ -353,11 +505,11 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                             if not video_url:
                                 video_url = att_url
 
-                # Xabarni mos handlerga yo'naltirish:
+                # Xabarni mos handlerga yo'naltirish (Debouncer orqali ketma-ket xabarlarni birlashtirish):
                 # 1. Haqiqiy ovozli xabar
                 if is_voice and voice_url:
                     logger.info(f"Yangi Direct OVOZLI xabar keldi [{sender_id}]")
-                    background_tasks.add_task(process_incoming_audio_message, sender_id, voice_url)
+                    asyncio.create_task(enqueue_user_message(sender_id, is_audio=True, audio_url=voice_url, mid=mid))
 
                 # 2. Video yoki Reels yuborilgan / ulashilgan bo'lsa
                 elif is_video:
@@ -367,19 +519,19 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                 # 3. Quick reply tugmasi bosilgan bo'lsa
                 elif quick_reply:
                     logger.info(f"Yangi Direct Quick reply keldi [{sender_id}]: {quick_reply}")
-                    background_tasks.add_task(process_incoming_message, sender_id, quick_reply)
+                    asyncio.create_task(enqueue_user_message(sender_id, text=quick_reply, mid=mid))
 
                 # 4. Oddiy matnli xabar
                 elif user_text:
                     logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
-                    background_tasks.add_task(process_incoming_message, sender_id, user_text)
+                    asyncio.create_task(enqueue_user_message(sender_id, text=user_text, mid=mid))
 
                 # 5. Rasm yoki boshqa fayl biriktirilgan bo'lsa
                 elif attachments:
                     att_type = attachments[0].get("type", "")
                     if att_type == "image":
                         logger.info(f"Yangi Direct RASM keldi [{sender_id}]")
-                        background_tasks.add_task(process_incoming_message, sender_id, "[Rasm yuborildi]")
+                        asyncio.create_task(enqueue_user_message(sender_id, text="[Rasm yuborildi]", mid=mid))
 
             # 2. Yangi Instagram API formati (entry -> changes)
             for change in entry.get("changes", []):
@@ -437,21 +589,21 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
                     if is_voice and voice_url:
                         logger.info(f"Yangi Direct OVOZLI xabar (v26.0) keldi [{sender_id}]")
-                        background_tasks.add_task(process_incoming_audio_message, sender_id, voice_url)
+                        asyncio.create_task(enqueue_user_message(sender_id, is_audio=True, audio_url=voice_url, mid=mid))
                     elif is_video:
                         logger.info(f"Yangi Direct VIDEO / REELS (v26.0) keldi [{sender_id}]: title='{video_title}', user_text='{user_text}'")
                         background_tasks.add_task(process_incoming_video_message, sender_id, video_title, video_url, user_text)
                     elif quick_reply:
                         logger.info(f"Yangi Direct Quick reply (v26.0) keldi [{sender_id}]: {quick_reply}")
-                        background_tasks.add_task(process_incoming_message, sender_id, quick_reply)
+                        asyncio.create_task(enqueue_user_message(sender_id, text=quick_reply, mid=mid))
                     elif user_text:
                         logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
-                        background_tasks.add_task(process_incoming_message, sender_id, user_text)
+                        asyncio.create_task(enqueue_user_message(sender_id, text=user_text, mid=mid))
                     elif attachments:
                         att_type = attachments[0].get("type", "")
                         if att_type == "image":
                             logger.info(f"Yangi Direct RASM (v26.0) keldi [{sender_id}]")
-                            background_tasks.add_task(process_incoming_message, sender_id, "[Rasm yuborildi]")
+                            asyncio.create_task(enqueue_user_message(sender_id, text="[Rasm yuborildi]", mid=mid))
 
                 # B) Video/Reels izohlari
                 elif field == "comments":
