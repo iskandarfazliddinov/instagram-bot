@@ -299,6 +299,58 @@ def process_incoming_message(sender_id: str, user_text: str):
             chat_history=chat_history
         )
         if ai_reply:
+            text_lower_inq = text_clean.lower()
+            
+            # 1. Aniq Hotel Operations so'rovi bo'lsa (boshqa kurslar nomi aralashmagan bo'lsa):
+            is_explicit_hotel_ops = (
+                any(k in text_lower_inq for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism", "hotel dastur", "hotel pdf", "hotel reja", "hotel operatsiyalari", "hotel kursi", "hotel"]) or
+                (client.get("campaign") == "Hotel Operations and Innovation")
+            ) and not any(k in text_lower_inq for k in ["front office", "frontoffice", "housekeeping", "gid", "turagent", "turoperator"])
+
+            # Agar tinglovchi Hotel Operations haqida so'ragan bo'lsa va AI javobida Telegram yoki PDF havolasi tushib qolgan bo'lsa,
+            # tinglovchiga barcha kerakli havolalar (Telegram PDF, to'g'ridan-to'g'ri PDF, Zoho ariza) borishini 100% kafolatlaymiz:
+            if is_explicit_hotel_ops:
+                if "t.me/MyMarketingAndPrBot" not in ai_reply and "hotel_operations.pdf" not in ai_reply:
+                    lang_msg = detect_message_language(text_clean)
+                    if lang_msg == "ru":
+                        links_text = (
+                            "\n\n📄 Программа курса (PDF, 27 страниц):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📥 Прямая ссылка: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n"
+                            "📝 Форма регистрации (Zoho):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    elif lang_msg == "en":
+                        links_text = (
+                            "\n\n📄 Course curriculum (PDF, 27 pages):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📥 Direct download: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n"
+                            "📝 Application form (Zoho):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    else:
+                        links_text = (
+                            "\n\n📄 O'quv dasturi (PDF, 27 bet):\n"
+                            "👉 https://t.me/MyMarketingAndPrBot?start=hotel\n"
+                            "📥 To'g'ridan-to'g'ri yuklab olish: https://instagram-bot-zohg.onrender.com/static/hotel_operations.pdf\n"
+                            "📝 Ariza topshirish (Zoho):\n"
+                            "https://survey.zohopublic.com/zs/jQCZao"
+                        )
+                    ai_reply = ai_reply.strip() + links_text
+
+            # 2. Aksincha: Agar so'rov Front Office, Housekeeping, Gid, Turagent, Turoperator yoki boshqa yo'nalish bo'lsa:
+            # AI javobidan adashib kirib qolishi mumkin bo'lgan Hotel Operations PDF va Zoho havolalarini xavfsiz tozalaymiz!
+            else:
+                is_other_course = (
+                    any(k in text_lower_inq for k in ["front office", "frontoffice", "housekeeping", "gid", "ekskurs", "turagent", "turoperator", "tourism-edu"]) or
+                    client.get("campaign") != "Hotel Operations and Innovation"
+                )
+                if is_other_course:
+                    ai_reply = re.sub(r"https?://t\.me/MyMarketingAndPrBot\S*", "", ai_reply)
+                    ai_reply = re.sub(r"https?://instagram-bot-zohg\.onrender\.com/static/hotel_operations\.pdf\S*", "", ai_reply)
+                    ai_reply = re.sub(r"https?://survey\.zohopublic\.com/zs/jQCZao\S*", "", ai_reply)
+                    ai_reply = re.sub(r"\n\s*\n\s*\n+", "\n\n", ai_reply).strip()
+
             res = send_message(sender_id, ai_reply)
             if not res or not res.get("error"):
                 append_client_chat_history(sender_id, "assistant", ai_reply)
