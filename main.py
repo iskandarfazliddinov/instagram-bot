@@ -240,12 +240,20 @@ def is_ad_template_reply(text: str) -> bool:
         "kurs narxi",
         "2 350 000 so'm",
         "2350000 so'm",
+        "5 500 000 so'm",
+        "5500000 so'm",
         "💰 kurs narxi",
         "расскажите подробнее о вашей компании",
+        "расскажите подробнее",
         "kurs dasturi bilan tanishish mumkinmi",
-        "qabul ochiq gid-ekskursovod"
+        "kurs dasturi",
+        "qabul ochiq gid-ekskursovod",
+        "qabul ochiq",
+        "batafsil ma'lumot olish",
+        "batafsil ma'lumot",
+        "o'quv dasturi"
     ]
-    if len(t) <= 160 and any(p in t for p in ad_phrases):
+    if len(t) <= 180 and any(p in t for p in ad_phrases):
         return True
 
     return False
