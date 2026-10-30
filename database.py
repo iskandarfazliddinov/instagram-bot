@@ -702,6 +702,23 @@ def get_operator_by_id(op_id: int) -> dict | None:
     conn.close()
     return dict(row) if row else None
 
+def find_matching_operator(manager_val: str) -> dict | None:
+    """Operatorni username yoki display_name bo'yicha moslashtirib topish"""
+    if not manager_val or str(manager_val).strip() in ["—", "none", "", "Biriktirilmagan (Yangi)", "⚪ Biriktirilmagan", "null", "None"]:
+        return None
+    m = str(manager_val).lower().replace("@", "").strip()
+    ops = get_all_operators()
+    for op in ops:
+        op_u = (op.get("username") or "").lower().strip()
+        op_d = (op.get("display_name") or "").lower().strip()
+        if m == op_u or m == op_d:
+            return op
+        if op_u and (op_u in m or m in op_u):
+            return op
+        if op_d and (op_d in m or m in op_d or op_d.replace(" ", "_") in m or m.replace("_", " ") in op_d):
+            return op
+    return None
+
 def create_operator(username: str, password: str, display_name: str, phone: str = "", role: str = "operator", allowed_directions: str = "all") -> int:
     """Yangi operator qo'shish"""
     conn = get_connection()

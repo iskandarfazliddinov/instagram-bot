@@ -30,7 +30,8 @@ from database import (
     set_client_ai_paused,
     log_activity,
     get_recent_activity_logs,
-    get_all_operators
+    get_all_operators,
+    find_matching_operator
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -1155,6 +1156,61 @@ def update_comment_from_admin(
         url="/admin?notice=Mijoz+ma%27lumotlari+va+izohi+muvaffaqiyatli+saqlandi#leads",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+@app.post("/admin/clients/{client_id}/assign-operator")
+def assign_operator_to_client(
+    client_id: int,
+    request: Request,
+    manager_name: str = Form(None, alias="manager_name")
+):
+    """Faqat Shirin, Jasur Raxmanov va Admin uchun: Lidni tanlangan operatorga tezkor biriktirish"""
+    user = get_current_user(request)
+    if not user:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    u_name = (user.get("username") or "").lower()
+    is_assigner = (user.get("role") in ["admin", "supervisor"] or u_name in ["admin", "jasurraxmanov", "shirin"])
+    if not is_assigner:
+        return JSONResponse({
+            "success": False, 
+            "error": "Faqat Shirin, Jasur Raxmanov va Admin boshqa operatorlarga lid biriktira oladi!"
+        }, status_code=403)
+
+    from datetime import datetime
+    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    clean_target = (manager_name or "").strip()
+    if not clean_target or clean_target in ["—", "⚪ Biriktirilmagan", "null", "None", ""]:
+        update_client_by_id(client_id, manager_name="", manager_time=None)
+        log_activity(client_id, user.get("display_name", "Admin"), "assign", "Mas'ul biriktirilishi olib tashlandi")
+        disp_name = "Biriktirilmagan"
+        final_val = ""
+    else:
+        matched_op = find_matching_operator(clean_target)
+        if matched_op:
+            final_mgr = matched_op.get("display_name") or matched_op.get("username")
+        else:
+            final_mgr = clean_target
+
+        update_client_by_id(client_id, manager_name=final_mgr, manager_time=now_str)
+        log_activity(client_id, user.get("display_name", "Admin"), "assign", f"Mas'ul operator biriktirildi: {final_mgr}")
+        disp_name = final_mgr
+        final_val = final_mgr
+
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception as e:
+        logger.error(f"Telegram lead update error from assign_operator_to_client: {e}")
+
+    return JSONResponse({
+        "success": True,
+        "client_id": client_id,
+        "manager_name": final_val,
+        "display_name": disp_name,
+        "manager_time": now_str
+    })
 
 # ----------------- CRM INSTAGRAM DIRECT CHAT VA AI BOSHQARUVI -----------------
 

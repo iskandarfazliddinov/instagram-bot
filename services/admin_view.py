@@ -737,6 +737,48 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             manager_display_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200">👤 {disp_mgr}</span>'
 
+        if is_lead_assigner:
+            is_unassigned = (not manager_name or manager_name == "—")
+            is_adm_sel = (not is_unassigned and ("admin" in manager_name.lower() or "admin" in str(disp_mgr).lower()))
+
+            opts_list = [
+                f'<option value="" {"selected" if is_unassigned else ""}>⚪ Biriktirilmagan</option>',
+                f'<option value="Admin" {"selected" if is_adm_sel else ""}>👑 Admin</option>'
+            ]
+            for op in operators:
+                d_name = op.get("display_name") or op.get("username")
+                u_name_op = (op.get("username") or "").lower()
+                is_selected = False
+                if not is_unassigned and not is_adm_sel:
+                    if (d_name.lower() == str(disp_mgr).lower() or 
+                        d_name.lower() == str(manager_name).lower() or 
+                        u_name_op == str(manager_name).lower() or 
+                        (matched_u and u_name_op == matched_u)):
+                        is_selected = True
+
+                opt_lbl = f"⭐ {d_name} (Men)" if d_name == curr_display_name else f"👤 {d_name}"
+                opts_list.append(f'<option value="{d_name}" {"selected" if is_selected else ""}>{opt_lbl}</option>')
+
+            options_str = "".join(opts_list)
+
+            kanban_manager_widget = f"""
+            <select onchange="quickAssignOperator('{client_id}', this.value)" id="kanban_mgr_select_{client_id}" onclick="event.stopPropagation()"
+                    class="text-[11px] py-0.5 px-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 font-bold rounded-lg outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer shadow-2xs transition max-w-[170px] truncate"
+                    title="Mas'ul mutaxassisni biriktirish">
+                {options_str}
+            </select>
+            """
+            table_manager_widget = f"""
+            <select onchange="quickAssignOperator('{client_id}', this.value)" id="table_mgr_select_{client_id}"
+                    class="text-xs py-1 px-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 font-bold rounded-lg outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer shadow-2xs transition max-w-[180px] truncate"
+                    title="Mas'ul mutaxassisni biriktirish">
+                {options_str}
+            </select>
+            """
+        else:
+            kanban_manager_widget = manager_display_badge
+            table_manager_widget = manager_display_badge
+
         initials = (full_name[:2] if full_name and full_name != 'Kiritilmagan' else 'IG').upper()
 
         # Kurs va Manba nishonlari (Badges)
@@ -823,7 +865,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <td class="px-5 py-3.5 whitespace-nowrap">{fol_badge}</td>
             <td class="px-5 py-3.5 whitespace-nowrap" id="row_status_badge_{client_id}">{badge_html}</td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <div id="row_manager_{client_id}">{manager_display_badge}</div>
+                <div id="row_manager_{client_id}">{table_manager_widget}</div>
                 <div id="row_comment_wrap_{client_id}">{comment_block}</div>
                 <div id="row_comment_btn_wrap_{client_id}">{comment_btn}</div>
             </td>
@@ -933,9 +975,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             <!-- Manager & Comment -->
             <div class="pt-2 border-t border-slate-100 flex flex-col gap-1">
-                <div class="flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400 text-[10px] font-medium">Mas'ul:</span>
-                    <span id="kanban_manager_{client_id}">{manager_display_badge}</span>
+                <div class="flex items-center justify-between text-[11px] gap-2">
+                    <span class="text-slate-500 text-[10px] font-bold shrink-0">Mas'ul:</span>
+                    <div id="kanban_manager_{client_id}" class="min-w-0">
+                        {kanban_manager_widget}
+                    </div>
                 </div>
                 <div id="kanban_comment_wrap_{client_id}">
                     {kanban_comment_block}
@@ -3137,11 +3181,43 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     }}
 
                     // 3. Mas'ul operator nomini yangilash
-                    if (newManager) {{
-                        const kMgr = document.getElementById('kanban_manager_' + clientId);
-                        if (kMgr) kMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager) + '</span>';
-                        const rMgr = document.getElementById('row_manager_' + clientId);
-                        if (rMgr) rMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager) + '</span>';
+                    if (newManager !== undefined) {{
+                        const kSel = document.getElementById('kanban_mgr_select_' + clientId);
+                        if (kSel) {{
+                            kSel.value = newManager;
+                            if (!kSel.value && newManager) {{
+                                for (let opt of kSel.options) {{
+                                    if (opt.value.toLowerCase().includes(newManager.toLowerCase()) || newManager.toLowerCase().includes(opt.value.toLowerCase())) {{
+                                        kSel.value = opt.value;
+                                        break;
+                                    }}
+                                }}
+                            }}
+                        }} else {{
+                            const kMgr = document.getElementById('kanban_manager_' + clientId);
+                            if (kMgr) kMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager || 'Biriktirilmagan') + '</span>';
+                        }}
+
+                        const tSel = document.getElementById('table_mgr_select_' + clientId);
+                        if (tSel) {{
+                            tSel.value = newManager;
+                            if (!tSel.value && newManager) {{
+                                for (let opt of tSel.options) {{
+                                    if (opt.value.toLowerCase().includes(newManager.toLowerCase()) || newManager.toLowerCase().includes(opt.value.toLowerCase())) {{
+                                        tSel.value = opt.value;
+                                        break;
+                                    }}
+                                }}
+                            }}
+                        }} else {{
+                            const rMgr = document.getElementById('row_manager_' + clientId);
+                            if (rMgr) rMgr.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100">👤 ' + escapeChatHtml(newManager || 'Biriktirilmagan') + '</span>';
+                        }}
+
+                        const kCard = document.getElementById('kanban_card_' + clientId);
+                        if (kCard) kCard.setAttribute('data-manager', (newManager || '').toLowerCase());
+                        const tRow = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+                        if (tRow) tRow.setAttribute('data-manager', (newManager || '').toLowerCase());
                     }}
 
                     // 4. Izoh blokini yangilash
@@ -3850,6 +3926,49 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 }}
             }} catch (err) {{
                 console.error('quickMoveLead error:', err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        async function quickAssignOperator(clientId, managerName) {{
+            try {{
+                const formData = new FormData();
+                formData.append('manager_name', managerName);
+
+                const resp = await fetch('/admin/clients/' + clientId + '/assign-operator', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+
+                const data = await resp.json();
+                if (resp.ok && data.success) {{
+                    const disp = data.display_name || managerName || "Biriktirilmagan";
+                    showToast("✅ Mas'ul biriktirildi: " + disp);
+
+                    // Sync Kanban and Table selects
+                    const kSel = document.getElementById('kanban_mgr_select_' + clientId);
+                    if (kSel && kSel.value !== managerName) kSel.value = managerName;
+                    const tSel = document.getElementById('table_mgr_select_' + clientId);
+                    if (tSel && tSel.value !== managerName) tSel.value = managerName;
+
+                    // Update data-manager attributes for filtering
+                    const kCard = document.getElementById('kanban_card_' + clientId);
+                    if (kCard) {{
+                        kCard.setAttribute('data-manager', (managerName || '').toLowerCase());
+                    }}
+                    const tRow = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+                    if (tRow) {{
+                        tRow.setAttribute('data-manager', (managerName || '').toLowerCase());
+                    }}
+                }} else {{
+                    showToast("⚠️ " + (data.error || "Mas'ulni biriktirishda xatolik yuz berdi"));
+                }}
+            }} catch (err) {{
+                console.error('quickAssignOperator error:', err);
                 showToast("⚠️ Server bilan bog'lanishda xatolik");
             }}
         }}
