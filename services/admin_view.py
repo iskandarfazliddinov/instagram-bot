@@ -144,6 +144,37 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         d_name = op.get("display_name") or op.get("username")
         operators_filter_options_html += f'<option value="{d_name.lower()}">👤 {d_name}</option>'
 
+    curr_username = (current_user.get("username") or "").lower() if current_user else ""
+    is_lead_assigner = (user_role in ["admin", "supervisor"] or curr_username in ["admin", "jasurraxmanov", "shirin"])
+
+    if is_lead_assigner:
+        manager_selection_html = f"""
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-bold text-slate-700">👤 Mas'ul Mutaxassis (Biriktirish):</label>
+                <button type="button" onclick="assignToMe('{curr_display_name}')" class="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition shadow-2xs cursor-pointer">⭐ O'zimga biriktirish</button>
+            </div>
+            <select name="manager_name" id="modalManagerSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
+                <option value="">⚪ Biriktirilmagan (Yangi)</option>
+                {operators_options_html}
+            </select>
+            <p class="text-[11px] text-purple-600 mt-1 font-semibold flex items-center gap-1"><span>👑</span> <span>Sizda lidni istalgan operatorga biriktirish vakolati mavjud.</span></p>
+        </div>
+        """
+    else:
+        manager_selection_html = f"""
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-bold text-slate-700">👤 Mas'ul Mutaxassis:</label>
+                <button type="button" onclick="assignToMe('{curr_display_name}')" class="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition shadow-2xs cursor-pointer">⭐ O'zimga biriktirish</button>
+            </div>
+            <select name="manager_name" id="modalManagerSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold bg-slate-50 text-slate-600 cursor-not-allowed outline-none">
+                <option value="{curr_display_name}">👤 {curr_display_name} (Siz)</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Lidni boshqa operatorga faqat Shirin, Jasur Raxmanov yoki Admin biriktirishi mumkin.</p>
+        </div>
+        """
+
     current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
 
     from database import AVAILABLE_DIRECTIONS
@@ -2319,16 +2350,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
 
                 <!-- Mas'ul mutaxassisni tanlash va O'zimga biriktirish -->
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-xs font-bold text-slate-700">👤 Mas'ul Mutaxassis (Operator):</label>
-                        <button type="button" onclick="assignToMe('{curr_display_name}')" class="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition shadow-2xs">⭐ O'zimga biriktirish</button>
-                    </div>
-                    <select name="manager_name" id="modalManagerSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white">
-                        <option value="">⚪ Biriktirilmagan (Yangi)</option>
-                        {operators_options_html}
-                    </select>
-                </div>
+                {manager_selection_html}
 
                 <!-- Mutaxassis izohi -->
                 <div>

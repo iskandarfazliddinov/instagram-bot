@@ -815,7 +815,7 @@ def admin_dashboard(request: Request, notice: str = ""):
     recent_logs = get_recent_activity_logs(60)
 
     # Agar mutaxassis (operator) bo'lsa va yo'nalishlar admin tomonidan cheklangan bo'lsa:
-    if curr_user.get("role") == "operator":
+    if curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
         op_info = get_operator_by_id(curr_user.get("id"))
         if op_info:
             allowed_dir_str = (op_info.get("allowed_directions") or "all").strip()
@@ -1056,8 +1056,13 @@ def update_status_from_admin(
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    effective_manager = (manager_name or "").strip()
-    if not effective_manager or effective_manager in ["Admin", "Operator"]:
+    u_name = (user.get("username") or "").lower()
+    is_assigner = (user.get("role") in ["admin", "supervisor"] or u_name in ["admin", "jasurraxmanov", "shirin"])
+    if is_assigner:
+        effective_manager = (manager_name or "").strip()
+        if not effective_manager or effective_manager in ["Admin", "Operator", "⚪ Biriktirilmagan (Yangi)"]:
+            effective_manager = manager_name.strip() if manager_name else user.get("display_name", "Admin")
+    else:
         effective_manager = user.get("display_name", "Operator")
 
     from datetime import datetime
@@ -1101,8 +1106,13 @@ def update_comment_from_admin(
             return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    effective_manager = (manager_name or "").strip()
-    if not effective_manager or effective_manager in ["Admin", "Operator"]:
+    u_name = (user.get("username") or "").lower()
+    is_assigner = (user.get("role") in ["admin", "supervisor"] or u_name in ["admin", "jasurraxmanov", "shirin"])
+    if is_assigner:
+        effective_manager = (manager_name or "").strip()
+        if not effective_manager or effective_manager in ["Admin", "Operator", "⚪ Biriktirilmagan (Yangi)"]:
+            effective_manager = manager_name.strip() if manager_name else user.get("display_name", "Admin")
+    else:
         effective_manager = user.get("display_name", "Operator")
 
     from datetime import datetime
@@ -1509,7 +1519,7 @@ def export_clients_excel(request: Request):
     """Yig'ilgan mijozlar bazasini Microsoft Excel (.xlsx) formatida to'liq formatlangan holda yuklab olish"""
     clients = get_all_clients()
     curr_user = get_current_user(request)
-    if curr_user and curr_user.get("role") == "operator":
+    if curr_user and curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
         from database import get_operator_by_id, get_lead_direction_key
         op_info = get_operator_by_id(curr_user.get("id"))
         if op_info:

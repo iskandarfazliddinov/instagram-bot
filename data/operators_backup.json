@@ -41,11 +41,11 @@
     "password_hash": "9e7d8f43253d9eb4fd66510e5f33a1908b4f29b8bd96da32fac0e14ebd5ffe16",
     "display_name": "Shirin Yakubovna",
     "phone": "",
-    "role": "operator",
+    "role": "supervisor",
     "is_active": 1,
     "created_at": "2026-10-27T20:31:38.322549",
     "last_login": "27.10.2026 20:33",
-    "allowed_directions": "turagent,turoperator,narx,dastur,konsultatsiya,umumiy"
+    "allowed_directions": "all"
   },
   {
     "id": 7,

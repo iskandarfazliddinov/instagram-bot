@@ -135,6 +135,46 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     )
     return text
 
+def is_privileged_lead_manager(user: dict) -> bool:
+    """
+    Faqat Shirin, Jasur Raxmanov va Admin boshqa operatorlarga lidlarni biriktira oladi.
+    """
+    if not user:
+        return False
+    uname = (user.get("username") or "").lower().strip()
+    fname = (user.get("first_name") or "").lower().strip()
+    lname = (user.get("last_name") or "").lower().strip()
+    full = f"{fname} {lname}".strip()
+
+    # 1. Privileged Telegram usernames
+    privileged_usernames = {
+        "admin", "jasurraxmanov", "jasur_raxmanov", "jasurraxmonov", "jasur_raxmonov", "jasur",
+        "shirin", "shirin_yakubovna", "shirinyakubovna", "shirinyakubova", "shirin_yakubova",
+        "iskandarfazliddinov", "fazliddinov_iskandar"
+    }
+    if uname in privileged_usernames:
+        return True
+
+    # 2. Database'dagi supervisor yoki adminlar bilan tekshirish
+    try:
+        from database import get_all_operators
+        for op in get_all_operators():
+            if op.get("role") in ["supervisor", "admin"] or op.get("username") in ["admin", "jasurraxmanov", "shirin"]:
+                op_u = (op.get("username") or "").lower()
+                op_d = (op.get("display_name") or "").lower()
+                if uname and op_u == uname:
+                    return True
+                if full and op_d and (op_d in full or full in op_d):
+                    return True
+    except Exception:
+        pass
+
+    # 3. Ism va familiya bo'yicha qidiruv
+    if full and any(k in full for k in ["shirin", "jasur", "admin", "iskandar"]):
+        return True
+
+    return False
+
 def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", username: str = "") -> list:
     digits = re.sub(r"\D", "", phone or "")
     if len(digits) == 9:
@@ -146,14 +186,19 @@ def build_inline_keyboard(client_id: int, phone: str, status: str = "yangi", use
     if status == "yangi":
         keyboard.append([
             {"text": "📞 Men bog'lanaman", "callback_data": f"claim_{client_id}"},
-            {"text": "✅ Bog'lanildi", "callback_data": f"done_{client_id}"}
+            {"text": "👥 Biriktirish", "callback_data": f"assignop_{client_id}"}
         ])
         keyboard.append([
-            {"text": "📦 Zahiraga qo'shish (Keyingi oqim)", "callback_data": f"reserve_{client_id}"}
+            {"text": "✅ Bog'lanildi", "callback_data": f"done_{client_id}"},
+            {"text": "📦 Zahiraga olish", "callback_data": f"reserve_{client_id}"}
         ])
-    elif status in ["boglandi", "jarayonda", "rad", "oylanyapti", "zahira"]:
+    else:
         keyboard.append([
             {"text": "🔄 Holatni o'zgartirish", "callback_data": f"claim_{client_id}"},
+            {"text": "👥 Qayta biriktirish", "callback_data": f"assignop_{client_id}"}
+        ])
+        keyboard.append([
+            {"text": "✅ Bog'lanildi", "callback_data": f"done_{client_id}"},
             {"text": "📦 Zahiraga olish", "callback_data": f"reserve_{client_id}"}
         ])
 
@@ -362,7 +407,7 @@ def handle_telegram_callback(update: dict):
 
     # Action va client_id ni ajratib olish
     parts = cq_data.split("_")
-    if len(parts) != 2:
+    if len(parts) < 2:
         try:
             requests.post(ans_url, json={"callback_query_id": cq_id, "text": "Noma'lum buyruq", "show_alert": False}, timeout=3)
         except Exception:
@@ -384,6 +429,146 @@ def handle_telegram_callback(update: dict):
             }, timeout=4)
         except Exception:
             pass
+        return
+
+    # 1. Operatorga biriktirish menyusi (Faqat Shirin, Jasur Raxmanov va Admin uchun)
+    if action == "assignop":
+        if not is_privileged_lead_manager(user):
+            try:
+                requests.post(ans_url, json={
+                    "callback_query_id": cq_id,
+                    "text": "⚠️ Faqat Shirin, Jasur Raxmanov va Admin boshqa operatorlarga biriktira oladi!",
+                    "show_alert": True
+                }, timeout=3)
+            except Exception:
+                pass
+            return
+
+        from database import get_all_operators
+        operators = get_all_operators()
+        op_keyboard = []
+        row = []
+        for op in operators:
+            if not op.get("is_active", 1):
+                continue
+            op_id = op["id"]
+            d_name = op.get("display_name") or op["username"]
+            row.append({"text": f"👤 {d_name}", "callback_data": f"setop_{client_id}_{op_id}"})
+            if len(row) == 2:
+                op_keyboard.append(row)
+                row = []
+        if row:
+            op_keyboard.append(row)
+
+        op_keyboard.append([
+            {"text": "👑 Admin", "callback_data": f"setop_{client_id}_admin"},
+            {"text": "🔙 Bekor qilish", "callback_data": f"cancelop_{client_id}"}
+        ])
+
+        try:
+            requests.post(ans_url, json={
+                "callback_query_id": cq_id,
+                "text": "Lidni qaysi operatorga biriktirmoqchisiz? Tanlang:",
+                "show_alert": False
+            }, timeout=3)
+        except Exception:
+            pass
+
+        edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup"
+        requests.post(edit_url, json={
+            "chat_id": chat_id,
+            "message_id": msg_id,
+            "reply_markup": {"inline_keyboard": op_keyboard}
+        }, timeout=5)
+        return
+
+    # 2. Tanlangan operatorga biriktirishni saqlash
+    if action == "setop":
+        if not is_privileged_lead_manager(user):
+            try:
+                requests.post(ans_url, json={
+                    "callback_query_id": cq_id,
+                    "text": "⚠️ Faqat Shirin, Jasur Raxmanov va Admin boshqa operatorlarga biriktira oladi!",
+                    "show_alert": True
+                }, timeout=3)
+            except Exception:
+                pass
+            return
+
+        target_op_str = parts[2] if len(parts) > 2 else ""
+        from database import get_all_operators, update_client_by_id, log_activity, get_client_by_id
+        operators = get_all_operators()
+        chosen_name = "Admin"
+        if target_op_str == "admin":
+            chosen_name = "Admin"
+        else:
+            try:
+                t_id = int(target_op_str)
+                for op in operators:
+                    if op["id"] == t_id:
+                        chosen_name = op.get("display_name") or op["username"]
+                        break
+            except ValueError:
+                chosen_name = target_op_str
+
+        u_from = user.get("username")
+        f_from = user.get("first_name", "")
+        l_from = user.get("last_name", "")
+        assigner_label = f"@{u_from}" if u_from else f"{f_from} {l_from}".strip() or "Rahbar"
+        now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+        update_client_by_id(
+            client_id,
+            manager_name=chosen_name,
+            manager_time=now_str,
+            lead_status="boglandi"
+        )
+        client = get_client_by_id(client_id)
+        if client:
+            client["manager_name"] = chosen_name
+            client["manager_time"] = now_str
+            client["lead_status"] = "boglandi"
+
+        log_activity(client_id, assigner_label, "assign", f"Lid {chosen_name} ga biriktirildi")
+
+        try:
+            requests.post(ans_url, json={
+                "callback_query_id": cq_id,
+                "text": f"✅ Lid {chosen_name} ga muvaffaqiyatli biriktirildi!",
+                "show_alert": False
+            }, timeout=3)
+        except Exception:
+            pass
+
+        if client:
+            new_text = build_lead_message_text(client, source=client.get("source", "Direct"))
+            new_keyboard = build_inline_keyboard(client_id, client.get("phone_number", ""), status="boglandi", username=client.get("username", ""))
+            edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
+            requests.post(edit_url, json={
+                "chat_id": chat_id,
+                "message_id": msg_id,
+                "text": new_text,
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": new_keyboard}
+            }, timeout=5)
+        return
+
+    # 3. Bekor qilish
+    if action == "cancelop":
+        try:
+            requests.post(ans_url, json={"callback_query_id": cq_id, "text": "Bekor qilindi", "show_alert": False}, timeout=3)
+        except Exception:
+            pass
+        from database import get_client_by_id
+        cl = get_client_by_id(client_id)
+        cur_status = cl.get("lead_status", "yangi") if cl else "yangi"
+        clean_kb = build_inline_keyboard(client_id, cl.get("phone_number", "") if cl else "", status=cur_status, username=cl.get("username", "") if cl else "")
+        edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup"
+        requests.post(edit_url, json={
+            "chat_id": chat_id,
+            "message_id": msg_id,
+            "reply_markup": {"inline_keyboard": clean_kb}
+        }, timeout=5)
         return
 
     # Mas'ul xodim nomini aniqlash

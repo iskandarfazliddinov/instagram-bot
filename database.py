@@ -510,6 +510,7 @@ def init_db():
             cursor.execute("UPDATE operators SET username = 'jasurraxmanov' WHERE username = 'jasur'")
             cursor.execute("DELETE FROM operators WHERE username = 'operator'")
             cursor.execute("UPDATE operators SET allowed_directions = 'hotel' WHERE allowed_directions = 'hotel_operations'")
+            cursor.execute("UPDATE operators SET role = 'supervisor', allowed_directions = 'all' WHERE username IN ('shirin', 'jasurraxmanov')")
             cursor.execute("UPDATE clients SET manager_name = 'Shirin Yakubovna' WHERE manager_name IN ('@shirin_yakubovna', '@shirin', 'shirin_yakubovna', 'shirin')")
             with open(OPERATORS_BACKUP_FILE, "r", encoding="utf-8") as f:
                 backup_ops = json.load(f)
