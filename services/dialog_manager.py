@@ -64,6 +64,65 @@ def extract_phone_number(text: str) -> str | None:
 
     return None
 
+def extract_phone_from_message_data(m: dict) -> str | None:
+    """
+    Xabar ob'ektidan (Webhook yoki Graph API) telefon raqamni topish:
+    1. m.get('message') yoki m.get('text')
+    2. m.get('quick_reply', {}).get('payload')
+    3. attachments (contact card, phone number card, WhatsApp share, payload, title, name, url)
+    """
+    if not isinstance(m, dict):
+        return None
+
+    for k in ['text', 'message']:
+        val = m.get(k)
+        if isinstance(val, str) and val.strip():
+            p = extract_phone_number(val)
+            if p:
+                return p
+
+    qr = m.get('quick_reply')
+    if isinstance(qr, dict):
+        p = extract_phone_number(str(qr.get('payload') or qr.get('text') or ''))
+        if p:
+            return p
+    elif isinstance(qr, str) and qr.strip():
+        p = extract_phone_number(qr)
+        if p:
+            return p
+
+    def scan_for_phone(obj) -> str | None:
+        if isinstance(obj, str):
+            if len(obj) >= 9:
+                found = extract_phone_number(obj)
+                if found:
+                    return found
+        elif isinstance(obj, dict):
+            priority_keys = ['phone_number', 'phone', 'contact', 'title', 'name', 'payload', 'text']
+            for pk in priority_keys:
+                if pk in obj:
+                    res = scan_for_phone(obj[pk])
+                    if res:
+                        return res
+            for v in obj.values():
+                res = scan_for_phone(v)
+                if res:
+                    return res
+        elif isinstance(obj, list):
+            for item in obj:
+                res = scan_for_phone(item)
+                if res:
+                    return res
+        return None
+
+    raw_atts = m.get('attachments')
+    if raw_atts:
+        res = scan_for_phone(raw_atts)
+        if res:
+            return res
+
+    return None
+
 def resolve_course_and_inquiry(chat_history: list = None, current_text: str = "", existing_campaign: str = "", existing_source: str = "") -> dict:
     """
     Suhbat tarixi (chat_history) va joriy xabar (current_text) asosida:

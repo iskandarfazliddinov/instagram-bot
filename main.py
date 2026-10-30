@@ -37,7 +37,8 @@ from services.dialog_manager import (
     process_incoming_message,
     process_incoming_comment,
     process_incoming_audio_message,
-    process_incoming_video_message
+    process_incoming_video_message,
+    extract_phone_from_message_data
 )
 from services.instagram import get_recent_media, resolve_media_id_from_url, send_message
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
@@ -367,10 +368,14 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
                 if has_voice:
                     continue
 
-                # Matnlarni xronologik tartibda bitta qilish
+                # Matnlarni va kontakt kartochkalaridagi telefon raqamlarni xronologik tartibda bitta qilish
                 text_list = []
                 for m in reversed(unprocessed):
                     t = (m.get('message') or '').strip()
+                    phone_in_m = extract_phone_from_message_data(m)
+                    if phone_in_m:
+                        if phone_in_m not in t:
+                            t = f"{t} {phone_in_m}".strip() if t else phone_in_m
                     if t:
                         text_list.append(t)
 
@@ -586,6 +591,12 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                 user_text = (message.get("text") or "").strip()
                 quick_reply = message.get("quick_reply", {}).get("payload", "") if message.get("quick_reply") else ""
 
+                # Agar xabarda yoki kontakt kartochkasida telefon raqam bo'lsa
+                phone_in_msg = extract_phone_from_message_data(message)
+                if phone_in_msg:
+                    if phone_in_msg not in user_text:
+                        user_text = f"{user_text} {phone_in_msg}".strip() if user_text else phone_in_msg
+
                 postback = messaging_event.get("postback") or {}
                 if postback and not user_text:
                     user_text = (postback.get("title") or postback.get("payload") or "").strip()
@@ -679,6 +690,12 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                     attachments = message.get("attachments") or []
                     user_text = (message.get("text") or "").strip()
                     quick_reply = message.get("quick_reply", {}).get("payload", "") if message.get("quick_reply") else ""
+
+                    # Agar xabarda yoki kontakt kartochkasida telefon raqam bo'lsa
+                    phone_in_msg = extract_phone_from_message_data(message)
+                    if phone_in_msg:
+                        if phone_in_msg not in user_text:
+                            user_text = f"{user_text} {phone_in_msg}".strip() if user_text else phone_in_msg
 
                     # Referral
                     referral = value.get("referral") or message.get("referral") or {}
