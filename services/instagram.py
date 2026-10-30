@@ -457,6 +457,14 @@ def reply_public_comment(comment_id: str, text: str) -> dict:
         data = response.json()
         if response.status_code != 200:
             check_meta_response_for_errors(data)
+        else:
+            new_cid = data.get("id")
+            if new_cid:
+                try:
+                    from database import mark_comment_processed
+                    mark_comment_processed(new_cid)
+                except Exception:
+                    pass
         return data
     except Exception as e:
         logger.error(f"Izoh ostiga ommaviy javob yozishda xatolik: {e}")

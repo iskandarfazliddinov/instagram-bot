@@ -733,9 +733,15 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
     Video/Reels ostida yozilgan izohni qabul qilib, o'sha videoga mos maxsus javob qaytarish
     """
     # 0. Cheklovlar: o'z sahifamiz yozgan javoblarni e'tiborsiz qoldiramiz va takrorlanishdan saqlaymiz
-    BOT_USERNAMES = ["ita_samarkand", "ita_samarkandita_samarkand"]
-    if username and username.lower() in BOT_USERNAMES:
-        logger.info(f"Bot o'z izohiga javob bermaydi (ignoring self-comment: @{username})")
+    u_clean = (username or "").lower().strip()
+    BOT_USERNAMES = {"ita_samarkand", "ita_samarkandita_samarkand", "xalqaro_turizm_akademiyasi", "itasamarkand"}
+    if u_clean in BOT_USERNAMES or "xalqaro_turizm" in u_clean or "ita_samarkand" in u_clean:
+        logger.info(f"Bot o'z sahifasi izohiga javob bermaydi (ignoring self-comment: @{username})")
+        return
+
+    text_clean = (comment_text or "").strip().lower()
+    if "directingizga" in text_clean or "havolani yubordik" in text_clean:
+        logger.info(f"Bot o'zining avto-javob matnini ko'rdi (loop dan saqlanish): «{comment_text[:40]}»")
         return
 
     from database import is_comment_processed, mark_comment_processed

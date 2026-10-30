@@ -654,7 +654,26 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                     media_id = value.get("media", {}).get("id", "")
                     from_user = value.get("from", {})
                     user_id = from_user.get("id")
-                    username = from_user.get("username", "")
+                    username = (from_user.get("username") or "").lower().strip()
+                    parent_id = value.get("parent_id")
+
+                    # 1. BOTNING O'Z SAHIFASI YOZGAN JAVOBLARINI DARHOL BLOKLASH (Loop prevention)
+                    bot_known_users = {"xalqaro_turizm_akademiyasi", "ita_samarkand", "ita_samarkandita_samarkand", "itasamarkand"}
+                    if username in bot_known_users or "xalqaro_turizm" in username or "ita_samarkand" in username:
+                        logger.info(f"[Webhook] Bot o'z sahifasi (@{username}) izohini e'tiborsiz qoldirdi (Loop prevention).")
+                        continue
+
+                    # 2. Agar izoh matnida botning avto-javob jumlalari bo'lsa
+                    ct_low = (comment_text or "").lower()
+                    if "directingizga" in ct_low or "havolani yubordik" in ct_low:
+                        logger.info(f"[Webhook] Bot o'z avto-javob matnini e'tiborsiz qoldirdi (Loop prevention): «{comment_text[:40]}»")
+                        continue
+
+                    # 3. Agar ushbu izoh boshqa bir izoh ostidagi javob (reply) bo'lsa:
+                    # Bot faqat videoning o'ziga yozilgan asosiy izohlarga javob beradi!
+                    if parent_id:
+                        logger.info(f"[Webhook] Izoh ostidagi javob (reply) e'tiborsiz qoldirildi (parent_id={parent_id}).")
+                        continue
 
                     if comment_id and user_id:
                         if is_duplicate_mid(f"cmt_{comment_id}"):
