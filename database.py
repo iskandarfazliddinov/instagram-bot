@@ -145,6 +145,41 @@ def init_db():
         )
     """)
 
+    # 6. Javob kutilayotgan izohlar jadvali (Faqat izoh qoldirgan, lekin hali Directda javob bermaganlar)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pending_comments (
+            instagram_id TEXT PRIMARY KEY,
+            comment_id TEXT,
+            media_id TEXT,
+            source TEXT,
+            campaign TEXT,
+            comment_text TEXT,
+            dm_welcome_text TEXT,
+            username TEXT DEFAULT '',
+            created_at TIMESTAMP
+        )
+    """)
+
+    # Tarixiy faqat izoh qoldirib, hali Directda biror marta javob yozmaganlarni pending_comments ga o'tkazish va clients dan tozalash
+    try:
+        cursor.execute("SELECT id, instagram_id, username, last_message, chat_history, source, campaign, phone_number, created_at FROM clients")
+        rows = cursor.fetchall()
+        for r in rows:
+            cid, ig_id, uname, lmsg, ch_raw, src, camp, phone, c_time = r
+            has_phone = bool(phone and str(phone).strip() not in ['', '—', 'None', 'null'])
+            ch = json.loads(ch_raw) if ch_raw else []
+            has_real_reply = any(m.get('role') == 'user' and not m.get('text', '').startswith('[Video izohi]:') for m in ch)
+            if not has_phone and not has_real_reply and str(lmsg).startswith('Izoh:'):
+                clean_comment = str(lmsg).replace('Izoh:', '').strip().strip('«»').split('(')[0].strip()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO pending_comments (instagram_id, source, campaign, comment_text, username, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (ig_id, src, camp, clean_comment, uname or '', c_time))
+                cursor.execute("DELETE FROM clients WHERE id = ?", (cid,))
+        conn.commit()
+    except Exception:
+        pass
+
     # Standart matnlarni tekshirib kiritish
     default_settings = {
         "direct_welcome": "Assalomu alaykum! Xalqaro turizm akademiyasining Samarqand kampusi rasmiy sahifasiga xush kelibsiz. 😊\n\nSizni qiziqtirgan qayta tayyorlash va malaka oshirish kurslari bo'yicha ma'lumot olish uchun, iltimos, ismingizni qoldiring:",
@@ -1191,6 +1226,61 @@ def mark_comment_processed(comment_id: str):
         pass
     finally:
         conn.close()
+
+def save_pending_comment(instagram_id: str, comment_id: str = "", media_id: str = "", source: str = "", campaign: str = "", comment_text: str = "", dm_welcome_text: str = "", username: str = ""):
+    """Faqat izoh qoldirgan, lekin hali Directda javob yozmagan foydalanuvchini vaqtincha saqlash"""
+    if not instagram_id:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now().isoformat()
+    try:
+        cursor.execute("""
+            INSERT OR REPLACE INTO pending_comments 
+            (instagram_id, comment_id, media_id, source, campaign, comment_text, dm_welcome_text, username, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (instagram_id, comment_id, media_id, source, campaign, comment_text, dm_welcome_text, username, now))
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def get_pending_comment(instagram_id: str) -> dict | None:
+    """Foydalanuvchining kutilayotgan izoh ma'lumotlarini olish"""
+    if not instagram_id:
+        return None
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM pending_comments WHERE instagram_id = ?", (instagram_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def delete_pending_comment(instagram_id: str):
+    """Directda javob bergach, kutilayotgan izohlar ro'yxatidan o'chirish"""
+    if not instagram_id:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM pending_comments WHERE instagram_id = ?", (instagram_id,))
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def get_client_by_instagram_id(instagram_id: str) -> dict | None:
+    """Mijozni faqat mavjud bo'lsa olish (yangi yaratmasdan)"""
+    if not instagram_id:
+        return None
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM clients WHERE instagram_id = ?", (instagram_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def delete_client_by_id(client_id: int):
     """Bitta lidni o'chirish"""

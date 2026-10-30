@@ -177,10 +177,36 @@ def process_incoming_message(sender_id: str, user_text: str):
     """
     Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
     """
+    from database import get_pending_comment, delete_pending_comment
+    pending = get_pending_comment(sender_id)
+
     client = get_or_create_client(sender_id)
     step = client.get("step", "start")
     text_clean = user_text.strip()
     text_lower = text_clean.lower()
+
+    if pending:
+        logger.info(f"Foydalanuvchi [{sender_id}] avval izoh qoldirgan va endi birinchi marta Directda javob berdi! Endi to'liq CRM ga kiritilmoqda.")
+        c_updates = {
+            "lead_status": "yangi"
+        }
+        if pending.get("source"):
+            c_updates["source"] = pending["source"]
+            client["source"] = pending["source"]
+        if pending.get("campaign") and pending["campaign"] != "Umumiy":
+            c_updates["campaign"] = pending["campaign"]
+            client["campaign"] = pending["campaign"]
+        if pending.get("username") and not client.get("username"):
+            c_updates["username"] = pending["username"]
+            client["username"] = pending["username"]
+
+        # Tarixga avvalgi izohni va direct xush kelibsiz xabarini tiklaymiz
+        append_client_chat_history(sender_id, "user", f"[Video izohi]: {pending.get('comment_text', '')}")
+        if pending.get("dm_welcome_text"):
+            append_client_chat_history(sender_id, "assistant", pending["dm_welcome_text"])
+
+        update_client(sender_id, **c_updates)
+        delete_pending_comment(sender_id)
 
     # Instagram profilidan ma'lumotlarni (@username, ism, obunachi ekanligi) avtomatik olish
     if not client.get("username") or not client.get("full_name") or client.get("is_follower") is None:
@@ -772,9 +798,9 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
         except Exception as e:
             logger.error(f"AI Comment DM yaratishda xato: {e}")
 
-    # 3. Bazada mijozni ro'yxatga olish (qaysi video ekanligi, havolasi va sarlavhasi bilan)
-    client = get_or_create_client(user_id)
-    
+    # 3. Mijozning Directiga o'sha videoga mos maxsus xabar (Private reply) yuborish
+    send_private_reply_to_comment(comment_id, dm_welcome_text)
+
     # Aniq manba matni
     if media_link:
         source_label = f"Reels: {media_link}"
@@ -785,34 +811,28 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
 
     last_msg_label = f"Izoh: «{comment_text}» ({short_caption})" if short_caption else f"Izoh: «{comment_text}»"
 
-    c_updates = {
-        "source": source_label,
-        "campaign": campaign_name,
-        "last_message": last_msg_label,
-        "step": "awaiting_name"
-    }
-
-    if username:
-        c_updates["username"] = username
-
-    try:
-        profile = get_user_profile(user_id)
-        if profile:
-            if profile.get("username") and not username:
-                c_updates["username"] = profile["username"]
-            if profile.get("name") and (not client.get("full_name") or client.get("full_name") in ["None", "Kiritilmagan", ""]):
-                c_updates["full_name"] = profile["name"]
-            if "is_user_follow_business" in profile:
-                c_updates["is_follower"] = 1 if profile["is_user_follow_business"] else 0
-    except Exception as e:
-        logger.error(f"Izoh qoldirgan foydalanuvchi profilini olishda xato: {e}")
-
-    update_client(user_id, **c_updates)
-
-    # 4. Mijozning Directiga o'sha videoga mos maxsus xabar (Private reply) yuborish
-    send_private_reply_to_comment(comment_id, dm_welcome_text)
-    append_client_chat_history(user_id, "user", f"[Video izohi]: {comment_text}")
-    append_client_chat_history(user_id, "assistant", dm_welcome_text)
+    # 4. Qat'iy qoida: Faqat izoh qoldirgan foydalanuvchi hali Directda javob bermaguncha CRM ga saqlanmaydi!
+    # Faqat kutilayotgan izohlar (pending_comments) jadvaliga yozib qo'yiladi.
+    from database import get_client_by_instagram_id, save_pending_comment
+    existing_client = get_client_by_instagram_id(user_id)
+    if existing_client:
+        # Agar bu mijoz avvaldan mavjud bo'lsa (ya'ni allaqachon Directda gaplashgan bo'lsa),
+        # uning mavjud kartasidagi chat tarixiga izohni qo'shib qo'yamiz
+        append_client_chat_history(user_id, "user", f"[Video izohi]: {comment_text}")
+        append_client_chat_history(user_id, "assistant", dm_welcome_text)
+        update_client(user_id, last_message=last_msg_label)
+    else:
+        save_pending_comment(
+            instagram_id=user_id,
+            comment_id=comment_id,
+            media_id=media_id,
+            source=source_label,
+            campaign=campaign_name,
+            comment_text=comment_text,
+            dm_welcome_text=dm_welcome_text,
+            username=username or ""
+        )
+        logger.info(f"Foydalanuvchi [{user_id}] faqat izoh qoldirdi. Hali Directda javob bermagani uchun CRM ga saqlanmadi (Directda javob yozgach CRM ga saqlanadi).")
 
 def process_incoming_video_message(sender_id: str, video_title: str = "", video_url: str = "", user_text: str = ""):
     """
