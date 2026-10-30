@@ -31,7 +31,13 @@ from database import (
     log_activity,
     get_recent_activity_logs,
     get_all_operators,
-    find_matching_operator
+    find_matching_operator,
+    now_uzb,
+    now_uzb_str,
+    now_uzb_time,
+    now_uzb_date,
+    now_uzb_iso,
+    to_uzb_time_str
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -940,7 +946,7 @@ def admin_dashboard(request: Request, notice: str = ""):
     recent_media = get_recent_media(limit=25)
     from database import get_all_operators, get_operator_by_id, get_lead_direction_key
     operators_data = get_all_operators()
-    recent_logs = get_recent_activity_logs(60)
+    recent_logs = get_recent_activity_logs(500)
 
     # Agar mutaxassis (operator) bo'lsa va yo'nalishlar admin tomonidan cheklangan bo'lsa:
     if curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
@@ -1193,8 +1199,7 @@ def update_status_from_admin(
     else:
         effective_manager = user.get("display_name", "Operator")
 
-    from datetime import datetime
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_str = now_uzb_str()
     update_client_by_id(client_id, lead_status=status_val, manager_name=effective_manager, manager_time=now_str)
     log_activity(client_id, effective_manager, "status", f"Holat o'zgartirildi: {status_val}")
     
@@ -1243,8 +1248,7 @@ def update_comment_from_admin(
     else:
         effective_manager = user.get("display_name", "Operator")
 
-    from datetime import datetime
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_str = now_uzb_str()
 
     update_data = {
         "manager_comment": (comment or "").strip(),
@@ -1305,8 +1309,7 @@ def assign_operator_to_client(
             "error": "Faqat Shirin, Jasur Raxmanov va Admin boshqa operatorlarga lid biriktira oladi!"
         }, status_code=403)
 
-    from datetime import datetime
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_str = now_uzb_str()
 
     clean_target = (manager_name or "").strip()
     if not clean_target or clean_target in ["—", "⚪ Biriktirilmagan", "null", "None", ""]:
@@ -1403,9 +1406,8 @@ def send_direct_message_from_crm(
         return JSONResponse({"success": False, "error": err_msg})
 
     manager_name = user.get("display_name", "Mutaxassis")
-    from datetime import datetime
-    now_time = datetime.now().strftime("%H:%M")
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_time = now_uzb_time()
+    now_str = now_uzb_str()
 
     # 2. Xabarni suhbat tarixiga yozish
     append_client_chat_history(ig_id, role="manager", text=msg_text, manager_name=manager_name)

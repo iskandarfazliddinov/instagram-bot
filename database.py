@@ -2,7 +2,52 @@ import os
 import re
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# O'zbekiston vaqti (Toshkent / Samarqand: UTC+5)
+UZB_TZ = timezone(timedelta(hours=5))
+
+def now_uzb() -> datetime:
+    """O'zbekiston vaqti (UTC+5) bo'yicha joriy datetime"""
+    return datetime.now(UZB_TZ)
+
+def now_uzb_iso() -> str:
+    """O'zbekiston vaqti bo'yicha ISO 8601 formati"""
+    return datetime.now(UZB_TZ).isoformat()
+
+def now_uzb_str() -> str:
+    """O'zbekiston vaqti bo'yicha 'DD.MM.YYYY HH:MM' formati"""
+    return datetime.now(UZB_TZ).strftime("%d.%m.%Y %H:%M")
+
+def now_uzb_date() -> str:
+    """O'zbekiston vaqti bo'yicha 'YYYY-MM-DD' formati"""
+    return datetime.now(UZB_TZ).strftime("%Y-%m-%d")
+
+def now_uzb_time() -> str:
+    """O'zbekiston vaqti bo'yicha 'HH:MM' formati"""
+    return datetime.now(UZB_TZ).strftime("%H:%M")
+
+def to_uzb_time_str(dt_val) -> str:
+    """Har qanday vaqt qiymatini O'zbekiston (UTC+5) formatiga ('DD.MM.YYYY HH:MM') o'tkazish"""
+    if not dt_val or dt_val in ["—", "None", "null", ""]:
+        return "—"
+    try:
+        s = str(dt_val).strip()
+        # Agar allaqachon DD.MM.YYYY formatida bo'lsa
+        if len(s) >= 10 and s[2] == '.' and s[5] == '.':
+            return s[:16]
+        if "T" in s or "-" in s:
+            clean_s = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(clean_s)
+            if dt.tzinfo is None:
+                # SQLite CURRENT_TIMESTAMP UTC da bo'ladi
+                dt = dt.replace(tzinfo=timezone.utc).astimezone(UZB_TZ)
+            else:
+                dt = dt.astimezone(UZB_TZ)
+            return dt.strftime("%d.%m.%Y %H:%M")
+        return s[:16]
+    except Exception:
+        return str(dt_val)[:16]
 
 import base64
 
@@ -814,7 +859,7 @@ def get_or_create_client(instagram_id: str) -> dict:
     cursor.execute("SELECT * FROM clients WHERE instagram_id = ?", (instagram_id,))
     row = cursor.fetchone()
 
-    now = datetime.now().isoformat()
+    now = now_uzb_iso()
     if not row:
         cursor.execute(
             "INSERT INTO clients (instagram_id, step, created_at, updated_at) VALUES (?, 'start', ?, ?)",
@@ -833,7 +878,7 @@ def update_client(instagram_id: str, **kwargs):
     """Mijoz ma'lumotlarini (ism, telefon, bosqich) yangilash"""
     conn = get_connection()
     cursor = conn.cursor()
-    kwargs["updated_at"] = datetime.now().isoformat()
+    kwargs["updated_at"] = now_uzb_iso()
     
     fields = [f"{k} = ?" for k in kwargs.keys()]
     values = list(kwargs.values())
@@ -858,7 +903,7 @@ def update_client_by_id(client_id: int, **kwargs):
     """Mijozni ID raqami bo'yicha holati yoki mas'ul xodimini yangilash"""
     conn = get_connection()
     cursor = conn.cursor()
-    kwargs["updated_at"] = datetime.now().isoformat()
+    kwargs["updated_at"] = now_uzb_iso()
     fields = [f"{k} = ?" for k in kwargs.keys()]
     values = list(kwargs.values())
     values.append(client_id)
@@ -893,7 +938,7 @@ def append_client_chat_history(instagram_id: str, role: str, text: str, manager_
             except Exception:
                 history = []
         
-        now_dt = datetime.now()
+        now_dt = now_uzb()
         now_time = now_dt.strftime("%d.%m %H:%M")
         msg_obj = {"role": role, "text": text.strip(), "time": now_time, "date": now_dt.strftime("%d.%m.%Y")}
         if manager_name:
@@ -905,7 +950,7 @@ def append_client_chat_history(instagram_id: str, role: str, text: str, manager_
             
         cursor.execute("UPDATE clients SET chat_history = ?, updated_at = ? WHERE instagram_id = ?", (
             json.dumps(history, ensure_ascii=False),
-            datetime.now().isoformat(),
+            now_uzb_iso(),
             instagram_id
         ))
         conn.commit()
@@ -921,7 +966,7 @@ def set_client_ai_paused(client_id: int, paused: bool) -> bool:
         cursor = conn.cursor()
         cursor.execute("UPDATE clients SET ai_paused = ?, updated_at = ? WHERE id = ?", (
             1 if paused else 0,
-            datetime.now().isoformat(),
+            now_uzb_iso(),
             client_id
         ))
         conn.commit()
@@ -950,8 +995,8 @@ def update_client_manager_comment(client_id: int, comment: str, manager_name: st
     """Xodim yoki mutaxassis izohini CRM yoki Telegramdan saqlash"""
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    now_iso = datetime.now().isoformat()
+    now_str = now_uzb_str()
+    now_iso = now_uzb_iso()
     if manager_name:
         cursor.execute("""
             UPDATE clients SET 
@@ -1322,7 +1367,7 @@ def log_activity(client_id: int, operator_name: str, action_type: str, details: 
         cursor.execute("""
             INSERT INTO activity_logs (client_id, operator_name, action_type, details, created_at)
             VALUES (?, ?, ?, ?, ?)
-        """, (client_id, (operator_name or "Tizim").strip(), action_type.strip(), details.strip(), datetime.now().isoformat()))
+        """, (client_id, (operator_name or "Tizim").strip(), action_type.strip(), details.strip(), now_uzb_iso()))
         conn.commit()
         conn.close()
         sync_activity_logs_backup()

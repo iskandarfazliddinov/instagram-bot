@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 import requests
 from config import settings
-from database import get_client_by_id, update_client_by_id, update_client
+from database import get_client_by_id, update_client_by_id, update_client, now_uzb_str
 
 logger = logging.getLogger(__name__)
 
@@ -515,7 +515,7 @@ def handle_telegram_callback(update: dict):
         f_from = user.get("first_name", "")
         l_from = user.get("last_name", "")
         assigner_label = f"@{u_from}" if u_from else f"{f_from} {l_from}".strip() or "Rahbar"
-        now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+        now_str = now_uzb_str()
 
         update_client_by_id(
             client_id,
@@ -607,7 +607,7 @@ def handle_telegram_callback(update: dict):
                 client.update(updates)
             client_id = client.get("id") or client_id
 
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_str = now_uzb_str()
     alert_text = "Holat yangilandi! ✅"
     new_status = client.get("lead_status", "yangi") if client else "boglandi"
 

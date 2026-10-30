@@ -1,6 +1,7 @@
 import re
 import json
 from datetime import datetime, timedelta
+from database import now_uzb, now_uzb_str, now_uzb_date, now_uzb_time, to_uzb_time_str, UZB_TZ
 from config import settings as config_settings
 
 def get_login_page_html(error: str = "") -> str:
@@ -254,10 +255,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     followup_leads = len([c for c in clients if (c.get("followup_count") or 0) > 0])
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    month_str = datetime.now().strftime("%Y-%m")
-    current_month_name = datetime.now().strftime("%B %Y")
-    now_date_display = datetime.now().strftime("%d.%m.%Y")
+    today_str = now_uzb_date()
+    month_str = now_uzb().strftime("%Y-%m")
+    current_month_name = now_uzb().strftime("%B %Y")
+    now_date_display = now_uzb().strftime("%d.%m.%Y")
 
     # Bugungi lidlar
     today_clients = [c for c in clients if (c.get("created_at") or "")[:10] == today_str]
@@ -289,7 +290,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     total_suspicious = sum(1 for c in clients if check_is_suspicious(c))
 
     # ---------------- 2. SO'NGGI 14 KUNLIK VAQT DINAMIKASI ----------------
-    today = datetime.now().date()
+    today = now_uzb().date()
     daily_dates = [(today - timedelta(days=i)) for i in range(13, -1, -1)]
     daily_labels = [d.strftime('%d.%m') for d in daily_dates]
     daily_keys = [d.strftime('%Y-%m-%d') for d in daily_dates]
@@ -565,7 +566,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             "last_message": c.get("last_message") or "",
             "manager_name": c.get("manager_name") or "",
             "manager_comment": c.get("manager_comment") or "",
-            "created_at": (c.get("created_at") or "")[:16].replace("T", " "),
+            "created_at": to_uzb_time_str(c.get("created_at")),
             "instagram_id": str(c.get("instagram_id") or ""),
             "ai_paused": 1 if c.get("ai_paused") else 0
         })
@@ -599,12 +600,12 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         source = client.get('source') or "Direct"
         campaign = client.get('campaign') or "Umumiy"
         last_msg = client.get('last_message') or "—"
-        created_at = client.get('created_at', '')[:16].replace("T", " ")
+        created_at = to_uzb_time_str(client.get('created_at'))
         lead_status = client.get('lead_status', 'yangi') or 'yangi'
         if lead_status in ['zaxira', 'zahira']:
             lead_status = 'zahira'
         manager_name = client.get('manager_name') or "—"
-        manager_time = client.get('manager_time') or ""
+        manager_time = to_uzb_time_str(client.get('manager_time'))
         is_fol = client.get('is_follower')
         ai_summary = client.get('ai_summary') or ""
         manager_comment = client.get('manager_comment') or ""
@@ -1573,7 +1574,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
                             <tr>
                                 <th class="px-5 py-3">Menejer / Xodim</th>
-                                <th class="px-4 py-3 text-center">Lid bilan ishlagani</th>
+                                <th class="px-4 py-3 text-center" title="Ushbu menejerga biriktirilgan jami lidlar soni">Jami Biriktirilgan</th>
                                 <th class="px-4 py-3 text-center">💭 O'ylayapti</th>
                                 <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
                                 <th class="px-4 py-3 text-center">📦 Zahira</th>
@@ -1665,7 +1666,140 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </tr>
         """
 
-    # Activity Logs table rows
+    # Activity Logs table rows & Bugungi amallar hisob-kitobi (UTC+5)
+    today_uzb_date_str = now_uzb().strftime("%d.%m.%Y")
+    today_uzb_iso_str = now_uzb_date()
+
+    operator_today_stats = {}
+
+    # Admin va barcha ro'yxatdan o'tgan operatorlarni bazaviy ro'yxatga olamiz
+    initial_ops = ["Admin"]
+    for op in (operators or []):
+        op_dname = (op.get("display_name") or op.get("username") or "").strip()
+        if op_dname and op_dname not in initial_ops:
+            initial_ops.append(op_dname)
+
+    for op_name in initial_ops:
+        operator_today_stats[op_name] = {
+            "name": op_name,
+            "clients": set(),
+            "status_count": 0,
+            "direct_count": 0,
+            "comment_count": 0,
+            "assign_count": 0,
+            "other_count": 0,
+            "total_actions": 0,
+            "last_active": "—"
+        }
+
+    # activity_logs dan bugungi amallarni yig'amiz
+    for log in (activity_logs or []):
+        raw_created = str(log.get("created_at") or "").strip()
+        time_uzb = to_uzb_time_str(raw_created)
+
+        # Bugungi sana ekanligini aniqlash (DD.MM.YYYY yoki YYYY-MM-DD bo'yicha)
+        is_today = time_uzb.startswith(today_uzb_date_str) or raw_created.startswith(today_uzb_iso_str)
+        if not is_today:
+            continue
+
+        op = (log.get("operator_name") or "Tizim").strip()
+        if op not in operator_today_stats:
+            operator_today_stats[op] = {
+                "name": op,
+                "clients": set(),
+                "status_count": 0,
+                "direct_count": 0,
+                "comment_count": 0,
+                "assign_count": 0,
+                "other_count": 0,
+                "total_actions": 0,
+                "last_active": "—"
+            }
+
+        cid = log.get("client_id")
+        if cid:
+            operator_today_stats[op]["clients"].add(cid)
+
+        atype = (log.get("action_type") or "").strip().lower()
+        if atype == "status":
+            operator_today_stats[op]["status_count"] += 1
+        elif atype == "direct_message":
+            operator_today_stats[op]["direct_count"] += 1
+        elif atype == "comment":
+            operator_today_stats[op]["comment_count"] += 1
+        elif atype == "assign":
+            operator_today_stats[op]["assign_count"] += 1
+        else:
+            operator_today_stats[op]["other_count"] += 1
+
+        operator_today_stats[op]["total_actions"] += 1
+
+        # Logs ID DESC bo'yicha saralangan, shuning uchun birinchi uchrashgan log - oxirgi amal vaqti
+        if operator_today_stats[op]["last_active"] == "—":
+            operator_today_stats[op]["last_active"] = time_uzb
+
+    sorted_today_ops = sorted(
+        operator_today_stats.values(),
+        key=lambda x: (x["total_actions"], len(x["clients"])),
+        reverse=True
+    )
+
+    today_actions_rows_html = ""
+    for op_stat in sorted_today_ops:
+        o_name = op_stat["name"]
+        o_clients_count = len(op_stat["clients"])
+        o_status = op_stat["status_count"]
+        o_direct = op_stat["direct_count"]
+        o_comment = op_stat["comment_count"]
+        o_assign = op_stat["assign_count"]
+        o_total = op_stat["total_actions"]
+        o_last = op_stat["last_active"]
+
+        if o_name == "Admin":
+            op_badge = '<span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold border border-amber-200">👑</span>'
+            op_label = f'<span class="font-bold text-slate-900">{o_name}</span> <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold ml-1">Admin</span>'
+        else:
+            op_badge = '<span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100">👤</span>'
+            op_label = f'<span class="font-bold text-slate-800">{o_name}</span>'
+
+        status_badge = f'<span class="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{o_status} ta</span>' if o_status > 0 else '<span class="text-slate-400">0</span>'
+        direct_badge = f'<span class="font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-100">{o_direct} ta</span>' if o_direct > 0 else '<span class="text-slate-400">0</span>'
+        comment_badge = f'<span class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{o_comment} ta</span>' if o_comment > 0 else '<span class="text-slate-400">0</span>'
+        assign_badge = f'<span class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{o_assign} ta</span>' if o_assign > 0 else '<span class="text-slate-400">0</span>'
+
+        if o_total > 0:
+            total_badge = f'<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">⚡ {o_total} ta amal</span>'
+            last_active_str = f'<span class="text-xs font-semibold text-slate-700">{o_last}</span>'
+        else:
+            total_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-slate-400 bg-slate-100">0 (Faol emas)</span>'
+            last_active_str = '<span class="text-xs text-slate-400 italic">Bugun amal yo\'q</span>'
+
+        today_actions_rows_html += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
+                    {op_badge}
+                    <div>{op_label}</div>
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-center font-extrabold text-slate-900 text-sm">
+                {f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">{o_clients_count} ta lid</span>' if o_clients_count > 0 else '<span class="text-slate-400">0</span>'}
+            </td>
+            <td class="px-4 py-3.5 text-center text-xs">{status_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{direct_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{comment_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{assign_badge}</td>
+            <td class="px-4 py-3.5 text-center">{total_badge}</td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">{last_active_str}</td>
+        </tr>
+        """
+
+    # Activity Logs table rows & Operator filter
+    all_log_ops = sorted(list(set([(log.get("operator_name") or "Tizim").strip() for log in (activity_logs or [])])))
+    audit_filter_options = '<option value="all">🔍 Barcha xodimlar</option>'
+    for al_op in all_log_ops:
+        audit_filter_options += f'<option value="{al_op.lower()}">👤 {al_op}</option>'
+
     activity_rows_html = ""
     if not activity_logs:
         activity_rows_html = """
@@ -1677,11 +1811,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         """
     else:
         for log in activity_logs:
-            l_time = log.get("created_at") or "—"
+            l_time = to_uzb_time_str(log.get("created_at"))
             l_op = log.get("operator_name") or "Tizim"
             l_type = log.get("action_type") or "harakat"
             l_cid = log.get("client_id") or "—"
             l_det = log.get("details") or "—"
+            c_name = log.get("client_name") or ""
+            c_user = log.get("client_username") or ""
+
+            client_hint = f"#{l_cid}"
+            if c_name:
+                client_hint += f" ({c_name})"
+            elif c_user:
+                client_hint += f" (@{c_user})"
 
             if l_type == "status":
                 type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">🔄 Holat</span>'
@@ -1689,16 +1831,18 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📝 Izoh</span>'
             elif l_type == "direct_message":
                 type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-pink-50 text-pink-700 border border-pink-200">💬 Direct</span>'
+            elif l_type == "assign":
+                type_badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">🎯 Biriktirish</span>'
             else:
                 type_badge = f'<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700">{l_type}</span>'
 
             activity_rows_html += f"""
-            <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
-                <td class="px-5 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">{l_time}</td>
+            <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition audit-log-row" data-operator="{l_op.lower()}">
+                <td class="px-5 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">🕒 {l_time}</td>
                 <td class="px-4 py-3 whitespace-nowrap font-bold text-slate-800 text-xs">👤 {l_op}</td>
                 <td class="px-4 py-3 text-center whitespace-nowrap">{type_badge}</td>
-                <td class="px-4 py-3 text-center whitespace-nowrap text-xs font-mono text-purple-700 font-bold">#{l_cid}</td>
-                <td class="px-5 py-3 text-xs text-slate-700">{l_det}</td>
+                <td class="px-4 py-3 text-center whitespace-nowrap text-xs font-mono text-purple-700 font-bold" title="{client_hint}">#{l_cid}</td>
+                <td class="px-5 py-3 text-xs text-slate-700 font-medium">{l_det}</td>
             </tr>
             """
 
@@ -1745,16 +1889,50 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <div id="tab_audit" class="tab-content hidden space-y-6">
             {anti_fraud_banner}
 
-            <!-- Mutaxassislar Faoliyati va Nazorat Jadvali -->
+            <!-- 1. MUTAXASSISLARNING BUGUNGI REAL-TIME FAOLLIGI (UTC+5) -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                            <span>🛡️</span> <span>Mutaxassislarning Haqiqiy Ish Unumdorligi va Nazorati</span>
+                            <span>⚡</span> <span>Xodimlarning Bugungi Real-Time Faolligi (Bugun kim nima ish qildi? — UTC+5)</span>
                         </h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Telefon olish, Direct orqali yozishish va shubhali holatlar balansi</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Bugun qaysi xodim nechta lid bilan ishladi, nechta holat o'zgartirdi va nechta Direct xabar jo'natdi</p>
                     </div>
-                    <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl">
+                    <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                        📅 Bugun: {now_date_display} (Toshkent vaqti)
+                    </span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-indigo-50/60 text-[11px] font-bold uppercase text-indigo-950 border-b border-indigo-100 tracking-wider">
+                            <tr>
+                                <th class="px-5 py-3">Mutaxassis / Xodim</th>
+                                <th class="px-4 py-3 text-center">👥 Ishlagan Lidlar Soni</th>
+                                <th class="px-4 py-3 text-center">🔄 Holat O'zgartirgan</th>
+                                <th class="px-4 py-3 text-center">💬 Directdan Yozgan</th>
+                                <th class="px-4 py-3 text-center">📝 Izoh Qoldirgan</th>
+                                <th class="px-4 py-3 text-center">🎯 Biriktirgan</th>
+                                <th class="px-4 py-3 text-center">⚡ Jami Amallar</th>
+                                <th class="px-5 py-3 text-right">Oxirgi Faolligi (UTC+5)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {today_actions_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. MUTAXASSISLAR FAOLIYATI VA BIRIKTIRILGAN LIDLAR NAZORATI -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                            <span>🛡️</span> <span>Mutaxassislarning Biriktirilgan Lidlar Nazorati (Umumiy & Oylik)</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Telefon olish, Direct yozishmalar va shubhali holatlar balansi</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl self-start sm:self-auto">
                         Kuzatuv ostida: {len(operators)} ta mutaxassis
                     </span>
                 </div>
@@ -1763,9 +1941,9 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider">
                             <tr>
                                 <th class="px-5 py-3">Mutaxassis</th>
-                                <th class="px-4 py-3 text-center">Bugungi Lidlar</th>
-                                <th class="px-4 py-3 text-center">Oylik Lidlar</th>
-                                <th class="px-4 py-3 text-center">Lid bilan ishlagani</th>
+                                <th class="px-4 py-3 text-center" title="Bugun tizimga tushgan yangi lidlardan ushbu menejerga biriktirilgani">Bugun Yangi Lid</th>
+                                <th class="px-4 py-3 text-center" title="Joriy oyda biriktirilgan lidlar">Oylik Lidlar</th>
+                                <th class="px-4 py-3 text-center" title="Ushbu menejerga biriktirilgan jami lidlar soni">Jami Biriktirilgan</th>
                                 <th class="px-4 py-3 text-center">📞 Olingan Telefonlar</th>
                                 <th class="px-4 py-3 text-center">💬 Direct Xabarlar</th>
                                 <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
@@ -1780,24 +1958,29 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </div>
 
-            <!-- Jonli Harakatlar Jurnali (Audit Activity Log) -->
+            <!-- 3. JONLI HARAKATLAR JURNALI (AUDIT LOG - UTC+5) -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                            <span>📜</span> <span>Xodimlarning Jonli Harakatlar Jurnali (Audit Log)</span>
+                            <span>📜</span> <span>Xodimlarning Jonli Harakatlar Jurnali (Audit Log — UTC+5)</span>
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">Kim, qachon, qaysi mijozning statusini o'zgartirdi, izoh yozdi yoki xabar jo'natdi</p>
                     </div>
-                    <button onclick="window.location.reload()" class="text-xs text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl font-bold transition">
-                        🔄 Yangilash
-                    </button>
+                    <div class="flex items-center gap-2 self-start sm:self-auto">
+                        <select onchange="filterAuditLogsByOperator(this.value)" class="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer transition shadow-2xs">
+                            {audit_filter_options}
+                        </select>
+                        <button onclick="window.location.reload()" class="text-xs text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer">
+                            🔄 Yangilash
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-100 max-h-96">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100 tracking-wider sticky top-0 bg-slate-50">
                             <tr>
-                                <th class="px-5 py-3">Vaqti</th>
+                                <th class="px-5 py-3">Vaqti (UTC+5)</th>
                                 <th class="px-4 py-3">Xodim</th>
                                 <th class="px-4 py-3 text-center">Amal Turi</th>
                                 <th class="px-4 py-3 text-center">Mijoz ID</th>
@@ -3786,6 +3969,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 sel.value = 'suspicious';
                 filterLeads();
             }}
+        }}
+
+        function filterAuditLogsByOperator(val) {{
+            const target = (val || 'all').toLowerCase();
+            const rows = document.querySelectorAll('.audit-log-row');
+            rows.forEach(r => {{
+                const op = (r.getAttribute('data-operator') || '').toLowerCase();
+                if (target === 'all' || op === target || op.includes(target)) {{
+                    r.style.display = '';
+                }} else {{
+                    r.style.display = 'none';
+                }}
+            }});
         }}
 
         const statusTitles = {{
