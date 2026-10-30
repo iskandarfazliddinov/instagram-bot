@@ -1717,18 +1717,23 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }
 
         cid = log.get("client_id")
-        if cid:
-            operator_today_stats[op]["clients"].add(cid)
-
         atype = (log.get("action_type") or "").strip().lower()
         if atype == "status":
             operator_today_stats[op]["status_count"] += 1
+            if cid:
+                operator_today_stats[op]["clients"].add(cid)
         elif atype == "direct_message":
             operator_today_stats[op]["direct_count"] += 1
+            if cid:
+                operator_today_stats[op]["clients"].add(cid)
         elif atype == "comment":
             operator_today_stats[op]["comment_count"] += 1
+            if cid:
+                operator_today_stats[op]["clients"].add(cid)
         elif atype == "assign":
             operator_today_stats[op]["assign_count"] += 1
+            # Eslatma: 'assign' bu mijoz bilan bevosita gaplashish emas, balki
+            # operatorga biriktirish bo'lgani uchun, faqat biriktirilgan lidlar 'Ishlagan lidlar' ga qo'shilmaydi
         else:
             operator_today_stats[op]["other_count"] += 1
 
@@ -1774,6 +1779,13 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             total_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-slate-400 bg-slate-100">0 (Faol emas)</span>'
             last_active_str = '<span class="text-xs text-slate-400 italic">Bugun amal yo\'q</span>'
 
+        if o_clients_count > 0:
+            clients_badge = f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-extrabold">{o_clients_count} ta lid</span>'
+        elif o_assign > 0:
+            clients_badge = '<span class="text-slate-400 text-xs italic">— (faqat biriktirish)</span>'
+        else:
+            clients_badge = '<span class="text-slate-400">0</span>'
+
         today_actions_rows_html += f"""
         <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
             <td class="px-5 py-3.5 whitespace-nowrap">
@@ -1782,8 +1794,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div>{op_label}</div>
                 </div>
             </td>
-            <td class="px-4 py-3.5 text-center font-extrabold text-slate-900 text-sm">
-                {f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">{o_clients_count} ta lid</span>' if o_clients_count > 0 else '<span class="text-slate-400">0</span>'}
+            <td class="px-4 py-3.5 text-center text-sm">
+                {clients_badge}
             </td>
             <td class="px-4 py-3.5 text-center text-xs">{status_badge}</td>
             <td class="px-4 py-3.5 text-center text-xs">{direct_badge}</td>
@@ -1907,11 +1919,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         <thead class="bg-indigo-50/60 text-[11px] font-bold uppercase text-indigo-950 border-b border-indigo-100 tracking-wider">
                             <tr>
                                 <th class="px-5 py-3">Mutaxassis / Xodim</th>
-                                <th class="px-4 py-3 text-center">👥 Ishlagan Lidlar Soni</th>
+                                <th class="px-4 py-3 text-center" title="Holati o'zgartirilgan, izoh yozilgan yoki Directda yozishilgan unikal lidlar soni">👥 Ishlagan Lidlar (Muloqot/Holat)</th>
                                 <th class="px-4 py-3 text-center">🔄 Holat O'zgartirgan</th>
                                 <th class="px-4 py-3 text-center">💬 Directdan Yozgan</th>
                                 <th class="px-4 py-3 text-center">📝 Izoh Qoldirgan</th>
-                                <th class="px-4 py-3 text-center">🎯 Biriktirgan</th>
+                                <th class="px-4 py-3 text-center" title="Operatorlarga mas'ul sifatida biriktirilgan lidlar soni (boshqaruv amali)">🎯 Biriktirgan</th>
                                 <th class="px-4 py-3 text-center">⚡ Jami Amallar</th>
                                 <th class="px-5 py-3 text-right">Oxirgi Faolligi (UTC+5)</th>
                             </tr>

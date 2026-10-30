@@ -1199,9 +1199,10 @@ def update_status_from_admin(
     else:
         effective_manager = user.get("display_name", "Operator")
 
+    actor_name = user.get("display_name", "Admin")
     now_str = now_uzb_str()
     update_client_by_id(client_id, lead_status=status_val, manager_name=effective_manager, manager_time=now_str)
-    log_activity(client_id, effective_manager, "status", f"Holat o'zgartirildi: {status_val}")
+    log_activity(client_id, actor_name, "status", f"Holat o'zgartirildi: {status_val}")
     
     try:
         update_telegram_lead_message(client_id)
@@ -1262,10 +1263,11 @@ def update_comment_from_admin(
         if p_clean and p_clean != "—":
             update_data["phone_number"] = p_clean
 
+    actor_name = user.get("display_name", "Admin")
     update_client_by_id(client_id, **update_data)
     st_text = status_val if status_val else "o'zgarmadi"
     comm_text = (comment or "")[:60]
-    log_activity(client_id, effective_manager, "comment", f"Izoh: {comm_text}; Holat: {st_text}")
+    log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}")
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
