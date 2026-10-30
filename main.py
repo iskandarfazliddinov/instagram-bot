@@ -189,6 +189,28 @@ async def _process_debounced_messages(sender_id: str):
             logger.info(f"[Debounce] Mijoz [{sender_id}] ning {len(text_items)} ta xabari bitta qilib birlashtirildi: «{combined_text[:80]}...»")
             await asyncio.to_thread(process_incoming_message, sender_id, combined_text)
 
+def is_ad_template_reply(text: str) -> bool:
+    """
+    Facebook Ads Manager yoki Instagram Ads avtomatik shablon xabarlarini aniqlash.
+    Masalan: 'taplink.cc/turizmacademyapp', 'Biz bilan bog\'laning +998901033000',
+    '+998901033000' yoki WhatsApp tugmali qisqa avto-xabarlar.
+    Bunday qisqa xabarlar mijozga kurs haqida to'liq ma'lumot bermaydi.
+    Shu sababli, bot bunday xabarlarni ko'rganda to'xtamasdan, mijozning
+    savoliga (masalan: Gid, Front Office, Housekeeping) to'liq ma'lumot berishi shart!
+    """
+    if not text:
+        return True  # Faqat WhatsApp/Aloqa kartochkasi bo'lsa
+    t = text.lower().strip()
+    if "taplink.cc" in t:
+        return True
+    if "biz bilan bog'laning" in t or "bog'laning" in t:
+        return True
+    if "@qabulakadembot" in t:
+        return True
+    if len(t) <= 60 and any(k in t for k in ["998", "901033000", "+998", "whatsapp", "aloqa", "nomeringiz"]):
+        return True
+    return False
+
 def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
     try:
         import os, requests
@@ -201,7 +223,7 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
         url = f'https://graph.facebook.com/v26.0/{ig_id}/conversations'
         params = {
             'fields': 'id,updated_time,participants,messages.limit(5){id,message,created_time,from,attachments}',
-            'limit': 2,
+            'limit': 10,
             'access_token': token
         }
         r = requests.get(url, params=params, timeout=15)
@@ -217,13 +239,21 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
             for m in msgs:
                 sender_id = str(m.get('from', {}).get('id', ''))
                 if sender_id in PAGE_IDS or sender_id == ig_id:
-                    break
+                    m_text = (m.get('message') or '').strip()
+                    # Agar bu sahifa xabari Facebook Ads Manager'ning qisqa avtomatik javobi bo'lsa:
+                    # Buni hisobga olmasdan, mijozning savolini (Gid, Front Office va h.k.) qidirishda davom etamiz!
+                    if is_ad_template_reply(m_text):
+                        logger.info(f"[Poller] Ads qisqa avto-javobi o'tkazib yuborildi («{m_text[:35]}»), mijoz xabariga to'liq javob berish uchun davom etamiz.")
+                        continue
+                    else:
+                        # Agar bu botimiz yoki operatorning haqiqiy to'liq javobi bo'lsa, to'xtaymiz
+                        break
                 customer_msgs.append(m)
 
             if not customer_msgs:
                 continue
 
-            unprocessed = [m for m in customer_msgs if m.get('id') and m.get('id') not in last_seen_mids and not is_duplicate_mid(m.get('id'))]
+            unprocessed = [m for m in customer_msgs if m.get('id') and m.get('id') not in last_seen_mids and m.get('id') not in PROCESSED_MIDS]
             if not unprocessed:
                 continue
 
@@ -243,6 +273,7 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
                 mid = m.get('id')
                 if mid:
                     last_seen_mids.add(mid)
+                    PROCESSED_MIDS[mid] = time.time()
                     if len(last_seen_mids) > 3000:
                         last_seen_mids.clear()
 
