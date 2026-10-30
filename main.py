@@ -193,25 +193,60 @@ async def _process_debounced_messages(sender_id: str):
 def is_ad_template_reply(text: str) -> bool:
     """
     Facebook Ads Manager yoki Instagram Ads avtomatik shablon xabarlarini aniqlash.
-    Masalan: 'taplink.cc/turizmacademyapp', 'Biz bilan bog\'laning +998901033000',
-    '+998901033000', 'Свяжитесь с нами' yoki WhatsApp tugmali qisqa avto-xabarlar.
-    Bunday qisqa xabarlar mijozga kurs haqida to'liq ma'lumot bermaydi.
-    Shu sababli, bot bunday xabarlarni ko'rganda to'xtamasdan, mijozning
-    savoliga (masalan: Gid, Front Office, Housekeeping, Hotel Operations, Turagentlik) to'liq ma'lumot berishi shart!
+    Bularga Meta Ads tezkor savol-javoblari (FAQ), kirish xabarlari, aloqa kartochkalari kiradi:
+    - 'Biz bilan bog'laning +998901033000'
+    - '💰 Kurs narxi: 2 350 000 so'm'
+    - 'Kurs narxi qancha?' / 'Kurs narxi?' / 'Kurs narxi'
+    - 'Assalomu alaykum! Xalqaro Turizm Akademiyasi Samarqand kampusiga xush kelibsiz...'
+    - 'E'tiboringiz uchun katta rahmat!...'
+    - 'Расскажите подробнее о вашей компании'
+    - 'Kurs dasturi bilan tanishish mumkinmi?'
+    - 'taplink.cc', 'qabulakadembot' va h.k.
+    Bunday qisqa/shablon xabarlar Meta Ads tomonidan avtomatik yuboriladi va mijozga to'liq javob bermaydi.
+    Bot bunday xabarlarni ko'rganda to'xtamasdan, mijozning asl murojaatiga to'liq AI javobini yuborishi shart!
     """
-    if not text:
-        return True  # Faqat WhatsApp/Aloqa kartochkasi bo'lsa
-    t = text.lower().strip()
-    if "taplink" in t:
+    if not text or not str(text).strip():
+        return True  # Bo'sh xabar yoki faqat tugma/kartochka bo'lsa
+
+    t = str(text).lower().strip()
+
+    # 1. Havolalar va kontakt botlari
+    if "taplink" in t or "qabulakadembot" in t:
         return True
+
+    # 2. Bog'lanish / Aloqa kartochkalari
     if any(k in t for k in ["biz bilan bog'laning", "bog'laning", "bog'lanish", "aloqaga chiqing", "aloqa uchun", "aloqa:"]):
         return True
     if any(k in t for k in ["свяжитесь с нами", "связаться с нами", "связаться"]):
         return True
-    if "qabulakadembot" in t:
+    if len(t) <= 120 and any(k in t for k in ["901033000", "90 103 30 00", "90-103-30-00", "+998901033000", "whatsapp"]):
         return True
-    if len(t) <= 80 and any(k in t for k in ["901033000", "90 103 30 00", "90-103-30-00", "+998901033000", "whatsapp", "aloqa", "nomeringiz", "raqamingiz"]):
+
+    # 3. Meta Ads kirish / welcome shablonlari (matn uzun bo'lsa ham aniqlash)
+    if "samarqand kampusiga xush kelibsiz" in t:
         return True
+    if "barcha ta'lim yo'nalishlari va modullar bo'yicha to'liq ma'lumot" in t:
+        return True
+    if "e'tiboringiz uchun katta rahmat" in t or "etiboringiz uchun katta rahmat" in t:
+        return True
+
+    # 4. Meta Ads FAQ avto-javoblari va tezkor tugmalar (aks-sado xabarlari)
+    ad_phrases = [
+        "kurs narxi: 2 350 000",
+        "kurs narxi: 2350000",
+        "kurs narxi qancha",
+        "kurs narxi?",
+        "kurs narxi",
+        "2 350 000 so'm",
+        "2350000 so'm",
+        "💰 kurs narxi",
+        "расскажите подробнее о вашей компании",
+        "kurs dasturi bilan tanishish mumkinmi",
+        "qabul ochiq gid-ekskursovod"
+    ]
+    if len(t) <= 160 and any(p in t for p in ad_phrases):
+        return True
+
     return False
 
 def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
@@ -224,85 +259,133 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
             return
         ig_id = os.getenv('INSTAGRAM_ACCOUNT_ID', '17841468109131133')
         url = f'https://graph.facebook.com/v26.0/{ig_id}/conversations'
-        params = {
-            'fields': 'id,updated_time,participants,messages.limit(5){id,message,created_time,from,attachments}',
-            'limit': 10,
-            'access_token': token
-        }
-        r = requests.get(url, params=params, timeout=15)
-        if r.status_code != 200:
-            return
-        data = r.json().get('data', [])
-        for conv in data:
-            msgs = conv.get('messages', {}).get('data', [])
-            if not msgs:
-                continue
 
-            customer_msgs = []
-            for m in msgs:
-                sender_id = str(m.get('from', {}).get('id', ''))
-                if sender_id in PAGE_IDS or sender_id == ig_id:
-                    m_text = (m.get('message') or '').strip()
-                    # Agar bu sahifa xabari Facebook Ads Manager'ning qisqa avtomatik javobi bo'lsa:
-                    # Buni hisobga olmasdan, mijozning savolini (Gid, Front Office va h.k.) qidirishda davom etamiz!
-                    if is_ad_template_reply(m_text):
-                        logger.info(f"[Poller] Ads qisqa avto-javobi o'tkazib yuborildi («{m_text[:35]}»), mijoz xabariga to'liq javob berish uchun davom etamiz.")
-                        continue
-                    else:
-                        # Agar bu botimiz yoki operatorning haqiqiy to'liq javobi bo'lsa, to'xtaymiz
-                        break
-                customer_msgs.append(m)
-
-            if not customer_msgs:
-                continue
-
-            unprocessed = [m for m in customer_msgs if m.get('id') and m.get('id') not in last_seen_mids and m.get('id') not in PROCESSED_MIDS]
-            if not unprocessed:
-                continue
-
-            # Debounce: yangi xabar kelganiga 3 soniyadan kam bo'lsa, kutamiz
+        # Asosiy kiruvchi xabarlar ('inbox') hamda so'rovlar ('pending' / Message Requests) ni tekshiramiz!
+        # Sababi: yangi foydalanuvchi sahifaga obuna bo'lmagan bo'lsa, xabari 'pending' (Запросы) papkasiga tushadi.
+        for folder in ['inbox', 'pending']:
             try:
-                newest_time_str = unprocessed[0].get('created_time', '')
-                if newest_time_str:
-                    msg_dt = datetime.fromisoformat(newest_time_str.replace('+0000', '+00:00'))
-                    now_utc = datetime.now(timezone.utc)
-                    age_seconds = (now_utc - msg_dt).total_seconds()
-                    if 0 <= age_seconds < 3.0:
-                        continue
-            except Exception:
-                pass
+                params = {
+                    'folder': folder,
+                    'fields': 'id,updated_time,participants,messages.limit(5){id,message,created_time,from,attachments}',
+                    'limit': 15,
+                    'access_token': token
+                }
+                r = requests.get(url, params=params, timeout=12)
+                if r.status_code != 200:
+                    continue
+                data = r.json().get('data', [])
+            except Exception as e:
+                logger.error(f"[Poller] Folder '{folder}' yuklashda xatolik: {e}")
+                continue
 
-            for m in unprocessed:
-                mid = m.get('id')
-                if mid:
-                    last_seen_mids.add(mid)
-                    PROCESSED_MIDS[mid] = time.time()
-                    if len(last_seen_mids) > 3000:
-                        last_seen_mids.clear()
+            for conv in data:
+                msgs = conv.get('messages', {}).get('data', [])
+                if not msgs:
+                    continue
 
-            sender_id = str(unprocessed[0].get('from', {}).get('id', ''))
+                customer_msgs = []
+                for m in msgs:
+                    sender_id = str(m.get('from', {}).get('id', ''))
+                    if sender_id in PAGE_IDS or sender_id == ig_id:
+                        m_text = (m.get('message') or '').strip()
+                        # Agar bu sahifa xabari Facebook Ads Manager'ning qisqa avtomatik javobi bo'lsa:
+                        # Buni hisobga olmasdan, mijozning savolini qidirishda davom etamiz!
+                        if is_ad_template_reply(m_text):
+                            logger.info(f"[Poller] Ads qisqa avto-javobi o'tkazib yuborildi («{m_text[:35]}»), mijoz xabariga to'liq javob berish uchun davom etamiz.")
+                            continue
+                        else:
+                            # Agar bu botimiz yoki operatorning haqiqiy to'liq javobi bo'lsa, to'xtaymiz
+                            break
+                    customer_msgs.append(m)
 
-            # Ovozli xabarlar bormi?
-            for m in unprocessed:
-                atts = m.get('attachments', {}).get('data', []) or []
-                for att in atts:
-                    att_type = att.get('type') or att.get('mime_type', '')
-                    att_url = att.get('file_url') or att.get('payload', {}).get('url')
-                    if ('audio' in str(att_type) or 'voice' in str(att_type)) and att_url:
-                        logger.info(f'[Poller] Ovozli xabar aniqlandi [{sender_id}]: {att_url[:60]}')
-                        process_incoming_audio_message(sender_id, att_url)
+                if not customer_msgs:
+                    continue
 
-            # Matnlarni xronologik tartibda bitta qilish
-            text_list = []
-            for m in reversed(unprocessed):
-                t = (m.get('message') or '').strip()
-                if t:
-                    text_list.append(t)
+                unprocessed = [m for m in customer_msgs if m.get('id') and m.get('id') not in last_seen_mids and m.get('id') not in PROCESSED_MIDS]
+                if not unprocessed:
+                    continue
 
-            if text_list:
-                combined_text = "\n".join(text_list)
-                logger.info(f'[Poller Auto-Sync] {len(text_list)} ta xabar birlashtirildi [{sender_id}]: «{combined_text[:80]}...»')
-                process_incoming_message(sender_id, combined_text)
+                # Debounce va 24 soatlik xabar oynasi tekshiruvi:
+                try:
+                    newest_time_str = unprocessed[0].get('created_time', '')
+                    if newest_time_str:
+                        msg_dt = datetime.fromisoformat(newest_time_str.replace('+0000', '+00:00'))
+                        now_utc = datetime.now(timezone.utc)
+                        age_seconds = (now_utc - msg_dt).total_seconds()
+                        if 0 <= age_seconds < 3.0:
+                            continue
+                        # 24 soatdan oshib ketgan xabarlarga Meta ruxsat bermaydi
+                        if age_seconds > 86400:
+                            continue
+                except Exception:
+                    pass
+
+                for m in unprocessed:
+                    mid = m.get('id')
+                    if mid:
+                        last_seen_mids.add(mid)
+                        PROCESSED_MIDS[mid] = time.time()
+                        if len(last_seen_mids) > 3000:
+                            last_seen_mids.clear()
+
+                sender_id = str(unprocessed[0].get('from', {}).get('id', ''))
+                if not sender_id or sender_id in PAGE_IDS or sender_id == ig_id:
+                    for p in conv.get('participants', {}).get('data', []):
+                        p_id = str(p.get('id', ''))
+                        if p_id and p_id not in PAGE_IDS and p_id != ig_id:
+                            sender_id = p_id
+                            break
+
+                # Ovozli yoki Video/Reels xabarlar bormi?
+                has_voice = False
+                has_video = False
+                video_url = ""
+                video_title = ""
+
+                for m in unprocessed:
+                    atts = m.get('attachments', {}).get('data', []) or []
+                    for att in atts:
+                        att_type = str(att.get('type') or att.get('mime_type', '')).lower()
+                        payload = att.get('payload', {})
+                        att_url = att.get('file_url') or payload.get('url', '')
+                        if not att_url and isinstance(att.get('video_data'), dict):
+                            att_url = att.get('video_data', {}).get('url', '')
+                        att_title = payload.get('title') or att.get('name') or ''
+
+                        if ('audio' in att_type or 'voice' in att_type) and att_url:
+                            has_voice = True
+                            logger.info(f'[Poller] Ovozli xabar aniqlandi [{sender_id}]: {att_url[:60]}')
+                            process_incoming_audio_message(sender_id, att_url)
+                            break
+                        elif ('video' in att_type or 'share' in att_type or 'ig_reel' in att_type or any(ext in att_url.lower() for ext in ['.mp4', '.mov', '.webm'])):
+                            has_video = True
+                            if not video_url and att_url:
+                                video_url = att_url
+                            if att_title and not video_title:
+                                video_title = att_title
+
+                if has_voice:
+                    continue
+
+                # Matnlarni xronologik tartibda bitta qilish
+                text_list = []
+                for m in reversed(unprocessed):
+                    t = (m.get('message') or '').strip()
+                    if t:
+                        text_list.append(t)
+
+                combined_text = "\n".join(text_list) if text_list else ""
+
+                if has_video:
+                    logger.info(f'[Poller] Video/Reels xabari aniqlandi [{sender_id}]: title="{video_title}", text="{combined_text}"')
+                    process_incoming_video_message(sender_id, video_title, video_url, combined_text)
+                elif combined_text:
+                    logger.info(f'[Poller Auto-Sync] {len(text_list)} ta xabar birlashtirildi [{sender_id}]: «{combined_text[:80]}...»')
+                    process_incoming_message(sender_id, combined_text)
+                elif not combined_text and not has_video:
+                    # Agar mijoz stiker, emodzi yoki matnsiz share yuborgan bo'lsa
+                    logger.info(f'[Poller] Matnsiz xabar keldi [{sender_id}], xushmuomala salomlashuv yuborilmoqda')
+                    process_incoming_message(sender_id, "Assalomu alaykum")
 
     except Exception as e:
         logger.error(f'[Poller Auto-Sync] Xatolik: {e}')
