@@ -193,21 +193,23 @@ def is_ad_template_reply(text: str) -> bool:
     """
     Facebook Ads Manager yoki Instagram Ads avtomatik shablon xabarlarini aniqlash.
     Masalan: 'taplink.cc/turizmacademyapp', 'Biz bilan bog\'laning +998901033000',
-    '+998901033000' yoki WhatsApp tugmali qisqa avto-xabarlar.
+    '+998901033000', 'Свяжитесь с нами' yoki WhatsApp tugmali qisqa avto-xabarlar.
     Bunday qisqa xabarlar mijozga kurs haqida to'liq ma'lumot bermaydi.
     Shu sababli, bot bunday xabarlarni ko'rganda to'xtamasdan, mijozning
-    savoliga (masalan: Gid, Front Office, Housekeeping) to'liq ma'lumot berishi shart!
+    savoliga (masalan: Gid, Front Office, Housekeeping, Hotel Operations, Turagentlik) to'liq ma'lumot berishi shart!
     """
     if not text:
         return True  # Faqat WhatsApp/Aloqa kartochkasi bo'lsa
     t = text.lower().strip()
-    if "taplink.cc" in t:
+    if "taplink" in t:
         return True
-    if "biz bilan bog'laning" in t or "bog'laning" in t:
+    if any(k in t for k in ["biz bilan bog'laning", "bog'laning", "bog'lanish", "aloqaga chiqing", "aloqa uchun", "aloqa:"]):
         return True
-    if "@qabulakadembot" in t:
+    if any(k in t for k in ["свяжитесь с нами", "связаться с нами", "связаться"]):
         return True
-    if len(t) <= 60 and any(k in t for k in ["998", "901033000", "+998", "whatsapp", "aloqa", "nomeringiz"]):
+    if "qabulakadembot" in t:
+        return True
+    if len(t) <= 80 and any(k in t for k in ["901033000", "90 103 30 00", "90-103-30-00", "+998901033000", "whatsapp", "aloqa", "nomeringiz", "raqamingiz"]):
         return True
     return False
 
@@ -500,11 +502,19 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                 user_text = (message.get("text") or "").strip()
                 quick_reply = message.get("quick_reply", {}).get("payload", "") if message.get("quick_reply") else ""
 
+                postback = messaging_event.get("postback") or {}
+                if postback and not user_text:
+                    user_text = (postback.get("title") or postback.get("payload") or "").strip()
+                    if not mid:
+                        mid = postback.get("mid")
+
                 # Referral (Instagram Ad orqali kelgan bo'lsa)
                 referral = messaging_event.get("referral") or message.get("referral") or {}
                 ad_title = ""
                 if referral:
                     ad_title = referral.get("ads_context_data", {}).get("ad_title", "") or referral.get("ref", "")
+                if not user_text and ad_title:
+                    user_text = ad_title
 
                 is_voice = False
                 voice_url = ""

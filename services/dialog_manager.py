@@ -64,6 +64,115 @@ def extract_phone_number(text: str) -> str | None:
 
     return None
 
+def resolve_course_and_inquiry(chat_history: list = None, current_text: str = "", existing_campaign: str = "", existing_source: str = "") -> dict:
+    """
+    Suhbat tarixi (chat_history) va joriy xabar (current_text) asosida:
+    1. Mijozning haqiqiy so'rovi (inquiry) - telefon raqam yoki oddiy salom emas, aynan qiziqqan mavzusi
+    2. Aniq o'quv kursi (campaign) - Gid, Front Office, Housekeeping, Hotel Operations, Turagentlik va h.k.
+    3. Manba (source) - Reels yoki tegishli havola
+    """
+    if chat_history is None:
+        chat_history = []
+
+    user_texts = []
+    for h in chat_history:
+        if h.get("role") == "user" and h.get("text"):
+            user_texts.append(h["text"].strip())
+    if current_text and current_text.strip():
+        user_texts.append(current_text.strip())
+
+    full_user_text = " \n ".join(user_texts).lower()
+
+    # Haqiqiy so'rov (telefon raqam va qisqa salom bo'lmagan matn)
+    substantive_inquiries = []
+    for t in user_texts:
+        t_clean = t.strip()
+        # Agar telefon raqam bo'lsa, o'tkazib yuboramiz
+        if extract_phone_number(t_clean) and len(re.sub(r"\D", "", t_clean)) >= 9:
+            continue
+        # Agar juda qisqa salom yoki tasdiq bo'lsa
+        if t_clean.lower() in [
+            "salom", "assalomu alaykum", "assalom alaykum", "hello", "hi",
+            "ha", "yo'q", "ok", "rahmat", "spasibo", "da", "net", "yaxshi"
+        ]:
+            continue
+        substantive_inquiries.append(t_clean)
+
+    actual_inquiry = substantive_inquiries[-1] if substantive_inquiries else (current_text or "Kurs bo'yicha ma'lumot")
+
+    detected_course = None
+    detected_source = None
+
+    # 1. Gid-ekskursiyachi yo'nalishi (Eng yuqori aniqlikda tekshirish)
+    if any(k in full_user_text for k in ["malaka", "72 soat", "72 соат", "sertifikatim bor", "muddat tugagan", "повышение квалификации"]):
+        detected_course = "Gid-ekskursiyachi (Malaka oshirish)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+    elif any(k in full_user_text for k in ["qayta tayyorla", "4 oy", "4 ой", "beyjik", "бейджик", "diplom", "диплом", "noldan", "переподготовк"]):
+        detected_course = "Gid-ekskursiyachi (Qayta tayyorlash)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+    elif any(k in full_user_text for k in ["gid", "ekskurs", "гид", "экскурсовод"]):
+        detected_course = "Gid-ekskursiyachi kursi"
+        detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+
+    # 2. Front Office va Housekeeping (Onlayn ta'lim platformasi: tourism-edu.uz)
+    elif any(k in full_user_text for k in ["housekeeping", "хаускипинг", "xona tozalash", "uborka", "уборка"]):
+        detected_course = "Onlayn ta'lim (Housekeeping)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+    elif any(k in full_user_text for k in ["front office", "frontoffice", "front-office", "front", "фронт офис", "фронтофис"]):
+        detected_course = "Onlayn ta'lim (Front Office)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+    elif any(k in full_user_text for k in ["tourism-edu", "platforma", "платформ"]):
+        detected_course = "Onlayn ta'lim platformasi (tourism-edu.uz)"
+        detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+
+    # 3. Hotel Operations and Innovation (UN Tourism qayta tayyorlash)
+    elif any(k in full_user_text for k in [
+        "hotel operations", "hotel operation", "27 bet", "27 sahifa", "27 страниц",
+        "un tourism", "inavation", "innovation", "hotel dastur", "hotel pdf", "hotel reja"
+    ]):
+        detected_course = "Hotel Operations and Innovation"
+        detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
+
+    # 4. Turagentlik va Turoperatorlik
+    elif any(k in full_user_text for k in ["turagent", "турагент", "agentlik"]):
+        detected_course = "Turagentlik kursi"
+        detected_source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
+    elif any(k in full_user_text for k in ["turoperator", "туроператор", "operatorlik"]):
+        detected_course = "Turoperatorlik kursi"
+        detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
+
+    # 5. Restoran ishi va servis
+    elif any(k in full_user_text for k in ["restoran", "ресторан", "servis", "сервис", "f&b", "ofitsiant", "barista"]):
+        detected_course = "Restoran ishi va servis"
+
+    # 6. Agar botning oldingi javobida aniq yo'nalish bo'lsa (masalan, bot Gid haqida ma'lumot bergan bo'lsa):
+    if not detected_course:
+        bot_texts = " \n ".join([h.get("text", "") for h in chat_history if h.get("role") == "assistant"]).lower()
+        if "gid-ekskursiyachi" in bot_texts or "gidlar" in bot_texts:
+            detected_course = "Gid-ekskursiyachi kursi"
+            detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
+        elif "front office" in bot_texts or "tourism-edu.uz" in bot_texts:
+            detected_course = "Onlayn ta'lim (Front Office)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        elif "hotel operations" in bot_texts:
+            detected_course = "Hotel Operations and Innovation"
+            detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
+        elif "turagent" in bot_texts:
+            detected_course = "Turagentlik kursi"
+            detected_source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
+        elif "turoperator" in bot_texts:
+            detected_course = "Turoperatorlik kursi"
+            detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
+
+    final_campaign = detected_course or (existing_campaign if existing_campaign and existing_campaign != "Umumiy" else "Umumiy")
+    final_source = detected_source or (existing_source if existing_source and existing_source != "Direct" else "Direct")
+
+    return {
+        "campaign": final_campaign,
+        "source": final_source,
+        "inquiry": actual_inquiry
+    }
+
 def process_incoming_message(sender_id: str, user_text: str):
     """
     Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
@@ -95,46 +204,27 @@ def process_incoming_message(sender_id: str, user_text: str):
             logger.error(f"Instagram profil ma'lumotlarini olishda xatolik: {e}")
 
     # Oxirgi yozilgan xabarni saqlash va suhbat tarixiga qo'shish
+    client["last_message"] = text_clean
     update_client(sender_id, last_message=text_clean)
     append_client_chat_history(sender_id, "user", text_clean)
 
-    # Qiziqqan kurs yo'nalishini aniqlash (Gid qayta tayyorlash, Gid malaka oshirish, Turagentlik, Turoperatorlik va h.k.)
-    history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
-    detected_course = None
-    detected_source = None
-
-    if any(k in history_text for k in ["housekeeping", "xona tozalash", "frontoffice", "front office", "tourism-edu", "платформ"]):
-        detected_course = "Onlayn ta'lim (Front Office / Housekeeping)"
-        detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
-    elif any(k in history_text for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism", "inavation", "innovation"]):
-        detected_course = "Hotel Operations and Innovation"
-        detected_source = "Reels: https://www.instagram.com/reel/DeZbpoZtFw0/"
-    elif any(k in history_text for k in ["malaka", "72 soat", "sertifikatim bor", "muddat tugagan", "повышение квалификации"]):
-        detected_course = "Gid-ekskursiyachi (Malaka oshirish)"
-    elif any(k in history_text for k in ["qayta tayyorla", "4 oy", "beyjik", "diplom", "gid", "ekskurs", "гид", "экскурсовод", "переподготовк"]):
-        detected_course = "Gid-ekskursiyachi (Qayta tayyorlash)"
-        detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
-    elif any(k in history_text for k in ["turagent", "турагент"]):
-        detected_course = "Turagentlik kursi"
-        detected_source = "Reels: https://www.instagram.com/p/DcQTeaKTBOa/"
-    elif any(k in history_text for k in ["turoperator", "туроператор"]):
-        detected_course = "Turoperatorlik kursi"
-        detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
-    elif any(k in history_text for k in ["restoran", "servis", "f&b"]):
-        detected_course = "Restoran ishi va servis"
-    elif any(k in history_text for k in ["narx", "qancha", "сколько стоит", "стоимость", "narxi"]):
-        detected_course = "Kurslar narxi"
-    elif any(k in history_text for k in ["dastur", "программ", "reja"]):
-        detected_course = "O'quv dasturi"
-    elif any(k in history_text for k in ["batafsil", "podrobneye", "подробнее", "malumot", "info"]):
-        detected_course = "Batafsil konsultatsiya"
+    # Qiziqqan kurs yo'nalishi va manbani to'liq suhbat tarixi orqali aniqlash
+    chat_history_now = get_client_chat_history(sender_id)
+    course_info = resolve_course_and_inquiry(
+        chat_history=chat_history_now,
+        current_text=text_clean,
+        existing_campaign=client.get("campaign"),
+        existing_source=client.get("source")
+    )
+    detected_course = course_info["campaign"]
+    detected_source = course_info["source"]
 
     upd_payload = {}
-    if detected_course:
+    if detected_course and detected_course != "Umumiy":
         if client.get("campaign") in ["Umumiy", "", None, "Batafsil konsultatsiya"] or (detected_course != client.get("campaign") and ("Gid" in detected_course or "kursi" in detected_course or "Hotel" in detected_course or "Front" in detected_course)):
             client["campaign"] = detected_course
             upd_payload["campaign"] = detected_course
-    if detected_source and (client.get("source") in ["Direct", "", None] or not client.get("source")):
+    if detected_source and detected_source != "Direct" and (client.get("source") in ["Direct", "", None] or not client.get("source")):
         client["source"] = detected_source
         upd_payload["source"] = detected_source
 
@@ -169,8 +259,24 @@ def process_incoming_message(sender_id: str, user_text: str):
             client["full_name"] = potential_name
             update_client(sender_id, full_name=potential_name)
 
-        # AI tahlili orqali mijozning nimalarga qiziqqani va unga nima kerakligini aniqlash
+        # To'liq tarixdan yo'nalish, manba va mijozning haqiqiy savolini aniqlash
         chat_history = get_client_chat_history(sender_id)
+        resolved_lead = resolve_course_and_inquiry(
+            chat_history=chat_history,
+            current_text=text_clean,
+            existing_campaign=client.get("campaign"),
+            existing_source=client.get("source")
+        )
+        if resolved_lead["campaign"] != "Umumiy":
+            client["campaign"] = resolved_lead["campaign"]
+        if resolved_lead["source"] != "Direct":
+            client["source"] = resolved_lead["source"]
+
+        # Admin guruhida So'rovi: None yoki faqat raqam emas, balki haqiqiy so'rov (masalan: "GID") ko'rinishi shart!
+        actual_user_inquiry = resolved_lead["inquiry"]
+        client["last_message"] = actual_user_inquiry
+
+        # AI tahlili orqali mijozning nimalarga qiziqqani va unga nima kerakligini aniqlash
         lead_summary = analyze_lead_need(chat_history, client)
         client["ai_summary"] = lead_summary
 
@@ -182,6 +288,9 @@ def process_incoming_message(sender_id: str, user_text: str):
             phone_number=clean_phone, 
             step="completed",
             lead_status="yangi",
+            campaign=client.get("campaign", "Umumiy"),
+            source=client.get("source", "Direct"),
+            last_message=actual_user_inquiry,
             ai_summary=lead_summary
         )
         client["phone_number"] = clean_phone
@@ -276,11 +385,13 @@ def process_incoming_message(sender_id: str, user_text: str):
 
         if new_course_found and new_course_found != client.get("campaign"):
             client["campaign"] = new_course_found
-            update_client(sender_id, campaign=new_course_found, lead_status="yangi")
+            client["last_message"] = text_clean
+            update_client(sender_id, campaign=new_course_found, lead_status="yangi", last_message=text_clean)
             if client.get("phone_number"):
                 notify_admin_new_lead(client, source="Direct (Yangi kursga qiziqish 🔄)")
         elif client.get("lead_status") in ["boglandi", "rad", "oylanyapti"] and client.get("phone_number"):
-            update_client(sender_id, lead_status="yangi")
+            client["last_message"] = text_clean
+            update_client(sender_id, lead_status="yangi", last_message=text_clean)
             client["lead_status"] = "yangi"
             notify_admin_new_lead(client, source="Direct (Qayta murojaat 🔄)")
 
@@ -372,10 +483,15 @@ def process_incoming_message(sender_id: str, user_text: str):
                             break
 
             # Qaysi kurs kontekstida ekanligini aniqlash:
-            is_hotel_ops = any(k in text_clean.lower() or k in history_text for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism"])
-            is_online_platform = any(k in text_clean.lower() or k in history_text for k in ["front office", "frontoffice", "housekeeping", "tourism-edu", "onlayn", "online", "masofaviy"])
-            is_gid = any(k in text_clean.lower() or k in history_text for k in ["gid", "ekskurs", "гид", "экскурсовод", "malaka", "qayta tayyorla", "beyjik", "72 soat"])
-            is_agency = any(k in text_clean.lower() or k in history_text for k in ["turagent", "turoperator", "турагент", "туроператор"])
+            history_text = (str(client.get("last_message", "")) + " " + text_clean).lower()
+            if chat_history:
+                history_text += " " + " ".join([h.get("text", "") for h in chat_history if h.get("role") == "user"]).lower()
+
+            c_name = str(client.get("campaign", ""))
+            is_hotel_ops = any(k in history_text for k in ["hotel operations", "hotel operation", "27 bet", "27 sahifa", "un tourism"]) or ("Hotel" in c_name)
+            is_online_platform = any(k in history_text for k in ["front office", "frontoffice", "housekeeping", "tourism-edu", "onlayn", "online", "masofaviy"]) or ("Front" in c_name or "Housekeeping" in c_name)
+            is_gid = any(k in history_text for k in ["gid", "ekskurs", "гид", "экскурсовод", "malaka", "qayta tayyorla", "beyjik", "72 soat"]) or ("Gid" in c_name)
+            is_agency = any(k in history_text for k in ["turagent", "turoperator", "турагент", "туроператор"]) or ("Turagent" in c_name or "Turoperator" in c_name)
 
             if is_hotel_ops:
                 if lang_req == "ru":
@@ -952,6 +1068,7 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
 
         display_msg = f"🎙️ {transcription}" if transcription else "🎙️ [Ovozli xabar]"
         updates = {"last_message": display_msg}
+        client["last_message"] = display_msg
         if summary:
             updates["ai_summary"] = summary
             client["ai_summary"] = summary

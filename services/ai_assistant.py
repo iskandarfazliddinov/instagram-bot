@@ -289,9 +289,24 @@ def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
     if client_context is None:
         client_context = {}
     api_key = get_setting("gemini_api_key", "").strip() or settings.GEMINI_API_KEY.strip()
-    campaign = client_context.get("campaign") or "Umumiy ta'lim kurslari"
+    campaign = client_context.get("campaign") or ""
     last_msg = client_context.get("last_message") or ""
     client_name = client_context.get("full_name") or "Mijoz"
+
+    # Agar yo'nalish 'Umumiy' bo'lib qolgan bo'lsa, to'liq suhbat tarixidan aniqlaymiz
+    if (not campaign or campaign in ["Umumiy", "Umumiy ta'lim kurslari"]) and chat_history:
+        try:
+            from services.dialog_manager import resolve_course_and_inquiry
+            res_c = resolve_course_and_inquiry(chat_history, last_msg, campaign, client_context.get("source", ""))
+            if res_c.get("campaign") and res_c["campaign"] != "Umumiy":
+                campaign = res_c["campaign"]
+            if res_c.get("inquiry") and not last_msg:
+                last_msg = res_c["inquiry"]
+        except Exception:
+            pass
+
+    if not campaign or campaign == "Umumiy":
+        campaign = "Turizm sohasi bo'yicha ta'lim kurslari"
 
     history_lines = []
     if chat_history and isinstance(chat_history, list):
@@ -308,23 +323,25 @@ def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
 
     if api_key:
         prompt = (
-            "Siz Xalqaro Turizm Akademiyasi Samarqand kampusining malakali mijozlar tahlilchisisiz.\n"
-            "Quyida Instagram orqali kelgan tinglovchi bilan bo'lgan muloqot berilgan.\n\n"
+            "Siz Xalqaro Turizm Akademiyasi Samarqand kampusining professional mijozlar tahlilchisisiz.\n"
+            "Quyida Instagram orqali kelgan tinglovchi bilan bo'lgan suhbat tarixi berilgan.\n\n"
             f"--- TINGLOVCHI HAQIDA ---\n"
             f"Ismi: {client_name}\n"
-            f"Yo'nalishi / Aksiya: {campaign}\n\n"
+            f"Qiziqqan yo'nalishi / Kursi: {campaign}\n"
+            f"Asosiy so'rovi: {last_msg}\n\n"
             f"--- SUHBAT TARIXI ---\n"
             f"{dialog_str}\n\n"
-            "VAZIFA: Ushbu tinglovchi aynan qaysi kurs yoki mavzuga qiziqqanini, unga qanday ma'lumotlar kerakligini "
-            "(masalan: kurs narxi, o'qish muddati, sertifikat turi, dars vaqtlari, amaliyot yoki qabul shartlari) "
-            "va mutaxassislarimiz bog'langanda nimalarga e'tibor qaratishi kerakligini 1-2 ta aniq, tushunarli, "
-            "o'zbek tilidagi qisqa jumla bilan xulosa qilib bering.\n"
-            "Hech qanday kirish so'z yoki ortiqcha belgilarsiz, faqat xulosa matnini qaytaring."
+            "MUHIM VAZIFA VA TALABLAR:\n"
+            "1. Tinglovchi AYNAN qaysi kurs yoki yo'nalishga qiziqqanini aniqlang (masalan: Gid-ekskursiyachi kursi, Front Office, Housekeeping, Hotel Operations, Turagentlik, Turoperatorlik va h.k.).\n"
+            "2. Agar suhbatda yoki tinglovchi xabarida GID / Ekskursiyachi tilga olingan bo'lsa, xulosada AYNAN 'Gid-ekskursiyachilik kursi' deb yozing!\n"
+            "3. HECH QACHON 'umumiy kurslar', 'turizm sohasidagi umumiy kurslar' yoki 'umumiy ta'lim' deb noaniq yozmang!\n"
+            "4. Tinglovchiga aynan qanday ma'lumotlar kerakligini (o'qish muddati, to'lov narxi, diplom/sertifikat/beyjik berilishi, amaliyot yoki qabul shartlari) va mutaxassislarimiz bog'langanda nimalarga e'tibor qaratishi kerakligini 1-2 ta aniq, lo'nda, o'zbek tilidagi qisqa jumla bilan xulosa qilib bering.\n"
+            "5. Faqat va faqat xulosa matnini qaytaring (hech qanday kirish so'z yoki ortiqcha belgisiz)."
         )
 
         headers = {"Content-Type": "application/json"}
 
-        for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
+        for model_name in CANDIDATE_MODELS:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             gen_config = {"temperature": 0.2, "maxOutputTokens": 400}
             if "gemini-3" in model_name:
@@ -335,7 +352,7 @@ def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
                 "generationConfig": gen_config
             }
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                response = requests.post(url, json=payload, headers=headers, timeout=25)
                 if response.status_code == 200:
                     data = response.json()
                     candidates = data.get("candidates", [])
@@ -344,27 +361,28 @@ def analyze_lead_need(chat_history: list, client_context: dict = None) -> str:
                         if parts:
                             summary = clean_ai_output(parts[0].get("text", ""))
                             if summary:
+                                if any(w in summary.lower() for w in ["umumiy kurslar", "turizm sohasidagi umumiy", "umumiy ta'lim"]) and campaign and "umumiy" not in campaign.lower():
+                                    summary = re.sub(r"turizm sohasidagi umumiy kurslar|umumiy ta'lim kurslari|umumiy kurslar", f"«{campaign}»", summary, flags=re.IGNORECASE)
                                 logger.info(f"AI Lead tahlili ({model_name}): {summary}")
                                 return summary
             except Exception as e:
                 logger.error(f"AI Lead tahlilida xatolik ({model_name}): {e}")
 
-    # Fallback evristik tahlil
-    summary_parts = []
-    if campaign and campaign != "Umumiy":
-        summary_parts.append(f"{campaign} yo'nalishiga qiziqqan.")
-    if last_msg:
-        lm_lower = last_msg.lower()
-        if any(w in lm_lower for w in ["narx", "qancha", "nechpul", "стоит", "цена", "how much", "cost", "price", "fee"]):
-            summary_parts.append("Kurs narxi va to'lov shartlarini so'ragan.")
-        elif any(w in lm_lower for w in ["sertifikat", "diplom", "диплом", "certificate", "beyjik", "бейджик", "badge"]):
-            summary_parts.append("Diplom, sertifikat yoki beyjik berilishi bilan qiziqqan.")
-        elif any(w in lm_lower for w in ["vaqt", "boshlan", "jadval", "когда", "schedule", "when"]):
-            summary_parts.append("Darslar boshlanish sanasi va vaqti kerak.")
-        else:
-            summary_parts.append(f"So'rovi: «{last_msg[:60]}»")
-
-    return " ".join(summary_parts) if summary_parts else f"{campaign} bo'yicha to'liq ma'lumot kutyapti."
+    # Fallback aqlli va aniq tahlil
+    c_lower = campaign.lower()
+    if any(k in c_lower for k in ["gid", "ekskurs"]):
+        return f"{client_name} Gid-ekskursiyachilik kursiga (4 oylik qayta tayyorlash diplomi va beyjik yoki 1 oylik malaka oshirish) qiziqmoqda; unga o'qish narxi, muddati va qabul shartlari bo'yicha to'liq ma'lumot berish tavsiya etiladi."
+    elif any(k in c_lower for k in ["hotel", "operations"]):
+        return f"{client_name} UN Tourism bilan birgalikdagi «Hotel Operations and Innovation» xalqaro qayta tayyorlash dasturiga qiziqmoqda; unga 27 betlik o'quv rejasi, Zoho ariza va qabul shartlari bo'yicha ma'lumot berish tavsiya etiladi."
+    elif any(k in c_lower for k in ["front", "housekeeping", "tourism-edu", "online", "onlayn"]):
+        return f"{client_name} tourism-edu.uz platformasidagi onlayn kurslar ({campaign}) bilan qiziqmoqda; unga masofaviy ta'lim formati, darslar tartibi va rasmiy sertifikat berilishi haqida ma'lumot berish tavsiya etiladi."
+    elif any(k in c_lower for k in ["turagent", "turoperator"]):
+        return f"{client_name} {campaign}ga (1 oylik amaliy ta'lim, 2 350 000 so'm) qiziqmoqda; unga o'quv dasturi, amaliyot va rasmiy sertifikat bo'yicha ma'lumot berish tavsiya etiladi."
+    elif any(k in c_lower for k in ["restoran", "servis", "f&b"]):
+        return f"{client_name} Restoran ishi va servis kursiga qiziqmoqda; unga amaliyot bazalari va kurs narxlari bo'yicha ma'lumot berish tavsiya etiladi."
+    else:
+        inq_str = f" So'rovi: «{last_msg[:60]}»." if last_msg and last_msg not in ["Kurs bo'yicha ma'lumot", "Batafsil ma'lumot"] else ""
+        return f"{client_name} akademiyamiz ta'lim dasturlariga qiziqmoqda.{inq_str} Unga mos kurslar, o'qish muddati va to'lov narxlari bo'yicha batafsil ma'lumot berish tavsiya etiladi."
 
 def generate_ai_comment_dm(comment_text: str, username: str = "", campaign_name: str = "") -> str:
     """

@@ -14,8 +14,52 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     username = client.get('username') or ''
     phone = client.get('phone_number') or ''
     ig_id = client.get('instagram_id', '')
-    last_msg = client.get('last_message', '')
-    campaign = client.get('campaign', 'Umumiy')
+    campaign = client.get('campaign') or 'Umumiy'
+
+    # 1. Kurs / Yo'nalishni aniqlash ('Umumiy' bo'lib qolmasligi uchun chuqur tekshiruv)
+    if campaign in ['Umumiy', '', None, 'None'] and ig_id:
+        try:
+            from database import get_client_chat_history
+            from services.dialog_manager import resolve_course_and_inquiry
+            ch = get_client_chat_history(ig_id)
+            res_c = resolve_course_and_inquiry(ch, "", campaign, source)
+            if res_c.get("campaign") and res_c["campaign"] != "Umumiy":
+                campaign = res_c["campaign"]
+        except Exception:
+            pass
+
+    # 2. So'rovni aniqlash ('None' yoki faqat telefon raqam bo'lib qolmasligi uchun)
+    raw_last_msg = client.get('last_message')
+    if raw_last_msg in [None, "None", "null", "—", ""]:
+        raw_last_msg = ""
+    digits_only = re.sub(r"\D", "", str(raw_last_msg))
+    phone_digits = re.sub(r"\D", "", str(phone or ""))
+    if (not raw_last_msg) or (digits_only and digits_only == phone_digits):
+        if ig_id:
+            try:
+                from database import get_client_chat_history
+                from services.dialog_manager import resolve_course_and_inquiry
+                ch = get_client_chat_history(ig_id)
+                res_inq = resolve_course_and_inquiry(ch, "", campaign, source)
+                raw_last_msg = res_inq.get("inquiry")
+            except Exception:
+                pass
+    if not raw_last_msg or raw_last_msg in [None, "None", "null", ""]:
+        raw_last_msg = f"{campaign} bo'yicha ma'lumot" if campaign and campaign != "Umumiy" else "Kurslar bo'yicha ma'lumot so'rovi"
+    last_msg = raw_last_msg
+
+    # 3. Manbani aniqlash ('Direct' bo'lsa, mos Reels havolasini topish)
+    if (source in ["Direct", "", None] or not source) and ig_id:
+        try:
+            from database import get_client_chat_history
+            from services.dialog_manager import resolve_course_and_inquiry
+            ch = get_client_chat_history(ig_id)
+            res_s = resolve_course_and_inquiry(ch, "", campaign, source)
+            if res_s.get("source") and res_s["source"] != "Direct":
+                source = res_s["source"]
+        except Exception:
+            pass
+
     status = client.get('lead_status', 'yangi')
     manager_name = client.get('manager_name', '')
     manager_time = client.get('manager_time', '')
@@ -157,7 +201,7 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     conn = get_connection()
     cursor = conn.cursor()
     if client_id:
-        cursor.execute("SELECT tg_message_id, lead_status, campaign, updated_at, phone_number FROM clients WHERE id = ?", (client_id,))
+        cursor.execute("SELECT tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE id = ?", (client_id,))
         row = cursor.fetchone()
         if row:
             if row["tg_message_id"]:
@@ -166,8 +210,14 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
             prev_campaign = row["campaign"]
             prev_updated = row["updated_at"]
             prev_phone = row["phone_number"]
+            if (not client.get("campaign") or client.get("campaign") == "Umumiy") and row["campaign"] and row["campaign"] != "Umumiy":
+                client["campaign"] = row["campaign"]
+            if (not client.get("source") or client.get("source") == "Direct") and row["source"] and row["source"] != "Direct":
+                client["source"] = row["source"]
+            if (not client.get("last_message") or client.get("last_message") in ["None", ""]) and row["last_message"] and row["last_message"] not in ["None", ""]:
+                client["last_message"] = row["last_message"]
     elif ig_id:
-        cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at, phone_number FROM clients WHERE instagram_id = ?", (ig_id,))
+        cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE instagram_id = ?", (ig_id,))
         row = cursor.fetchone()
         if row:
             client_id = row["id"]
@@ -178,6 +228,12 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
             prev_campaign = row["campaign"]
             prev_updated = row["updated_at"]
             prev_phone = row["phone_number"]
+            if (not client.get("campaign") or client.get("campaign") == "Umumiy") and row["campaign"] and row["campaign"] != "Umumiy":
+                client["campaign"] = row["campaign"]
+            if (not client.get("source") or client.get("source") == "Direct") and row["source"] and row["source"] != "Direct":
+                client["source"] = row["source"]
+            if (not client.get("last_message") or client.get("last_message") in ["None", ""]) and row["last_message"] and row["last_message"] not in ["None", ""]:
+                client["last_message"] = row["last_message"]
     conn.close()
 
     if "prev_phone" in client:
