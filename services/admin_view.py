@@ -870,7 +870,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <div id="row_comment_wrap_{client_id}">{comment_block}</div>
                 <div id="row_comment_btn_wrap_{client_id}">{comment_btn}</div>
             </td>
-            <td class="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">{created_at}</td>
+            <td class="px-5 py-3.5 text-xs text-slate-600 font-mono whitespace-nowrap font-medium" title="Murojaat sanasi va vaqti">🕒 {created_at}</td>
             {action_td}
         </tr>
         """
@@ -947,7 +947,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
                 <div class="text-right shrink-0">
-                    <span class="text-[10px] text-slate-400 block font-mono">{created_at[-5:] if len(created_at) >= 5 else ''}</span>
+                    <span class="text-[10px] text-slate-500 block font-mono font-medium whitespace-nowrap mb-0.5" title="Murojaat sanasi va vaqti (Toshkent)">🕒 {created_at}</span>
                     {fol_badge}
                 </div>
             </div>
@@ -2810,6 +2810,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="unassigned">⚪ Biriktirilmagan lidlar</option>
                             {operators_filter_options_html}
                         </select>
+                        <select id="lead_sort_order" onchange="sortCardsAndRows(this.value)" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer" title="Lidlar tartibi">
+                            <option value="asc" selected>⬇️ Navbat bo'yicha (Yangisi oxirida)</option>
+                            <option value="desc">⬆️ Yangilar avval (Yangisi tepada)</option>
+                        </select>
                         <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
                             <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
                                 🔄 Yangilash
@@ -3996,6 +4000,32 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }});
         }}
 
+        function sortCardsAndRows(order) {{
+            const colStatuses = ['yangi', 'oylanyapti', 'boglandi', 'zahira', 'rad'];
+            colStatuses.forEach(st => {{
+                const colBox = document.getElementById('kanban_col_' + st);
+                if (!colBox) return;
+                const cards = Array.from(colBox.querySelectorAll('.kanban-card'));
+                cards.sort((a, b) => {{
+                    const idA = parseInt(a.getAttribute('data-client-id') || '0', 10);
+                    const idB = parseInt(b.getAttribute('data-client-id') || '0', 10);
+                    return order === 'asc' ? (idA - idB) : (idB - idA);
+                }});
+                cards.forEach(c => colBox.appendChild(c));
+            }});
+
+            const tbody = document.querySelector('#leads_table_view tbody');
+            if (tbody) {{
+                const rows = Array.from(tbody.querySelectorAll('.client-row'));
+                rows.sort((a, b) => {{
+                    const idA = parseInt(a.getAttribute('data-client-id') || '0', 10);
+                    const idB = parseInt(b.getAttribute('data-client-id') || '0', 10);
+                    return order === 'asc' ? (idA - idB) : (idB - idA);
+                }});
+                rows.forEach(r => tbody.appendChild(r));
+            }}
+        }}
+
         const statusTitles = {{
             "yangi": "⚪ Yangi Lid",
             "boglandi": "🟢 Muvaffaqiyatli",
@@ -4096,7 +4126,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 const emptyPlaceholder = targetCol.querySelector('.empty-col-placeholder');
                 if (emptyPlaceholder) emptyPlaceholder.remove();
 
-                targetCol.prepend(card);
+                targetCol.appendChild(card);
                 card.setAttribute('data-status', newStatus);
                 const sel = card.querySelector('select');
                 if (sel) sel.value = newStatus;

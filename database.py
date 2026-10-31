@@ -1021,11 +1021,12 @@ def update_client_manager_comment(client_id: int, comment: str, manager_name: st
     sync_leads_backup()
     return dict(row) if row else None
 
-def get_all_clients():
-    """Barcha yig'ilgan mijozlar ro'yxatini olish"""
+def get_all_clients(order_asc: bool = True):
+    """Barcha yig'ilgan mijozlar ro'yxatini olish (yangi kelgan lidlar ro'yxat oxiridan qo'shiladi)"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM clients ORDER BY created_at DESC")
+    order_clause = "ORDER BY id ASC" if order_asc else "ORDER BY id DESC"
+    cursor.execute(f"SELECT * FROM clients {order_clause}")
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]

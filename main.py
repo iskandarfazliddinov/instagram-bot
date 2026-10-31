@@ -948,21 +948,42 @@ def admin_dashboard(request: Request, notice: str = ""):
     operators_data = get_all_operators()
     recent_logs = get_recent_activity_logs(500)
 
-    # Agar mutaxassis (operator) bo'lsa va yo'nalishlar admin tomonidan cheklangan bo'lsa:
+    # Agar mutaxassis (operator) bo'lsa:
     if curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
         op_info = get_operator_by_id(curr_user.get("id"))
-        if op_info:
-            allowed_dir_str = (op_info.get("allowed_directions") or "all").strip()
-            curr_user["allowed_directions"] = allowed_dir_str
-            if allowed_dir_str != "all" and allowed_dir_str:
-                allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()])
-                filtered_clients = []
-                for cl in clients_data:
-                    c_dir = get_lead_direction_key(cl.get("campaign", ""))
-                    # Ruxsat etilgan yo'nalish yoki aynan shu operatorga biriktirilgan lid
-                    if c_dir in allowed_keys or cl.get("manager_name") == curr_user.get("display_name"):
-                        filtered_clients.append(cl)
-                clients_data = filtered_clients
+        allowed_dir_str = (op_info.get("allowed_directions") or "all").strip() if op_info else "all"
+        curr_user["allowed_directions"] = allowed_dir_str
+        allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()]) if allowed_dir_str != "all" and allowed_dir_str else set()
+
+        my_display = (curr_user.get("display_name") or "").strip().lower()
+        my_user = (curr_user.get("username") or "").strip().lower()
+
+        filtered_clients = []
+        for cl in clients_data:
+            mgr = (cl.get("manager_name") or "").strip()
+            mgr_lower = mgr.lower()
+            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
+            is_assigned_to_me = bool(not is_unassigned and (mgr_lower == my_display or mgr_lower == my_user or my_display in mgr_lower or mgr_lower in my_display))
+            is_assigned_to_other = bool(not is_unassigned and not is_assigned_to_me)
+
+            # 1. Boshqa operatorga biriktirilgan bo'lsa -> bu operatorga ASLO ko'rinmasin!
+            if is_assigned_to_other:
+                continue
+
+            # 2. Aynan shu operatorga biriktirilgan bo'lsa -> albatta ko'rinsin
+            if is_assigned_to_me:
+                filtered_clients.append(cl)
+                continue
+
+            # 3. Hali hech kimga biriktirilmagan yangi lid bo'lsa -> operator yo'nalishlariga qaraymiz
+            if not allowed_keys:
+                filtered_clients.append(cl)
+            else:
+                c_dir = get_lead_direction_key(cl.get("campaign", ""))
+                if c_dir in allowed_keys:
+                    filtered_clients.append(cl)
+
+        clients_data = filtered_clients
 
     html_content = get_admin_dashboard_html(
         settings_data, campaigns_data, clients_data,
@@ -1709,15 +1730,32 @@ def export_clients_excel(request: Request):
     if curr_user and curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
         from database import get_operator_by_id, get_lead_direction_key
         op_info = get_operator_by_id(curr_user.get("id"))
-        if op_info:
-            allowed_dir_str = (op_info.get("allowed_directions") or "all").strip()
-            if allowed_dir_str != "all" and allowed_dir_str:
-                allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()])
-                clients = [
-                    cl for cl in clients
-                    if get_lead_direction_key(cl.get("campaign", "")) in allowed_keys
-                    or cl.get("manager_name") == curr_user.get("display_name")
-                ]
+        allowed_dir_str = (op_info.get("allowed_directions") or "all").strip() if op_info else "all"
+        allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()]) if allowed_dir_str != "all" and allowed_dir_str else set()
+
+        my_display = (curr_user.get("display_name") or "").strip().lower()
+        my_user = (curr_user.get("username") or "").strip().lower()
+
+        filtered = []
+        for cl in clients:
+            mgr = (cl.get("manager_name") or "").strip()
+            mgr_lower = mgr.lower()
+            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
+            is_assigned_to_me = bool(not is_unassigned and (mgr_lower == my_display or mgr_lower == my_user or my_display in mgr_lower or mgr_lower in my_display))
+            is_assigned_to_other = bool(not is_unassigned and not is_assigned_to_me)
+
+            if is_assigned_to_other:
+                continue
+            if is_assigned_to_me:
+                filtered.append(cl)
+                continue
+            if not allowed_keys:
+                filtered.append(cl)
+            else:
+                c_dir = get_lead_direction_key(cl.get("campaign", ""))
+                if c_dir in allowed_keys:
+                    filtered.append(cl)
+        clients = filtered
     
     try:
         import openpyxl
