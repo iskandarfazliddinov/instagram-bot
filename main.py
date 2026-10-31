@@ -44,7 +44,8 @@ from services.dialog_manager import (
     process_incoming_comment,
     process_incoming_audio_message,
     process_incoming_video_message,
-    extract_phone_from_message_data
+    extract_phone_from_message_data,
+    is_reaction_or_empty
 )
 from services.instagram import get_recent_media, resolve_media_id_from_url, send_message
 from services.admin_view import get_admin_dashboard_html, get_login_page_html
@@ -399,12 +400,13 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
                     logger.info(f'[Poller] Video/Reels xabari aniqlandi [{sender_id}]: title="{video_title}", text="{combined_text}"')
                     process_incoming_video_message(sender_id, video_title, video_url, combined_text)
                 elif combined_text:
+                    if is_reaction_or_empty(combined_text):
+                        logger.info(f'[Poller] Mijoz [{sender_id}] matnsiz reaksiya yoki emodzi yubordi («{combined_text}»), CRM ga kiritilmaydi.')
+                        continue
                     logger.info(f'[Poller Auto-Sync] {len(text_list)} ta xabar birlashtirildi [{sender_id}]: «{combined_text[:80]}...»')
                     process_incoming_message(sender_id, combined_text)
-                elif not combined_text and not has_video:
-                    # Agar mijoz stiker, emodzi yoki matnsiz share yuborgan bo'lsa
-                    logger.info(f'[Poller] Matnsiz xabar keldi [{sender_id}], xushmuomala salomlashuv yuborilmoqda')
-                    process_incoming_message(sender_id, "Assalomu alaykum")
+                else:
+                    logger.info(f'[Poller] Matnsiz reaksiya yoki ko\'rildi holati [{sender_id}], e\'tiborsiz qoldirildi.')
 
     except Exception as e:
         logger.error(f'[Poller Auto-Sync] Xatolik: {e}')
@@ -592,8 +594,12 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                 sender_id = str(messaging_event.get("sender", {}).get("id", ""))
                 message = messaging_event.get("message", {})
 
+                # Reaksiya (reaction), o'qildi (read) yoki yetkazildi (delivery) hodisalari bo'lsa - e'tiborsiz qoldiramiz
+                if "reaction" in messaging_event or "read" in messaging_event or "delivery" in messaging_event:
+                    continue
+
                 # Bot o'zi yuborgan xabarning aks sadosi (echo) yoki sahifamiz nomidan chiqqan xabarlar
-                if message.get("is_echo") or (sender_id in PAGE_IDS):
+                if message.get("is_echo") or (sender_id in PAGE_IDS) or message.get("is_deleted"):
                     continue
 
                 mid = message.get("mid")
@@ -673,6 +679,9 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
                 # 4. Oddiy matnli xabar
                 elif user_text:
+                    if is_reaction_or_empty(user_text):
+                        logger.info(f"[Webhook] Shunchaki reaksiya / emodzi keldi [{sender_id}]: «{user_text}», CRM ga qo'shilmaydi.")
+                        continue
                     logger.info(f"Yangi Direct xabar keldi [{sender_id}]: {user_text}")
                     asyncio.create_task(enqueue_user_message(sender_id, text=user_text, mid=mid))
 
@@ -690,10 +699,12 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
 
                 # A) Direct xabarlar (Instagram API v26.0 messages yoki standby)
                 if field in ["messages", "standby"]:
+                    if "reaction" in value or "read" in value or "delivery" in value:
+                        continue
                     sender_id = str(value.get("sender", {}).get("id", ""))
                     message = value.get("message", {})
 
-                    if message.get("is_echo") or (sender_id in PAGE_IDS):
+                    if message.get("is_echo") or (sender_id in PAGE_IDS) or message.get("is_deleted"):
                         continue
 
                     mid = message.get("mid")
@@ -753,6 +764,9 @@ async def receive_instagram_events(request: Request, background_tasks: Backgroun
                         logger.info(f"Yangi Direct Quick reply (v26.0) keldi [{sender_id}]: {quick_reply}")
                         asyncio.create_task(enqueue_user_message(sender_id, text=quick_reply, mid=mid))
                     elif user_text:
+                        if is_reaction_or_empty(user_text):
+                            logger.info(f"[Webhook v26.0] Shunchaki reaksiya / emodzi keldi [{sender_id}]: «{user_text}», CRM ga qo'shilmaydi.")
+                            continue
                         logger.info(f"Yangi Direct xabar (v26.0) keldi [{sender_id}]: {user_text}")
                         asyncio.create_task(enqueue_user_message(sender_id, text=user_text, mid=mid))
                     elif attachments:

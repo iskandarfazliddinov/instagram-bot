@@ -676,6 +676,12 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
         username = item["username"]
         msgs = item["msgs"]
 
+        # Agar foydalanuvchi biror marta ham Directda o'zi yozmagan bo'lsa (faqat bot private reply yoki reklama yuborgan bo'lsa) - CRM ga kiritilmaydi!
+        BOT_USERNAMES = {"xalqaro_turizm_akademiyasi", "ita_samarkand", "ita_samarkandita_samarkand", "itasamarkand"}
+        user_msgs = [m for m in msgs if (m.get("from", {}).get("username") or "").lower() not in BOT_USERNAMES and (m.get("message") or "").strip()]
+        if not user_msgs:
+            continue
+
         msgs.reverse()
         chat_history = []
         phone = None

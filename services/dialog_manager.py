@@ -232,10 +232,39 @@ def resolve_course_and_inquiry(chat_history: list = None, current_text: str = ""
         "inquiry": actual_inquiry
     }
 
+def is_reaction_or_empty(text: str) -> bool:
+    """
+    Xabar faqat reaksiya (emodzi, layk, stiker) yoki bo'sh ekanligini tekshirish.
+    Bunday xabarlar mijozning qiziqib yozgan savoli emas, shuning uchun CRM ga lid sifatida qo'shilmaydi.
+    """
+    if not text or not str(text).strip():
+        return True
+    t = str(text).strip()
+    if t in ["[Rasm yuborildi]", "[Stiker]", "[Like]", "👍", "❤️", "🔥", "👏"]:
+        return True
+    import re
+    # Matnda harflar (lotin/kirill) yoki raqamlar bormi?
+    has_alphanumeric = bool(re.search(r'[a-zA-Z0-9\u0400-\u04FF\u0100-\u017F]', t))
+    if not has_alphanumeric:
+        # Faqat emodzilar, yurakchalar, belgilar yoki tinish belgilari bo'lsa
+        return True
+    return False
+
 def process_incoming_message(sender_id: str, user_text: str):
     """
     Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
     """
+    # 0. Shunchaki reaksiya, emodzi yoki layk bosgan bo'lsa - CRM ga qo'shilmaydi va javob yuborilmaydi
+    if is_reaction_or_empty(user_text):
+        from database import get_client_by_instagram_id
+        existing_client = get_client_by_instagram_id(sender_id)
+        if existing_client:
+            append_client_chat_history(sender_id, "user", user_text.strip() or "[Reaksiya bildirdi]")
+            logger.info(f"Mavjud mijoz [{sender_id}] reaksiya bildirdi («{user_text}»).")
+        else:
+            logger.info(f"Foydalanuvchi [{sender_id}] shunchaki reaksiya/emodzi bildirdi («{user_text}»). Qiziqib yozmagani uchun CRM ga qo'shilmaydi va javob berilmaydi.")
+        return
+
     from database import get_pending_comment, delete_pending_comment
     pending = get_pending_comment(sender_id)
 
