@@ -3340,7 +3340,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }} else if (cLow.includes('narx')) {{
                 return '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💰 Kurslar narxi</span>';
             }} else if (cLow.includes('dastur')) {{
-                return '<span class="bg-violet-50 text-violet-700 border border-violet-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O\'quv dasturi</span>';
+                return '<span class="bg-violet-50 text-violet-700 border border-violet-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O&#39;quv dasturi</span>';
             }} else if (cLow.includes('konsultatsiya') || cLow.includes('batafsil')) {{
                 return '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💬 Batafsil konsultatsiya</span>';
             }} else {{
