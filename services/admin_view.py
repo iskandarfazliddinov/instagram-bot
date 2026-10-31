@@ -199,6 +199,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         for d in AVAILABLE_DIRECTIONS:
             course_filter_options_html += f'<option value="{d["key"]}">{d["name"]}</option>'
 
+    # Tahrirlash modali uchun barcha kurslar/yo'nalishlar variantlari
+    campaign_options_html = ""
+    for d in AVAILABLE_DIRECTIONS:
+        campaign_options_html += f'<option value="{d["name"]}">{d["name"]}</option>\n'
+
     # Xodim uchun yo'nalishlar xabarnomasi banneri
     operator_directions_banner = ""
     if is_restricted_operator:
@@ -856,7 +861,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">
-                <div>{campaign_badge}</div>
+                <div id="table_camp_badge_{client_id}" onclick="openCommentModalWithFocus('{client_id}', 'campaign')" class="cursor-pointer hover:opacity-80 transition inline-block" title="Yo'nalishni o'zgartirish uchun bosing">{campaign_badge}</div>
                 <div>{source_badge}</div>
             </td>
             <td class="px-5 py-3.5">
@@ -967,7 +972,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             <!-- Course & Source badges -->
             <div class="flex flex-wrap items-center gap-1 mb-2">
-                {campaign_badge}
+                <div id="kanban_camp_badge_{client_id}" onclick="openCommentModalWithFocus('{client_id}', 'campaign')" class="cursor-pointer hover:opacity-80 transition inline-block" title="Yo'nalishni o'zgartirish uchun bosing">{campaign_badge}</div>
                 {source_badge}
             </div>
 
@@ -2588,6 +2593,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </select>
                 </div>
 
+                <!-- Yo'nalish / Kursni tanlash va o'zgartirish -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">📚 Qiziqqan Yo'nalishi / Kursi:</label>
+                    <select name="campaign" id="modalCampaignSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white cursor-pointer shadow-xs">
+                        {campaign_options_html}
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">Agar mijoz adashib boshqa kursga tushgan bo'lsa, to'g'ri yo'nalishga shu yerdan o'tkazishingiz mumkin.</p>
+                </div>
+
                 <!-- Mas'ul mutaxassisni tanlash va O'zimga biriktirish -->
                 {manager_selection_html}
 
@@ -3208,6 +3222,21 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             if (courseElem) {{
                 courseElem.textContent = "Qiziqqan yo'nalishi: " + (campaign || 'Umumiy');
             }}
+
+            const campSelect = document.getElementById('modalCampaignSelect');
+            if (campSelect) {{
+                campSelect.value = campaign || '';
+                if (!campSelect.value && campaign) {{
+                    const clean = campaign.toLowerCase().replace(/[^\\w\\s]/gi, '').trim();
+                    for (let opt of campSelect.options) {{
+                        const optVal = opt.value.toLowerCase().replace(/[^\\w\\s]/gi, '').trim();
+                        if (optVal && (optVal === clean || optVal.includes(clean) || clean.includes(optVal))) {{
+                            campSelect.value = opt.value;
+                            break;
+                        }}
+                    }}
+                }}
+            }}
             
             const statusSelect = document.getElementById('modalStatusSelect');
             if (statusSelect) {{
@@ -3270,6 +3299,52 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const sel = document.getElementById('modalManagerSelect');
             if (sel) {{
                 sel.value = name;
+            }}
+        }}
+
+        function openCommentModalWithFocus(clientId, focusField) {{
+            const btn = document.getElementById('kanban_comment_btn_' + clientId) || 
+                        document.getElementById('table_action_comment_btn_' + clientId) || 
+                        document.getElementById('table_row_comment_btn_' + clientId);
+            if (btn) {{
+                btn.click();
+            }}
+            if (focusField === 'campaign') {{
+                setTimeout(() => {{
+                    const campSelect = document.getElementById('modalCampaignSelect');
+                    if (campSelect) {{
+                        campSelect.focus();
+                        campSelect.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    }}
+                }}, 150);
+            }}
+        }}
+
+        function getCampaignBadgeHtml(campaign) {{
+            if (!campaign) return '<span class="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">💬 Umumiy</span>';
+            const cLow = campaign.toLowerCase();
+            if (cLow.includes('front') || cLow.includes('housekeeping') || cLow.includes('xona tozalash') || cLow.includes('tourism-edu')) {{
+                return '<span class="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">💻 Front Office (Onlayn)</span>';
+            }} else if (cLow.includes('hotel') || cLow.includes('mehmonxona') || cLow.includes('operations')) {{
+                return '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🏨 Hotel Operations</span>';
+            }} else if (cLow.includes('malaka')) {{
+                return '<span class="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🗺 Gidlik (Malaka oshirish)</span>';
+            }} else if (cLow.includes('gid') || cLow.includes('ekskurs')) {{
+                return '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">🌍 Gidlik (Qayta tayyorlash)</span>';
+            }} else if (cLow.includes('turagent')) {{
+                return '<span class="bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">✈️ Turagentlik</span>';
+            }} else if (cLow.includes('turoperator')) {{
+                return '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">✈️ Turoperatorlik</span>';
+            }} else if (cLow.includes('onlayn') || cLow.includes('online')) {{
+                return '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs">💻 Onlayn platforma</span>';
+            }} else if (cLow.includes('narx')) {{
+                return '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💰 Kurslar narxi</span>';
+            }} else if (cLow.includes('dastur')) {{
+                return '<span class="bg-violet-50 text-violet-700 border border-violet-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">📄 O\'quv dasturi</span>';
+            }} else if (cLow.includes('konsultatsiya') || cLow.includes('batafsil')) {{
+                return '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">💬 Batafsil konsultatsiya</span>';
+            }} else {{
+                return '<span class="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">💬 ' + escapeChatHtml(campaign) + '</span>';
             }}
         }}
 
@@ -3364,6 +3439,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     const newComment = data.manager_comment || '';
                     const newPhone = data.phone_number || '';
                     const newManager = data.manager_name || '';
+                    const newCampaign = data.campaign || (formData.get('campaign') ? formData.get('campaign').toString() : '');
                     const newTime = data.manager_time || '';
 
                     // 1. Holat o'zgargan bo'lsa -> Kanban va Table'da harakatlantirish
@@ -3426,11 +3502,37 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     if (kWrap) kWrap.innerHTML = commentHtml;
                     if (rWrap) rWrap.innerHTML = commentHtml;
 
+                    // 4.5 Yo'nalish (kurs) ni yangilash
+                    if (newCampaign) {{
+                        currentModalCampaign = newCampaign;
+                        const courseElem = document.getElementById('modalClientCourse');
+                        if (courseElem) {{
+                            courseElem.textContent = "Qiziqqan yo'nalishi: " + newCampaign;
+                        }}
+                        const kCamp = document.getElementById('kanban_camp_badge_' + clientId);
+                        if (kCamp) kCamp.innerHTML = getCampaignBadgeHtml(newCampaign);
+                        const tCamp = document.getElementById('table_camp_badge_' + clientId);
+                        if (tCamp) tCamp.innerHTML = getCampaignBadgeHtml(newCampaign);
+
+                        const kCard = document.getElementById('kanban_card_' + clientId);
+                        if (kCard) {{
+                            kCard.setAttribute('data-course', newCampaign.toLowerCase());
+                            const curSearch = kCard.getAttribute('data-search') || '';
+                            kCard.setAttribute('data-search', curSearch + ' ' + newCampaign.toLowerCase());
+                        }}
+                        const tRow = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+                        if (tRow) {{
+                            tRow.setAttribute('data-course', newCampaign.toLowerCase());
+                            const curSearch = tRow.getAttribute('data-search') || '';
+                            tRow.setAttribute('data-search', curSearch + ' ' + newCampaign.toLowerCase());
+                        }}
+                    }}
+
                     // 5. Tugmalardagi onclick parametrlarini yangilash
                     const cleanPhone = newPhone || (document.getElementById('modalPhoneInput') ? document.getElementById('modalPhoneInput').value : '') || '';
                     const safeCommentJs = newComment.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'").replace(/\\n/g, ' ');
                     const safeNameJs = (currentModalClientName || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
-                    const safeCampJs = (currentModalCampaign || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
+                    const safeCampJs = (newCampaign || currentModalCampaign || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
                     const safeMgrJs = newManager.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
 
                     const newOnclick = "openCommentModal('" + clientId + "', '" + safeCommentJs + "', '" + safeNameJs + "', '" + (newStatus || 'yangi') + "', '" + cleanPhone + "', '" + currentModalUsername + "', '" + safeCampJs + "', '" + safeMgrJs + "', " + currentModalAiPaused + ", '" + currentModalInstagramId + "')";

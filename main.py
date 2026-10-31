@@ -1252,9 +1252,10 @@ def update_comment_from_admin(
     comment: str = Form(""),
     status_val: str = Form(None, alias="status"),
     phone_val: str = Form(None, alias="phone"),
-    manager_name: str = Form(None, alias="manager_name")
+    manager_name: str = Form(None, alias="manager_name"),
+    campaign: str = Form(None, alias="campaign")
 ):
-    """CRM dan mutaxassis izohi, holati, mas'ul xodimi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
+    """CRM dan mutaxassis izohi, holati, mas'ul xodimi, yo'nalishi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
     user = get_current_user(request)
     if not user:
         if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
@@ -1283,12 +1284,15 @@ def update_comment_from_admin(
         p_clean = phone_val.strip()
         if p_clean and p_clean != "—":
             update_data["phone_number"] = p_clean
+    if campaign and campaign.strip():
+        update_data["campaign"] = campaign.strip()
 
     actor_name = user.get("display_name", "Admin")
     update_client_by_id(client_id, **update_data)
     st_text = status_val if status_val else "o'zgarmadi"
     comm_text = (comment or "")[:60]
-    log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}")
+    camp_text = f"; Yo'nalish: {campaign.strip()}" if (campaign and campaign.strip()) else ""
+    log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}{camp_text}")
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
@@ -1303,6 +1307,7 @@ def update_comment_from_admin(
             "manager_comment": (comment or "").strip(),
             "lead_status": status_val if status_val else None,
             "phone_number": phone_val.strip() if (phone_val and phone_val != "—") else None,
+            "campaign": campaign.strip() if (campaign and campaign.strip()) else None,
             "manager_time": now_str
         })
 
@@ -1363,6 +1368,35 @@ def assign_operator_to_client(
         "manager_name": final_val,
         "display_name": disp_name,
         "manager_time": now_str
+    })
+
+@app.post("/admin/clients/{client_id}/campaign")
+def update_client_campaign(
+    client_id: int,
+    request: Request,
+    campaign: str = Form(...)
+):
+    """Lid yo'nalishini (kursini) CRM dan tezkor o'zgartirish"""
+    user = get_current_user(request)
+    if not user:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    clean_camp = (campaign or "").strip()
+    if clean_camp:
+        update_client_by_id(client_id, campaign=clean_camp)
+        actor = user.get("display_name", "Admin")
+        log_activity(client_id, actor, "campaign", f"Yo'nalish o'zgartirildi: {clean_camp}")
+        try:
+            update_telegram_lead_message(client_id)
+        except Exception as e:
+            logger.error(f"Telegram update error from campaign change: {e}")
+
+    return JSONResponse({
+        "success": True,
+        "client_id": client_id,
+        "campaign": clean_camp
     })
 
 # ----------------- CRM INSTAGRAM DIRECT CHAT VA AI BOSHQARUVI -----------------
