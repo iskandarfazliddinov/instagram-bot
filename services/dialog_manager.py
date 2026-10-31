@@ -905,7 +905,36 @@ def process_incoming_comment(comment_id: str, media_id: str, user_id: str, usern
 
     last_msg_label = f"Izoh: «{comment_text}» ({short_caption})" if short_caption else f"Izoh: «{comment_text}»"
 
-    # 4. Qat'iy qoida: Faqat izoh qoldirgan foydalanuvchi hali Directda javob bermaguncha CRM ga saqlanmaydi!
+    # 4. Agar foydalanuvchi to'g'ridan-to'g'ri izohning o'zida telefon raqam qoldirgan bo'lsa:
+    comment_phone = extract_phone_number(comment_text)
+    if comment_phone:
+        client = get_or_create_client(user_id)
+        update_client(
+            user_id,
+            phone_number=comment_phone,
+            campaign=campaign_name,
+            source=source_label,
+            lead_status="yangi",
+            username=username or "",
+            last_message=last_msg_label,
+            step="completed"
+        )
+        client.update({
+            "phone_number": comment_phone,
+            "campaign": campaign_name,
+            "source": source_label,
+            "lead_status": "yangi",
+            "username": username or "",
+            "last_message": last_msg_label
+        })
+        append_client_chat_history(user_id, "user", f"[Izohda raqam qoldirdi]: {comment_text}")
+        append_client_chat_history(user_id, "assistant", dm_welcome_text)
+        from services.telegram import notify_admin_new_lead
+        notify_admin_new_lead(client, source=f"Izoh ({source_label})")
+        logger.info(f"Mijoz [{user_id}] izohda telefon raqamini qoldirdi ({comment_phone}). Darhol CRM va Telegramga yuborildi!")
+        return
+
+    # 5. Qat'iy qoida: Faqat izoh qoldirgan foydalanuvchi hali Directda javob bermaguncha CRM ga saqlanmaydi!
     # Faqat kutilayotgan izohlar (pending_comments) jadvaliga yozib qo'yiladi.
     from database import get_client_by_instagram_id, save_pending_comment
     existing_client = get_client_by_instagram_id(user_id)
