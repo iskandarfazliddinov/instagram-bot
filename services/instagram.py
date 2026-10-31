@@ -771,9 +771,9 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
             if not client.get("lead_status") or client.get("lead_status") == "boshlangich":
                 updates["lead_status"] = "yangi"
             updates["step"] = "completed"
-        if course:
+        if course and (not client.get("campaign") or client.get("campaign") in ["Umumiy", "", None]):
             updates["campaign"] = course
-        if source:
+        if source and (not client.get("source") or client.get("source") in ["Direct", "", None]):
             updates["source"] = source
         if last_msg:
             updates["last_message"] = last_msg

@@ -444,24 +444,6 @@ async def on_startup():
     asyncio.create_task(token_auto_refresh_worker())
     asyncio.create_task(direct_realtime_poller_worker())
 
-    # Server ishga tushganda barcha lidlarni kurs va video manbasi bo'yicha boyitish
-    async def initial_leads_enrich_and_sync():
-        try:
-            from services.instagram import enrich_all_leads_campaign_and_source
-            cnt = enrich_all_leads_campaign_and_source()
-            logger.info(f"Barcha mavjud lidlar video va kurs bo'yicha boyitildi: {cnt} ta yangilandi.")
-        except Exception as e:
-            logger.error(f"Dastlabki lidlarni boyitishda xatolik: {e}")
-
-        await asyncio.sleep(15)
-        try:
-            from services.instagram import sync_leads_from_instagram_inbox
-            sync_leads_from_instagram_inbox(limit=50)
-            logger.info("Instagram Direct yozishmalari bazaga muvaffaqiyatli sinxronlandi.")
-        except Exception as e:
-            logger.error(f"Dastlabki Instagram sinxronlashda xatolik: {e}")
-
-    asyncio.create_task(initial_leads_enrich_and_sync())
     logger.info("Ma'lumotlar bazasi, AI Follow-up va Token Auto-Refresh xizmati ishga tushirildi.")
 
 @app.get("/")
