@@ -711,9 +711,17 @@ def sync_leads_from_instagram_inbox(limit: int = 50, max_pages: int = 15) -> dic
 
         f_low = all_text_combined.lower()
 
-        # 1. Front Office & Housekeeping (DbM6EinhiZI)
-        if any(k in f_low for k in ["front office", "frontoffice", "housekeeping", "tourism-edu.uz", "xona tozalash"]):
+        # 1. Housekeeping (DbM6EinhiZI)
+        if any(k in f_low for k in ["housekeeping", "хаускипинг", "xona tozalash", "uborka", "уборка"]):
+            course = "Onlayn ta'lim (Housekeeping)"
+            source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        # 2. Front Office (DbM6EinhiZI)
+        elif any(k in f_low for k in ["front office", "frontoffice", "front", "фронт офис", "фронтофис"]):
             course = "Onlayn ta'lim (Front Office)"
+            source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        # 3. Onlayn ta'lim platformasi
+        elif any(k in f_low for k in ["tourism-edu.uz", "platforma"]):
+            course = "Onlayn ta'lim platformasi"
             source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
         # 2. Hotel Operations and Innovation (DeZbpoZtFw0 / DerPZSNNS0F)
         elif any(k in f_low for k in ["hotel operations", "hotel operation", "mehmonxona boshqaruvi", "menejermisiz", "menejer yoki bo'lim"]):
@@ -820,9 +828,19 @@ def enrich_all_leads_campaign_and_source():
         detected_course = None
         detected_source = None
         
-        # 1. Front Office & Housekeeping (DbM6EinhiZI)
-        if any(k in f_low for k in ["front office", "frontoffice", "housekeeping", "tourism-edu.uz", "xona tozalash"]):
+        # 1. Housekeeping (DbM6EinhiZI)
+        if any(k in f_low for k in ["housekeeping", "хаускипинг", "xona tozalash", "uborka", "уборка"]):
+            detected_course = "Onlayn ta'lim (Housekeeping)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+            
+        # 2. Front Office (DbM6EinhiZI)
+        elif any(k in f_low for k in ["front office", "frontoffice", "front", "фронт офис", "фронтофис"]):
             detected_course = "Onlayn ta'lim (Front Office)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+
+        # 3. Onlayn ta'lim platformasi
+        elif any(k in f_low for k in ["tourism-edu.uz", "platforma"]):
+            detected_course = "Onlayn ta'lim platformasi"
             detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
             
         # 2. Hotel Operations and Innovation (DeZbpoZtFw0 / DerPZSNNS0F)

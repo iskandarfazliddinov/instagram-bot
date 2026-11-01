@@ -472,23 +472,26 @@ def process_incoming_message(sender_id: str, user_text: str):
     if step == "completed":
         new_course_found = None
         for k, c_name in [
-            ("housekeeping", "Housekeeping (Onlayn)"),
-            ("frontoffice", "Front Office (Onlayn)"),
-            ("front office", "Front Office (Onlayn)"),
+            ("housekeeping", "Onlayn ta'lim (Housekeeping)"),
+            ("хаускипинг", "Onlayn ta'lim (Housekeeping)"),
+            ("frontoffice", "Onlayn ta'lim (Front Office)"),
+            ("front office", "Onlayn ta'lim (Front Office)"),
+            ("фронт офис", "Onlayn ta'lim (Front Office)"),
+            ("фронтофис", "Onlayn ta'lim (Front Office)"),
             ("tourism-edu", "Onlayn ta'lim platformasi"),
             ("online", "Onlayn ta'lim platformasi"),
             ("onlayn", "Onlayn ta'lim platformasi"),
-            ("malaka", "Gid malaka oshirish"),
-            ("72 soat", "Gid malaka oshirish"),
-            ("qayta tayyorla", "Gid qayta tayyorlash"),
-            ("4 oy", "Gid qayta tayyorlash"),
-            ("beyjik", "Gid qayta tayyorlash"),
+            ("malaka", "Gid-ekskursiyachi (Malaka oshirish)"),
+            ("72 soat", "Gid-ekskursiyachi (Malaka oshirish)"),
+            ("qayta tayyorla", "Gid-ekskursiyachi (Qayta tayyorlash)"),
+            ("4 oy", "Gid-ekskursiyachi (Qayta tayyorlash)"),
+            ("beyjik", "Gid-ekskursiyachi (Qayta tayyorlash)"),
             ("turagent", "Turagentlik kursi"),
             ("turoperator", "Turoperatorlik kursi"),
             ("gid", "Gid-ekskursiyachi kursi"),
             ("ekskurs", "Gid-ekskursiyachi kursi"),
-            ("hotel operations", "Hotel Operations"),
-            ("un tourism", "Hotel Operations"),
+            ("hotel operations", "Hotel Operations and Innovation"),
+            ("un tourism", "Hotel Operations and Innovation"),
             ("restoran", "Restoran ishi va servis"),
             ("servis", "Restoran ishi va servis"),
             ("f&b", "Restoran ishi va servis")
@@ -502,12 +505,21 @@ def process_incoming_message(sender_id: str, user_text: str):
             client["last_message"] = text_clean
             update_client(sender_id, campaign=new_course_found, lead_status="yangi", last_message=text_clean)
             if client.get("phone_number"):
-                notify_admin_new_lead(client, source="Direct (Yangi kursga qiziqish 🔄)")
+                # Agar Telegramda xabar allaqachon mavjud bo'lsa -> faqat mavjud xabarni yangilaymiz (dublikat chiqarmaymiz)
+                if client.get("tg_message_id") and client.get("id"):
+                    from services.telegram import update_telegram_lead_message
+                    update_telegram_lead_message(client["id"])
+                else:
+                    notify_admin_new_lead(client, source="Direct (Yangi kursga qiziqish 🔄)")
         elif client.get("lead_status") in ["boglandi", "rad", "oylanyapti"] and client.get("phone_number"):
             client["last_message"] = text_clean
             update_client(sender_id, lead_status="yangi", last_message=text_clean)
             client["lead_status"] = "yangi"
-            notify_admin_new_lead(client, source="Direct (Qayta murojaat 🔄)")
+            if client.get("tg_message_id") and client.get("id"):
+                from services.telegram import update_telegram_lead_message
+                update_telegram_lead_message(client["id"])
+            else:
+                notify_admin_new_lead(client, source="Direct (Qayta murojaat 🔄)")
 
     # 2. Sun'iy Intellekt (Gemini AI Yordamchi) orqali javob berish
     # AI yoqilgan bo'lsa, u barcha savollarga bevosita javob beradi
@@ -1004,9 +1016,9 @@ def process_incoming_video_message(sender_id: str, video_title: str = "", video_
     elif "gid" in v_text or "ekskurs" in v_text:
         detected_course = "Gid-ekskursiyachi kursi"
     elif "housekeeping" in v_text:
-        detected_course = "Housekeeping (Onlayn)"
+        detected_course = "Onlayn ta'lim (Housekeeping)"
     elif "frontoffice" in v_text or "front office" in v_text:
-        detected_course = "Front Office (Onlayn)"
+        detected_course = "Onlayn ta'lim (Front Office)"
     elif "hotel" in v_text or "mehmonxona" in v_text:
         detected_course = "Mehmonxona boshqaruvi"
     elif "restoran" in v_text or "servis" in v_text or "f&b" in v_text:

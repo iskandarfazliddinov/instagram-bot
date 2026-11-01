@@ -297,8 +297,8 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     # RE-ENGAGEMENT (Qayta murojaat, yangi raqam yoki yangi kursga qiziqish) shartlari:
     is_reengagement = False
     current_campaign = client.get("campaign", "Umumiy")
+    time_diff_hours = 0
     if has_existing_msg:
-        time_diff_hours = 0
         if prev_updated:
             try:
                 from datetime import datetime
@@ -308,18 +308,21 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
                 pass
         
         status_handled = (prev_status in ["boglandi", "rad", "oylanyapti"])
-        campaign_changed = (prev_campaign and current_campaign and prev_campaign != current_campaign and current_campaign != "Umumiy")
 
-        if phone_changed or phone_added or status_handled or campaign_changed or time_diff_hours >= 4:
+        # QAT'IY QOIDA: Agar 4 soatdan kam vaqt o'tgan bo'lsa (yoki ko'rib chiqilgan bo'lsa 2 soatdan kam):
+        # Bu BOSHQA YANGI LID EMAS, balki o'sha suhbatning davomi hisoblanadi.
+        # Telefon raqam qo'shilsa ham, yo'nalish o'zgarsa ham FAQAT mavjud Telegram kartochkasi tahrirlanadi (dublikat yuborilmaydi).
+        # Yangi Telegram xabari FAQAT oradan kamida 4 soat (yoki status_handled bo'lsa kamida 2 soat) o'tgandagina chiqadi!
+        if time_diff_hours >= 4 or (status_handled and time_diff_hours >= 2):
             is_reengagement = True
             client["is_reengagement"] = True
             client["lead_status"] = "yangi"
             from database import update_client
             if ig_id:
                 update_client(ig_id, lead_status="yangi")
-            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (phone_changed={phone_changed}, phone_added={phone_added}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
+            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (vaqt farqi={time_diff_hours:.1f} soat, status_handled={status_handled}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
 
-    # Agar 1-2 soat ichidagi bir xil takroriy xabar bo'lsa -> faqat mavjud xabarni yangilaymiz (spam qilmaymiz)
+    # Agar allaqachon Telegramda xabari bo'lsa va bu qayta murojaat bo'lmasa -> FAQAT mavjud xabarni yangilaymiz (dublikat bo'lmaydi)
     if has_existing_msg and client_id and not is_reengagement:
         try:
             success = update_telegram_lead_message(client_id)
@@ -327,9 +330,15 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
                 logger.info(f"Mijoz [{client_id}] mavjud Telegram xabari yangilandi (takroriy yangi xabar yuborilmadi).")
                 return
             else:
-                logger.warning(f"Telegramdagi eski xabar yangilanmadi (topilmadi yoki o'chirilgan), yangi yuboriladi.")
+                # Agar yangilanmadi, lekin vaqt farqi 4 soatdan kam bo'lsa -> yangi xabar yubormasdan to'xtatamiz!
+                # Chunki xabar allaqachon guruhda bor, takroriy xabar chiqarish guruhda chalkashlik keltirib chiqaradi.
+                if time_diff_hours < 4:
+                    logger.info(f"Mijoz [{client_id}] Telegram xabari o'zgarishsiz yoki yangilashga hojat yo'q (dublikat bekor qilindi).")
+                    return
         except Exception as e:
-            logger.warning(f"Telegramdagi eski xabarni yangilab bo'lmadi, yangi yuboriladi: {e}")
+            logger.warning(f"Telegramdagi eski xabarni yangilashda xato: {e}")
+            if time_diff_hours < 4:
+                return
 
     client["source"] = source
     text = build_lead_message_text(client, source=source)
@@ -748,7 +757,13 @@ def update_telegram_lead_message(client_id: int) -> bool:
             "parse_mode": "HTML",
             "reply_markup": {"inline_keyboard": new_keyboard}
         }, timeout=8)
-        return resp.status_code == 200
+        if resp.status_code == 200:
+            return True
+        if resp.status_code == 400 and "message is not modified" in resp.text:
+            # Xabar matni va tugmalari allaqachon ayni shu ko'rinishda (o'zgarishsiz) - bu xato emas, to'liq muvaffaqiyat
+            return True
+        logger.warning(f"Telegram editMessageText xatosi [{tg_mid}]: {resp.text}")
+        return False
     except Exception as e:
         logger.error(f"Telegram xabarni CRM dan yangilashda xato: {e}")
         return False
