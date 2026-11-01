@@ -1,6 +1,8 @@
 import re
 import logging
 import requests
+import threading
+import time
 from config import settings
 from database import (
     get_or_create_client,
@@ -15,6 +17,10 @@ from services.telegram import notify_admin_new_lead
 from services.ai_assistant import analyze_lead_need, detect_message_language, is_russian_message, is_english_message
 
 logger = logging.getLogger(__name__)
+
+# Konkurent hodisalar (Webhook + Poller) bitta xabarni ikki marta ishlamasligi uchun xotira kesh va lock
+_processing_users_lock = threading.Lock()
+_recent_processed_texts = {}  # {sender_id: (text, timestamp)}
 
 # Standart trigger kalit so'zlar
 TRIGGER_KEYWORDS = [
@@ -200,8 +206,11 @@ def resolve_course_and_inquiry(chat_history: list = None, current_text: str = ""
         detected_course = "Turoperatorlik kursi"
         detected_source = "Reels: https://www.instagram.com/p/DbXj3F1joxH/"
 
-    # 5. Restoran ishi va servis
-    elif any(k in full_user_text for k in ["restoran", "ресторан", "servis", "сервис", "f&b", "ofitsiant", "barista"]):
+    # 5. Restoran ishi va servis / Umumiy ovqatlantirish
+    elif any(k in full_user_text for k in [
+        "restoran", "ресторан", "servis", "сервис", "f&b", "ofitsiant", "barista",
+        "umumiy ovqatlantirish", "ovqatlantirish", "ovqatlanish", "общепит", "общественное питание"
+    ]):
         detected_course = "Restoran ishi va servis"
 
     # 6. Agar botning oldingi javobida aniq yo'nalish bo'lsa (masalan, bot Gid haqida ma'lumot bergan bo'lsa):
@@ -210,8 +219,14 @@ def resolve_course_and_inquiry(chat_history: list = None, current_text: str = ""
         if "gid-ekskursiyachi" in bot_texts or "gidlar" in bot_texts:
             detected_course = "Gid-ekskursiyachi kursi"
             detected_source = "Reels: https://www.instagram.com/reel/DbDpNKLKgll/"
-        elif "front office" in bot_texts or "tourism-edu.uz" in bot_texts:
+        elif "front office" in bot_texts:
             detected_course = "Onlayn ta'lim (Front Office)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        elif "housekeeping" in bot_texts:
+            detected_course = "Onlayn ta'lim (Housekeeping)"
+            detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
+        elif "tourism-edu.uz" in bot_texts or "onlayn platforma" in bot_texts:
+            detected_course = "Onlayn ta'lim platformasi (tourism-edu.uz)"
             detected_source = "Reels: https://www.instagram.com/reel/DbM6EinhiZI/"
         elif "hotel operations" in bot_texts:
             detected_course = "Hotel Operations and Innovation"
@@ -254,6 +269,24 @@ def process_incoming_message(sender_id: str, user_text: str):
     """
     Direct xabarni qabul qilib, unga mos dinamik javob, AI yordamchi va havola yuborish mantiqi
     """
+    text_clean = (user_text or "").strip()
+    if not text_clean:
+        return
+
+    # Webhook va Poller bir vaqtning o'zida bitta xabarni ikki marta ishlamasligi uchun deduplikatsiya tekshiruvi:
+    now_ts = time.time()
+    with _processing_users_lock:
+        if sender_id in _recent_processed_texts:
+            last_text, last_ts = _recent_processed_texts[sender_id]
+            if now_ts - last_ts < 5.0 and (last_text == text_clean or (last_text and last_text in text_clean) or (text_clean and text_clean in last_text)):
+                logger.info(f"Mijoz [{sender_id}] xabari atigi {now_ts - last_ts:.1f} soniya oldin qabul qilingan («{text_clean[:40]}»), takroriy ishlov berish rad etildi.")
+                return
+        _recent_processed_texts[sender_id] = (text_clean, now_ts)
+        if len(_recent_processed_texts) > 2000:
+            exp = [k for k, v in _recent_processed_texts.items() if now_ts - v[1] > 60]
+            for k in exp:
+                _recent_processed_texts.pop(k, None)
+
     # 0. Shunchaki reaksiya, emodzi yoki layk bosgan bo'lsa - CRM ga qo'shilmaydi va javob yuborilmaydi
     if is_reaction_or_empty(user_text):
         from database import get_client_by_instagram_id
@@ -1021,7 +1054,7 @@ def process_incoming_video_message(sender_id: str, video_title: str = "", video_
         detected_course = "Onlayn ta'lim (Front Office)"
     elif "hotel" in v_text or "mehmonxona" in v_text:
         detected_course = "Mehmonxona boshqaruvi"
-    elif "restoran" in v_text or "servis" in v_text or "f&b" in v_text:
+    elif any(k in v_text for k in ["restoran", "servis", "f&b", "ovqatlantirish", "ovqatlanish", "общепит"]):
         detected_course = "Restoran ishi va servis"
     elif "online" in v_text or "onlayn" in v_text or "masofa" in v_text or "platforma" in v_text:
         detected_course = "Onlayn ta'lim platformasi"

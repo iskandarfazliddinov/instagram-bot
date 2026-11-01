@@ -396,6 +396,11 @@ def _check_and_reply_new_messages(last_seen_mids, PAGE_IDS):
 
                 combined_text = "\n".join(text_list) if text_list else ""
 
+                # Agar bu mijozning xabari Webhook orqali allaqachon navbatda (debouncer) turgan bo'lsa -> pollerdan qayta ishlatmaymiz!
+                if sender_id in _pending_user_messages:
+                    logger.info(f'[Poller] Mijoz [{sender_id}] xabari Webhook navbatida turibdi, poller o\'tkazib yubordi.')
+                    continue
+
                 if has_video:
                     logger.info(f'[Poller] Video/Reels xabari aniqlandi [{sender_id}]: title="{video_title}", text="{combined_text}"')
                     process_incoming_video_message(sender_id, video_title, video_url, combined_text)

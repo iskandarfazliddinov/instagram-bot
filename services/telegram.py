@@ -2,12 +2,18 @@ import os
 import json
 import logging
 import re
+import threading
+import time
 from datetime import datetime
 import requests
 from config import settings
 from database import get_client_by_id, update_client_by_id, update_client, now_uzb_str
 
 logger = logging.getLogger(__name__)
+
+# Konkurent so'rovlar (Webhook + Poller) Telegramga 1 vaqtning o'zida dublikat xabar chiqarishining oldini olish uchun global Lock va Kesh
+_telegram_lead_send_lock = threading.Lock()
+_recently_sent_leads = {}  # {key: (tg_message_id, timestamp)}
 
 def build_lead_message_text(client: dict, source: str = "Direct") -> str:
     full_name = client.get('full_name') or 'Noma\'lum'
@@ -217,14 +223,13 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
     """
     Yangi mijoz ma'lumot qoldirganda Telegram adminiga yoki guruhiga xabar yuborish.
     MUHIM QOIDA: Telegram guruhga odatda FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
-    Agar mijozga eslatma (follow-up) yuborilib, shunda ham raqam qoldirmasa,
-    operatorlar Direct orqali bog'lanishi uchun allow_no_phone=True orqali yuboriladi.
+    Dublikat xabarlarning (ayniqsa Webhook va Poller konkurent ishlaganda) 100% oldini olish uchun
+    qattiq thread lock va vaqtinchalik xotira keshidan foydalaniladi.
     """
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
         return
 
     # 1. QAT'IY TELEFON RAQAM TEKSHIRUVI:
-    # Guruhga FAQAT TELEFON RAQAMINI QOLDIRGAN haqiqiy lidlar yuboriladi!
     phone = client.get("phone_number")
     digits = re.sub(r"\D", "", str(phone or ""))
     has_valid_phone = len(digits) >= 9
@@ -233,37 +238,27 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
         logger.info(f"Mijoz [{client.get('id') or client.get('instagram_id')}] hali telefon raqamini kiritmagan. Telegram guruhga yuborilmadi.")
         return
 
-    # Client ID, tg_message_id, oldingi holat, yo'nalish va avvalgi raqamni aniqlash
-    client_id = client.get("id")
-    ig_id = client.get("instagram_id")
-    existing_tg_mid = client.get("tg_message_id")
-    prev_status = None
-    prev_campaign = None
-    prev_updated = None
-    prev_phone = None
+    # 2. KONKURENT XABARLARNI BLOKLASH UCHUN GLOBAL LOCK:
+    with _telegram_lead_send_lock:
+        client_id = client.get("id")
+        ig_id = client.get("instagram_id")
+        existing_tg_mid = client.get("tg_message_id")
+        prev_status = None
+        prev_campaign = None
+        prev_updated = None
+        prev_phone = None
 
-    from database import get_connection
-    conn = get_connection()
-    cursor = conn.cursor()
-    if client_id:
-        cursor.execute("SELECT tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE id = ?", (client_id,))
-        row = cursor.fetchone()
-        if row:
-            if row["tg_message_id"]:
-                existing_tg_mid = row["tg_message_id"]
-            prev_status = row["lead_status"]
-            prev_campaign = row["campaign"]
-            prev_updated = row["updated_at"]
-            prev_phone = row["phone_number"]
-            if (not client.get("campaign") or client.get("campaign") == "Umumiy") and row["campaign"] and row["campaign"] != "Umumiy":
-                client["campaign"] = row["campaign"]
-            if (not client.get("source") or client.get("source") == "Direct") and row["source"] and row["source"] != "Direct":
-                client["source"] = row["source"]
-            if (not client.get("last_message") or client.get("last_message") in ["None", ""]) and row["last_message"] and row["last_message"] not in ["None", ""]:
-                client["last_message"] = row["last_message"]
-    elif ig_id:
-        cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE instagram_id = ?", (ig_id,))
-        row = cursor.fetchone()
+        from database import get_connection, UZB_TZ
+        conn = get_connection()
+        cursor = conn.cursor()
+        row = None
+        if client_id:
+            cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE id = ?", (client_id,))
+            row = cursor.fetchone()
+        elif ig_id:
+            cursor.execute("SELECT id, tg_message_id, lead_status, campaign, updated_at, phone_number, last_message, source FROM clients WHERE instagram_id = ?", (ig_id,))
+            row = cursor.fetchone()
+
         if row:
             client_id = row["id"]
             client["id"] = client_id
@@ -279,94 +274,106 @@ def notify_admin_new_lead(client: dict, source: str = "Direct", allow_no_phone: 
                 client["source"] = row["source"]
             if (not client.get("last_message") or client.get("last_message") in ["None", ""]) and row["last_message"] and row["last_message"] not in ["None", ""]:
                 client["last_message"] = row["last_message"]
-    conn.close()
+        conn.close()
 
-    if "prev_phone" in client:
-        prev_phone = client.get("prev_phone")
+        # DEDUPLIKATSIYA 1: So'nggi 60 soniya ichida aynan shu mijozga Telegramga xabar yuborilganmi?
+        now_ts = time.time()
+        # 5 daqiqadan eski keshni tozalash
+        expired_keys = [k for k, v in _recently_sent_leads.items() if now_ts - v[1] > 300]
+        for k in expired_keys:
+            _recently_sent_leads.pop(k, None)
 
-    has_existing_msg = bool(existing_tg_mid and isinstance(existing_tg_mid, int) and existing_tg_mid > 0)
+        dedup_keys = []
+        if client_id:
+            dedup_keys.append(f"id:{client_id}")
+        if ig_id:
+            dedup_keys.append(f"ig:{ig_id}")
+        if digits:
+            dedup_keys.append(f"phone:{digits[-9:]}")
 
-    # Telefon raqami yangilanganligini tekshirish
-    phone_changed = bool(prev_phone and phone and re.sub(r"\D", "", str(prev_phone)) != re.sub(r"\D", "", str(phone)))
-    phone_added = bool((not prev_phone or str(prev_phone).strip() in ["", "None", "—", "null"]) and phone and len(re.sub(r"\D", "", str(phone))) >= 9)
-    if phone_changed:
-        client["phone_updated_note"] = f"🆕 (Yangi raqam! Avvalgi: {prev_phone})"
-    elif phone_added and has_existing_msg:
-        client["phone_updated_note"] = f"🆕 (Telefon raqami kiritildi! 🎉)"
+        for k in dedup_keys:
+            if k in _recently_sent_leads:
+                cached_mid, cached_ts = _recently_sent_leads[k]
+                if now_ts - cached_ts < 45.0:
+                    logger.info(f"Mijoz [{k}] uchun atigi {now_ts - cached_ts:.1f} soniya avval Telegram xabari yuborilgan (mid={cached_mid}). Takroriy yangi xabar yuborish bekor qilindi.")
+                    if client_id:
+                        update_telegram_lead_message(client_id)
+                    return
+                if cached_mid and not existing_tg_mid:
+                    existing_tg_mid = cached_mid
 
-    # RE-ENGAGEMENT (Qayta murojaat, yangi raqam yoki yangi kursga qiziqish) shartlari:
-    is_reengagement = False
-    current_campaign = client.get("campaign", "Umumiy")
-    time_diff_hours = 0
-    if has_existing_msg:
+        if "prev_phone" in client:
+            prev_phone = client.get("prev_phone")
+
+        has_existing_msg = bool(existing_tg_mid and isinstance(existing_tg_mid, int) and existing_tg_mid > 0)
+
+        # Vaqt farqini hisoblash (O'zbekiston vaqti / Timezone bilan to'g'ri ishlash)
+        time_diff_hours = 0
         if prev_updated:
             try:
-                from datetime import datetime
                 dt_prev = datetime.fromisoformat(str(prev_updated))
-                time_diff_hours = (datetime.now() - dt_prev).total_seconds() / 3600
+                now_tz = datetime.now(UZB_TZ)
+                if dt_prev.tzinfo is None:
+                    dt_prev = dt_prev.replace(tzinfo=UZB_TZ)
+                time_diff_hours = (now_tz - dt_prev).total_seconds() / 3600
             except Exception:
                 pass
-        
+
         status_handled = (prev_status in ["boglandi", "rad", "oylanyapti"])
+        is_reengagement = False
 
-        # QAT'IY QOIDA: Agar 4 soatdan kam vaqt o'tgan bo'lsa (yoki ko'rib chiqilgan bo'lsa 2 soatdan kam):
-        # Bu BOSHQA YANGI LID EMAS, balki o'sha suhbatning davomi hisoblanadi.
-        # Telefon raqam qo'shilsa ham, yo'nalish o'zgarsa ham FAQAT mavjud Telegram kartochkasi tahrirlanadi (dublikat yuborilmaydi).
-        # Yangi Telegram xabari FAQAT oradan kamida 4 soat (yoki status_handled bo'lsa kamida 2 soat) o'tgandagina chiqadi!
-        if time_diff_hours >= 4 or (status_handled and time_diff_hours >= 2):
-            is_reengagement = True
-            client["is_reengagement"] = True
-            client["lead_status"] = "yangi"
-            from database import update_client
-            if ig_id:
-                update_client(ig_id, lead_status="yangi")
-            logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (vaqt farqi={time_diff_hours:.1f} soat, status_handled={status_handled}, is_reengagement=True). Telegramga yangi xabar yuboriladi.")
+        # Qat'iy qoida: Yangi Telegram xabari FAQAT oradan kamida 4 soat o'tgandagina (yoki ko'rib chiqilgan bo'lsa kamida 2 soat) chiqadi!
+        if has_existing_msg:
+            if time_diff_hours >= 4 or (status_handled and time_diff_hours >= 2):
+                is_reengagement = True
+                client["is_reengagement"] = True
+                client["lead_status"] = "yangi"
+                from database import update_client
+                if ig_id:
+                    update_client(ig_id, lead_status="yangi")
+                logger.info(f"Mijoz [{client_id}] qayta murojaat qildi (vaqt farqi={time_diff_hours:.1f} soat). Telegramga yangi xabar yuboriladi.")
 
-    # Agar allaqachon Telegramda xabari bo'lsa va bu qayta murojaat bo'lmasa -> FAQAT mavjud xabarni yangilaymiz (dublikat bo'lmaydi)
-    if has_existing_msg and client_id and not is_reengagement:
+        # Agar allaqachon Telegramda xabari bo'lsa va bu qayta murojaat bo'lmasa -> FAQAT mavjud xabarni tahrirlaymiz
+        if has_existing_msg and client_id and not is_reengagement:
+            try:
+                update_telegram_lead_message(client_id)
+                logger.info(f"Mijoz [{client_id}] Telegram xabari yangilandi (dublikat xabar yuborilmadi).")
+            except Exception as e:
+                logger.warning(f"Telegramdagi eski xabarni yangilashda xato: {e}")
+            return  # HECH QACHON YANGI XABAR YUBORILMAYDI
+
+        client["source"] = source
+        text = build_lead_message_text(client, source=source)
+        keyboard = build_inline_keyboard(client_id or 0, client.get("phone_number", ""), status=client.get("lead_status", "yangi"), username=client.get("username", ""))
+
+        url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": keyboard}
+        }
+
         try:
-            success = update_telegram_lead_message(client_id)
-            if success:
-                logger.info(f"Mijoz [{client_id}] mavjud Telegram xabari yangilandi (takroriy yangi xabar yuborilmadi).")
-                return
+            response = requests.post(url, json=payload, timeout=15)
+            if response.status_code == 200:
+                res_data = response.json()
+                msg_id = res_data.get("result", {}).get("message_id")
+                if msg_id:
+                    client["tg_message_id"] = msg_id
+                    # Darhol keshga yozamiz
+                    now_sent = time.time()
+                    for k in dedup_keys:
+                        _recently_sent_leads[k] = (msg_id, now_sent)
+                    if client.get("instagram_id"):
+                        update_client(client["instagram_id"], tg_message_id=msg_id)
+                    if client.get("id"):
+                        update_client_by_id(client["id"], tg_message_id=msg_id)
+                    logger.info(f"Mijoz [{client.get('id')}] Telegram guruhga muvaffaqiyatli yuborildi (msg_id={msg_id}).")
             else:
-                # Agar yangilanmadi, lekin vaqt farqi 4 soatdan kam bo'lsa -> yangi xabar yubormasdan to'xtatamiz!
-                # Chunki xabar allaqachon guruhda bor, takroriy xabar chiqarish guruhda chalkashlik keltirib chiqaradi.
-                if time_diff_hours < 4:
-                    logger.info(f"Mijoz [{client_id}] Telegram xabari o'zgarishsiz yoki yangilashga hojat yo'q (dublikat bekor qilindi).")
-                    return
+                logger.error(f"Telegram API javobi: {response.text}")
         except Exception as e:
-            logger.warning(f"Telegramdagi eski xabarni yangilashda xato: {e}")
-            if time_diff_hours < 4:
-                return
-
-    client["source"] = source
-    text = build_lead_message_text(client, source=source)
-    keyboard = build_inline_keyboard(client_id or 0, client.get("phone_number", ""), status=client.get("lead_status", "yangi"), username=client.get("username", ""))
-
-    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-        "reply_markup": {"inline_keyboard": keyboard}
-    }
-
-    try:
-        response = requests.post(url, json=payload, timeout=15)
-        if response.status_code == 200:
-            res_data = response.json()
-            msg_id = res_data.get("result", {}).get("message_id")
-            if msg_id:
-                client["tg_message_id"] = msg_id
-                if client.get("instagram_id"):
-                    update_client(client["instagram_id"], tg_message_id=msg_id)
-                if client.get("id"):
-                    update_client_by_id(client["id"], tg_message_id=msg_id)
-        else:
-            logger.error(f"Telegram API javobi: {response.text}")
-    except Exception as e:
-        logger.error(f"Telegram bildirishnoma yuborishda xatolik: {e}")
+            logger.error(f"Telegram bildirishnoma yuborishda xatolik: {e}")
 
 def send_telegram_alert(text: str) -> bool:
     """
