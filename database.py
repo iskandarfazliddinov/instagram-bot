@@ -1599,7 +1599,7 @@ def delete_study_group(group_id: int) -> bool:
         return False
 
 def add_client_to_study_group(group_id: int, client_id: int, added_by: str = "", notes: str = "") -> bool:
-    """Lidni o'quv guruhiga biriktirish / qo'shish"""
+    """Lidni o'quv guruhiga biriktirish / qo'shish va holatini avtomatik 'zahira' ga o'tkazish"""
     try:
         group = get_study_group_by_id(group_id)
         if not group:
@@ -1612,11 +1612,20 @@ def add_client_to_study_group(group_id: int, client_id: int, added_by: str = "",
             INSERT OR REPLACE INTO group_members (group_id, client_id, added_by, added_at, notes)
             VALUES (?, ?, ?, ?, ?)
         """, (group_id, client_id, (added_by or "Operator").strip(), now, (notes or "").strip()))
-        cursor.execute("UPDATE clients SET group_id = ?, group_name = ?, updated_at = ? WHERE id = ?", (group_id, group["name"], now, client_id))
+
+        # Agar guruh allaqachon boshlangan bo'lsa -> 'boglandi' (Muvaffaqiyatli), aks holda -> 'zahira'
+        target_status = "boglandi" if group.get("status") == "boshlandi" else "zahira"
+
+        cursor.execute("""
+            UPDATE clients 
+            SET group_id = ?, group_name = ?, lead_status = ?, updated_at = ? 
+            WHERE id = ?
+        """, (group_id, group["name"], target_status, now, client_id))
         conn.commit()
         conn.close()
 
-        log_activity(client_id, added_by or "Operator", "guruhga_biriktirildi", f"'{group['name']}' guruhiga qo'shildi")
+        status_text = "Muvaffaqiyatli" if target_status == "boglandi" else "Zahira"
+        log_activity(client_id, added_by or "Operator", "guruhga_biriktirildi", f"'{group['name']}' guruhiga qo'shildi (Holat: {status_text})")
         sync_groups_backup()
         sync_leads_backup()
         return True
@@ -1664,8 +1673,12 @@ def get_study_group_members(group_id: int) -> list:
         return []
 
 def start_study_group(group_id: int, started_by: str = "") -> bool:
-    """Guruhni 'boshlandi' (faol) holatiga o'tkazish"""
+    """Guruhni 'boshlandi' (faol) holatiga o'tkazish va barcha talabalar holatini avtomatik 'boglandi' (Muvaffaqiyatli) qilish"""
     try:
+        group = get_study_group_by_id(group_id)
+        if not group:
+            return False
+
         now = now_uzb_iso()
         conn = get_connection()
         cursor = conn.cursor()
@@ -1674,9 +1687,30 @@ def start_study_group(group_id: int, started_by: str = "") -> bool:
             SET status = 'boshlandi', updated_at = ?
             WHERE id = ?
         """, (now, group_id))
+
+        # Guruhdagi barcha talabalar ID larini olish
+        cursor.execute("SELECT client_id FROM group_members WHERE group_id = ?", (group_id,))
+        client_rows = cursor.fetchall()
+        client_ids = [r["client_id"] for r in client_rows]
+
+        # Barcha talabalarni 'boglandi' (Muvaffaqiyatli) holatiga o'tkazish
+        if client_ids:
+            placeholders = ",".join("?" for _ in client_ids)
+            cursor.execute(f"""
+                UPDATE clients
+                SET lead_status = 'boglandi', updated_at = ?
+                WHERE id IN ({placeholders})
+            """, [now] + client_ids)
+
         conn.commit()
         conn.close()
+
+        # Faollik jurnaliga yozish
+        for cid in client_ids:
+            log_activity(cid, started_by or "Admin", "kurs_boshlandi", f"'{group['name']}' kursi boshlandi -> Holati 'Muvaffaqiyatli'ga o'zgardi")
+
         sync_groups_backup()
+        sync_leads_backup()
         return True
     except Exception as e:
         logger.error(f"start_study_group xatoligi: {e}")

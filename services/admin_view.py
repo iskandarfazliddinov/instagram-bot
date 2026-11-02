@@ -5088,7 +5088,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         async function startGroupCourse(groupId, name) {{
-            if (!confirm("'" + name + "' guruhida darslarni boshlaysizmi? Guruh holati 'Boshlangan' holatiga o'tadi.")) return;
+            if (!confirm("'" + name + "' guruhida darslarni boshlaysizmi?\\n\\nBarcha biriktirilgan talabalar holati avtomatik ravishda '🟢 Muvaffaqiyatli' (kursga yozildi) ga o'tkaziladi.")) return;
             try {{
                 const resp = await fetch('/admin/groups/' + groupId + '/start', {{
                     method: 'POST',
@@ -5099,11 +5099,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 }});
                 const data = await resp.json();
                 if (data.success) {{
-                    showToast("🚀 Guruhga start berildi! Kurs rasman boshlandi!");
+                    showToast("🚀 Guruhga start berildi! Barcha talabalar 'Muvaffaqiyatli' holatiga o'tkazildi!");
                     setTimeout(() => {{
                         window.location.hash = 'groups';
                         window.location.reload();
-                    }}, 500);
+                    }}, 600);
                 }} else {{
                     showToast("⚠️ Xatolik yuz berdi");
                 }}
@@ -5332,9 +5332,26 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 }});
                 const data = await resp.json();
                 if (data.success) {{
-                    showToast("✅ Talaba guruhga qo'shildi!");
+                    const stMsg = data.new_status === 'boglandi' ? "Muvaffaqiyatli" : "Zahira";
+                    showToast("✅ Talaba guruhga qo'shildi va holati '" + stMsg + "'ga o'tkazildi!");
                     await loadGroupMembersData(groupId);
                     switchGroupModalSubTab('members');
+
+                    if (data.new_status && typeof quickMoveLead === 'function') {{
+                        quickMoveLead(clientId, data.new_status);
+                    }}
+                    if (data.group) {{
+                        const kBadge = document.getElementById('kanban_group_badge_' + clientId);
+                        if (kBadge) {{
+                            kBadge.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan guruh">🎓 ' + escapeChatHtml(data.group.name) + '</span>';
+                            kBadge.classList.remove('hidden');
+                        }}
+                        const tBadge = document.getElementById('table_group_badge_' + clientId);
+                        if (tBadge) {{
+                            tBadge.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan guruh">🎓 ' + escapeChatHtml(data.group.name) + '</span>';
+                            tBadge.classList.remove('hidden');
+                        }}
+                    }}
                 }} else {{
                     showToast("⚠️ Qo'shishda xatolik");
                 }}

@@ -91,6 +91,10 @@ def build_lead_message_text(client: dict, source: str = "Direct") -> str:
         status_icon = "🔴"
         status_label = f"Bog'lana olmadi (Ko'tarmadi / Rad etdi) ❌\n👤 <b>Mas'ul:</b> {manager_name}\n🕒 <b>Vaqti:</b> {manager_time}"
 
+    grp_name = client.get("group_name")
+    if grp_name:
+        status_label += f"\n🎓 <b>O'quv guruhi:</b> {grp_name}"
+
     ig_line = f"📸 <b>Instagram:</b> <a href='https://instagram.com/{username}'>@{username}</a>\n" if username else ""
     if is_fol is not None:
         fol_str = "✅ Sahifa obunachisi ⭐" if (is_fol == 1 or is_fol is True) else "❌ Sahifaga obuna bo'lmagan"

@@ -1317,6 +1317,9 @@ def update_comment_from_admin(
             assigned_group_name = grp["name"] if grp else ""
             update_data["group_id"] = assigned_group_id
             update_data["group_name"] = assigned_group_name
+            # Guruhga qo'shilganda: agar guruh boshlangan bo'lsa -> 'boglandi' (Muvaffaqiyatli), aks holda -> 'zahira'
+            target_lead_st = "boglandi" if (grp and grp.get("status") == "boshlandi") else "zahira"
+            update_data["lead_status"] = target_lead_st
         elif g_clean == "" or g_clean == "0":
             cl_cur = get_client_by_id(client_id)
             if cl_cur and cl_cur.get("group_id"):
@@ -1325,7 +1328,8 @@ def update_comment_from_admin(
             update_data["group_name"] = ""
 
     update_client_by_id(client_id, **update_data)
-    st_text = status_val if status_val else "o'zgarmadi"
+    effective_status = update_data.get("lead_status") or status_val or "o'zgarmadi"
+    st_text = effective_status
     comm_text = (comment or "")[:60]
     camp_text = f"; Yo'nalish: {campaign.strip()}" if (campaign and campaign.strip()) else ""
     grp_text = f"; Guruh: {assigned_group_name}" if assigned_group_name else ""
@@ -1342,7 +1346,7 @@ def update_comment_from_admin(
             "client_id": client_id,
             "manager_name": effective_manager,
             "manager_comment": (comment or "").strip(),
-            "lead_status": status_val if status_val else None,
+            "lead_status": update_data.get("lead_status") or (status_val if status_val else None),
             "phone_number": phone_val.strip() if (phone_val and phone_val != "—") else None,
             "campaign": campaign.strip() if (campaign and campaign.strip()) else None,
             "group_id": assigned_group_id,
@@ -1789,14 +1793,21 @@ def delete_group_endpoint(group_id: int, request: Request):
 
 @app.post("/admin/groups/{group_id}/start")
 def start_group_endpoint(group_id: int, request: Request):
-    """Kursga start berish (status: boshlandi)"""
+    """Kursga start berish (status: boshlandi, barcha talabalar holati: boglandi / Muvaffaqiyatli)"""
     user = get_current_user(request)
     if not user:
         return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
 
     actor_name = user.get("display_name", "Admin")
+    members_before = get_study_group_members(group_id)
     success = start_study_group(group_id, started_by=actor_name)
-    return JSONResponse({"success": success, "message": "Guruhga start berildi! Kurs rasman boshlandi 🚀"})
+    if success:
+        for m in members_before:
+            try:
+                update_telegram_lead_message(m["client_id"])
+            except Exception:
+                pass
+    return JSONResponse({"success": success, "message": "Guruhga start berildi! Barcha talabalar 'Muvaffaqiyatli' holatiga o'tkazildi 🚀"})
 
 @app.get("/admin/groups/{group_id}/members")
 def get_group_members_endpoint(group_id: int, request: Request):
@@ -1819,7 +1830,7 @@ def add_group_member_endpoint(
     client_id: int = Form(...),
     notes: str = Form("")
 ):
-    """Lidni guruhga qo'shish"""
+    """Lidni guruhga qo'shish (holati avtomatik 'zahira' ga o'tadi)"""
     user = get_current_user(request)
     if not user:
         return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
@@ -1827,7 +1838,12 @@ def add_group_member_endpoint(
     actor_name = user.get("display_name", "Operator")
     success = add_client_to_study_group(group_id, client_id, added_by=actor_name, notes=notes)
     group = get_study_group_by_id(group_id)
-    return JSONResponse({"success": success, "group": group})
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception:
+        pass
+    new_st = "boglandi" if (group and group.get("status") == "boshlandi") else "zahira"
+    return JSONResponse({"success": success, "group": group, "client_id": client_id, "new_status": new_st})
 
 @app.post("/admin/groups/{group_id}/remove-member")
 def remove_group_member_endpoint(
@@ -1843,6 +1859,10 @@ def remove_group_member_endpoint(
     actor_name = user.get("display_name", "Operator")
     success = remove_client_from_study_group(group_id, client_id, removed_by=actor_name)
     group = get_study_group_by_id(group_id)
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception:
+        pass
     return JSONResponse({"success": success, "group": group})
 
 @app.get("/admin/groups/{group_id}/candidate-leads")
@@ -1875,6 +1895,7 @@ def assign_client_group_endpoint(
         success = add_client_to_study_group(group_id, client_id, added_by=actor_name)
         group = get_study_group_by_id(group_id)
         group_name = group["name"] if group else ""
+        new_status = "boglandi" if (group and group.get("status") == "boshlandi") else "zahira"
     else:
         cl = get_client_by_id(client_id)
         cur_gid = cl.get("group_id") if cl else None
@@ -1885,8 +1906,14 @@ def assign_client_group_endpoint(
             update_client_by_id(client_id, group_id=None, group_name="", updated_at=now_iso)
         success = True
         group_name = ""
+        new_status = None
 
-    return JSONResponse({"success": success, "group_id": group_id, "group_name": group_name})
+    try:
+        update_telegram_lead_message(client_id)
+    except Exception:
+        pass
+
+    return JSONResponse({"success": success, "group_id": group_id, "group_name": group_name, "new_status": new_status})
 
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
