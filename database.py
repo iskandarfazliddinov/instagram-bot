@@ -59,6 +59,7 @@ BACKUP_FILE = os.path.join(DB_DIR, "leads_backup.json")
 SETTINGS_BACKUP_FILE = os.path.join(DB_DIR, "settings_backup.json")
 OPERATORS_BACKUP_FILE = os.path.join(DB_DIR, "operators_backup.json")
 ACTIVITY_LOGS_BACKUP_FILE = os.path.join(DB_DIR, "activity_logs_backup.json")
+GROUPS_BACKUP_FILE = os.path.join(DB_DIR, "groups_backup.json")
 _DEFAULT_GK = base64.b64decode(b"QVEuQWI4Uk42SWJQNzhzNHo3aWZUajZFUkphX1BKU2NaRFBjNXdIeW1KSEdxS3FqMnNXMUE=").decode("utf-8")
 DEFAULT_GEMINI_KEY = os.getenv("GEMINI_API_KEY", _DEFAULT_GK)
 
@@ -110,7 +111,9 @@ def init_db():
         ("chat_history", "TEXT DEFAULT '[]'"),
         ("followup_count", "INTEGER DEFAULT 0"),
         ("last_followup_at", "TEXT DEFAULT ''"),
-        ("ai_paused", "INTEGER DEFAULT 0")
+        ("ai_paused", "INTEGER DEFAULT 0"),
+        ("group_id", "INTEGER DEFAULT NULL"),
+        ("group_name", "TEXT DEFAULT ''")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -122,6 +125,36 @@ def init_db():
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
+        )
+    """)
+
+    # 1.1 O'quv guruhlari jadvali (Oqimlar)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS study_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            direction_key TEXT NOT NULL,
+            direction_name TEXT NOT NULL,
+            target_count INTEGER DEFAULT 15,
+            status TEXT DEFAULT 'yigilmoqda',
+            start_date TEXT DEFAULT '',
+            mentor TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP
+        )
+    """)
+
+    # 1.2 Guruh a'zolari (talabalar) jadvali
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            client_id INTEGER NOT NULL,
+            added_by TEXT DEFAULT '',
+            added_at TIMESTAMP,
+            notes TEXT DEFAULT '',
+            UNIQUE(group_id, client_id)
         )
     """)
 
@@ -652,6 +685,36 @@ def init_db():
                         log.get("action_type"),
                         log.get("details"),
                         log.get("created_at")
+                    ))
+        except Exception:
+            pass
+
+    # O'quv guruhlarini zaxiradan tiklash (agar mavjud bo'lsa)
+    if os.path.exists(GROUPS_BACKUP_FILE):
+        try:
+            with open(GROUPS_BACKUP_FILE, "r", encoding="utf-8") as f:
+                b_groups_data = json.load(f)
+            b_groups = b_groups_data.get("groups", [])
+            for g in b_groups:
+                cursor.execute("SELECT id FROM study_groups WHERE id = ?", (g.get("id"),))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO study_groups (id, name, direction_key, direction_name, target_count, status, start_date, mentor, notes, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        g.get("id"), g.get("name"), g.get("direction_key"), g.get("direction_name"),
+                        g.get("target_count", 15), g.get("status", "yigilmoqda"), g.get("start_date", ""),
+                        g.get("mentor", ""), g.get("notes", ""), g.get("created_at"), g.get("updated_at")
+                    ))
+            b_members = b_groups_data.get("members", [])
+            for m in b_members:
+                cursor.execute("SELECT id FROM group_members WHERE group_id = ? AND client_id = ?", (m.get("group_id"), m.get("client_id")))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO group_members (id, group_id, client_id, added_by, added_at, notes)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        m.get("id"), m.get("group_id"), m.get("client_id"), m.get("added_by", ""), m.get("added_at"), m.get("notes", "")
                     ))
         except Exception:
             pass
@@ -1402,6 +1465,251 @@ def get_recent_activity_logs(limit: int = 50) -> list:
         conn.close()
         return rows
     except Exception:
+        return []
+
+# ==========================================
+# 🎓 O'QUV GURUHLARI (OQIMLAR) BOSHQARUVI
+# ==========================================
+
+def sync_groups_backup():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM study_groups ORDER BY id DESC")
+        groups = [dict(r) for r in cursor.fetchall()]
+        cursor.execute("SELECT * FROM group_members ORDER BY id ASC")
+        members = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        with open(GROUPS_BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump({"groups": groups, "members": members}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"sync_groups_backup xatoligi: {e}")
+
+def create_study_group(name: str, direction_key: str, target_count: int = 15, start_date: str = "", mentor: str = "", notes: str = "") -> int:
+    """Yangi o'quv guruhi yaratish"""
+    dir_name = "Boshqa / Umumiy"
+    for d in AVAILABLE_DIRECTIONS:
+        if d["key"] == direction_key:
+            dir_name = d["name"]
+            break
+
+    now = now_uzb_iso()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO study_groups (name, direction_key, direction_name, target_count, status, start_date, mentor, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'yigilmoqda', ?, ?, ?, ?, ?)
+    """, (name.strip(), direction_key, dir_name, int(target_count or 15), start_date.strip(), mentor.strip(), notes.strip(), now, now))
+    group_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    sync_groups_backup()
+    return group_id
+
+def get_all_study_groups(status: str = None) -> list:
+    """Barcha o'quv guruhlarini a'zolar soni va to'lish foizi bilan olish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        if status:
+            cursor.execute("SELECT * FROM study_groups WHERE status = ? ORDER BY id DESC", (status,))
+        else:
+            cursor.execute("SELECT * FROM study_groups ORDER BY id DESC")
+        rows = [dict(r) for r in cursor.fetchall()]
+        for g in rows:
+            cursor.execute("SELECT COUNT(*) FROM group_members WHERE group_id = ?", (g["id"],))
+            cnt = cursor.fetchone()[0]
+            g["student_count"] = cnt
+            t_count = g.get("target_count") or 15
+            g["percent"] = min(round((cnt / t_count) * 100), 100) if t_count > 0 else 0
+            g["is_ready"] = bool(cnt >= t_count)
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"get_all_study_groups xatoligi: {e}")
+        return []
+
+def get_study_group_by_id(group_id: int) -> dict:
+    """Guruhni ID bo'yicha olish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM study_groups WHERE id = ?", (group_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return None
+        g = dict(row)
+        cursor.execute("SELECT COUNT(*) FROM group_members WHERE group_id = ?", (g["id"],))
+        cnt = cursor.fetchone()[0]
+        g["student_count"] = cnt
+        t_count = g.get("target_count") or 15
+        g["percent"] = min(round((cnt / t_count) * 100), 100) if t_count > 0 else 0
+        g["is_ready"] = bool(cnt >= t_count)
+        conn.close()
+        return g
+    except Exception as e:
+        logger.error(f"get_study_group_by_id xatoligi: {e}")
+        return None
+
+def update_study_group(group_id: int, **kwargs) -> bool:
+    """Guruh ma'lumotlarini tahrirlash"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        kwargs["updated_at"] = now_uzb_iso()
+        if "direction_key" in kwargs:
+            for d in AVAILABLE_DIRECTIONS:
+                if d["key"] == kwargs["direction_key"]:
+                    kwargs["direction_name"] = d["name"]
+                    break
+
+        fields = [f"{k} = ?" for k in kwargs.keys()]
+        values = list(kwargs.values())
+        values.append(group_id)
+        cursor.execute(f"UPDATE study_groups SET {', '.join(fields)} WHERE id = ?", values)
+
+        # Agar guruh nomi o'zgargan bo'lsa, clients jadvalidagi nomni ham sinxronlash
+        if "name" in kwargs:
+            cursor.execute("UPDATE clients SET group_name = ? WHERE group_id = ?", (kwargs["name"], group_id))
+
+        conn.commit()
+        conn.close()
+        sync_groups_backup()
+        return True
+    except Exception as e:
+        logger.error(f"update_study_group xatoligi: {e}")
+        return False
+
+def delete_study_group(group_id: int) -> bool:
+    """Guruhni o'chirish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM study_groups WHERE id = ?", (group_id,))
+        cursor.execute("DELETE FROM group_members WHERE group_id = ?", (group_id,))
+        cursor.execute("UPDATE clients SET group_id = NULL, group_name = '' WHERE group_id = ?", (group_id,))
+        conn.commit()
+        conn.close()
+        sync_groups_backup()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"delete_study_group xatoligi: {e}")
+        return False
+
+def add_client_to_study_group(group_id: int, client_id: int, added_by: str = "", notes: str = "") -> bool:
+    """Lidni o'quv guruhiga biriktirish / qo'shish"""
+    try:
+        group = get_study_group_by_id(group_id)
+        if not group:
+            return False
+
+        now = now_uzb_iso()
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO group_members (group_id, client_id, added_by, added_at, notes)
+            VALUES (?, ?, ?, ?, ?)
+        """, (group_id, client_id, (added_by or "Operator").strip(), now, (notes or "").strip()))
+        cursor.execute("UPDATE clients SET group_id = ?, group_name = ?, updated_at = ? WHERE id = ?", (group_id, group["name"], now, client_id))
+        conn.commit()
+        conn.close()
+
+        log_activity(client_id, added_by or "Operator", "guruhga_biriktirildi", f"'{group['name']}' guruhiga qo'shildi")
+        sync_groups_backup()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"add_client_to_study_group xatoligi: {e}")
+        return False
+
+def remove_client_from_study_group(group_id: int, client_id: int, removed_by: str = "") -> bool:
+    """Lidni guruhdan chiqarish"""
+    try:
+        now = now_uzb_iso()
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM group_members WHERE group_id = ? AND client_id = ?", (group_id, client_id))
+        cursor.execute("UPDATE clients SET group_id = NULL, group_name = '', updated_at = ? WHERE id = ? AND group_id = ?", (now, client_id, group_id))
+        conn.commit()
+        conn.close()
+
+        log_activity(client_id, removed_by or "Operator", "guruhdan_chiqarildi", f"Guruhdan olib tashlandi")
+        sync_groups_backup()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"remove_client_from_study_group xatoligi: {e}")
+        return False
+
+def get_study_group_members(group_id: int) -> list:
+    """Guruhdagi talabalar ro'yxatini to'liq olish"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT gm.id as member_id, gm.group_id, gm.client_id, gm.added_by, gm.added_at, gm.notes as member_notes,
+                   c.full_name, c.phone_number, c.username, c.instagram_id, c.campaign, c.lead_status, c.manager_name, c.created_at
+            FROM group_members gm
+            JOIN clients c ON gm.client_id = c.id
+            WHERE gm.group_id = ?
+            ORDER BY gm.id ASC
+        """, (group_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"get_study_group_members xatoligi: {e}")
+        return []
+
+def start_study_group(group_id: int, started_by: str = "") -> bool:
+    """Guruhni 'boshlandi' (faol) holatiga o'tkazish"""
+    try:
+        now = now_uzb_iso()
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE study_groups 
+            SET status = 'boshlandi', updated_at = ?
+            WHERE id = ?
+        """, (now, group_id))
+        conn.commit()
+        conn.close()
+        sync_groups_backup()
+        return True
+    except Exception as e:
+        logger.error(f"start_study_group xatoligi: {e}")
+        return False
+
+def get_available_leads_for_group(group_id: int, search: str = "", limit: int = 60) -> list:
+    """Guruhga qo'shish mumkin bo'lgan lidlarni qidirish (hali shu guruhda bo'lmaganlar)"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        q = f"%{search.strip().lower()}%" if search else "%"
+        cursor.execute("""
+            SELECT id, full_name, phone_number, username, campaign, lead_status, manager_name, group_id, group_name
+            FROM clients
+            WHERE id NOT IN (SELECT client_id FROM group_members WHERE group_id = ?)
+              AND (
+                LOWER(COALESCE(full_name, '')) LIKE ? OR
+                LOWER(COALESCE(phone_number, '')) LIKE ? OR
+                LOWER(COALESCE(username, '')) LIKE ? OR
+                LOWER(COALESCE(campaign, '')) LIKE ?
+              )
+            ORDER BY 
+              CASE WHEN lead_status IN ('boglandi', 'muvaffaqiyatli', 'jarayonda') THEN 1 
+                   WHEN lead_status = 'zahira' THEN 2 
+                   ELSE 3 END,
+              id DESC
+            LIMIT ?
+        """, (group_id, q, q, q, q, limit))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"get_available_leads_for_group xatoligi: {e}")
         return []
 
 

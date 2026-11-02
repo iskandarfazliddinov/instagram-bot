@@ -37,7 +37,17 @@ from database import (
     now_uzb_time,
     now_uzb_date,
     now_uzb_iso,
-    to_uzb_time_str
+    to_uzb_time_str,
+    create_study_group,
+    get_all_study_groups,
+    get_study_group_by_id,
+    update_study_group,
+    delete_study_group,
+    add_client_to_study_group,
+    remove_client_from_study_group,
+    get_study_group_members,
+    start_study_group,
+    get_available_leads_for_group
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -986,13 +996,16 @@ def admin_dashboard(request: Request, notice: str = ""):
 
         clients_data = filtered_clients
 
+    groups_data = get_all_study_groups()
+
     html_content = get_admin_dashboard_html(
         settings_data, campaigns_data, clients_data,
         recent_media=recent_media, notice=notice,
         user_role=curr_user["role"],
         current_user=curr_user,
         operators=operators_data,
-        activity_logs=recent_logs
+        activity_logs=recent_logs,
+        groups=groups_data
     )
     return HTMLResponse(content=html_content)
 
@@ -1254,9 +1267,10 @@ def update_comment_from_admin(
     status_val: str = Form(None, alias="status"),
     phone_val: str = Form(None, alias="phone"),
     manager_name: str = Form(None, alias="manager_name"),
-    campaign: str = Form(None, alias="campaign")
+    campaign: str = Form(None, alias="campaign"),
+    group_id: str = Form(None, alias="group_id")
 ):
-    """CRM dan mutaxassis izohi, holati, mas'ul xodimi, yo'nalishi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
+    """CRM dan mutaxassis izohi, holati, mas'ul xodimi, yo'nalishi, guruhi va telefon raqamini saqlash hamda Telegram guruhidagi xabarni yangilash"""
     user = get_current_user(request)
     if not user:
         if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
@@ -1289,11 +1303,33 @@ def update_comment_from_admin(
         update_data["campaign"] = campaign.strip()
 
     actor_name = user.get("display_name", "Admin")
+
+    # O'quv guruhini biriktirish yoki yangilash
+    assigned_group_name = ""
+    assigned_group_id = None
+    if group_id is not None:
+        g_clean = group_id.strip()
+        if g_clean and g_clean != "0" and g_clean.isdigit():
+            gid_int = int(g_clean)
+            add_client_to_study_group(gid_int, client_id, added_by=actor_name)
+            grp = get_study_group_by_id(gid_int)
+            assigned_group_id = gid_int
+            assigned_group_name = grp["name"] if grp else ""
+            update_data["group_id"] = assigned_group_id
+            update_data["group_name"] = assigned_group_name
+        elif g_clean == "" or g_clean == "0":
+            cl_cur = get_client_by_id(client_id)
+            if cl_cur and cl_cur.get("group_id"):
+                remove_client_from_study_group(cl_cur.get("group_id"), client_id, removed_by=actor_name)
+            update_data["group_id"] = None
+            update_data["group_name"] = ""
+
     update_client_by_id(client_id, **update_data)
     st_text = status_val if status_val else "o'zgarmadi"
     comm_text = (comment or "")[:60]
     camp_text = f"; Yo'nalish: {campaign.strip()}" if (campaign and campaign.strip()) else ""
-    log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}{camp_text}")
+    grp_text = f"; Guruh: {assigned_group_name}" if assigned_group_name else ""
+    log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}{camp_text}{grp_text}")
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
@@ -1309,6 +1345,8 @@ def update_comment_from_admin(
             "lead_status": status_val if status_val else None,
             "phone_number": phone_val.strip() if (phone_val and phone_val != "—") else None,
             "campaign": campaign.strip() if (campaign and campaign.strip()) else None,
+            "group_id": assigned_group_id,
+            "group_name": assigned_group_name,
             "manager_time": now_str
         })
 
@@ -1658,6 +1696,197 @@ def admin_delete_operator(
     from database import delete_operator
     delete_operator(op_id)
     return RedirectResponse(url="/admin?notice=Operator+muvaffaqiyatli+o%27chirildi#tab_operators", status_code=status.HTTP_303_SEE_OTHER)
+
+# ==========================================
+# 🎓 O'QUV GURUHLARI (OQIMLAR) ENDPOINTLARI
+# ==========================================
+
+@app.post("/admin/groups/create")
+def create_group_endpoint(
+    request: Request,
+    name: str = Form(...),
+    direction_key: str = Form(...),
+    target_count: int = Form(15),
+    start_date: str = Form(""),
+    mentor: str = Form(""),
+    notes: str = Form("")
+):
+    """Yangi o'quv guruhi yaratish"""
+    user = get_current_user(request)
+    if not user:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    group_id = create_study_group(
+        name=name.strip(),
+        direction_key=direction_key.strip(),
+        target_count=target_count,
+        start_date=start_date.strip(),
+        mentor=mentor.strip(),
+        notes=notes.strip()
+    )
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": True, "group_id": group_id, "message": "Guruh muvaffaqiyatli yaratildi"})
+
+    return RedirectResponse(
+        url="/admin?notice=Yangi+o%27quv+guruhi+muvaffaqiyatli+yaratildi#groups",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/groups/{group_id}/update")
+def update_group_endpoint(
+    group_id: int,
+    request: Request,
+    name: str = Form(None),
+    direction_key: str = Form(None),
+    target_count: int = Form(None),
+    status_val: str = Form(None, alias="status"),
+    start_date: str = Form(None),
+    mentor: str = Form(None),
+    notes: str = Form(None)
+):
+    """Guruh ma'lumotlarini tahrirlash"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    fields = {}
+    if name is not None: fields["name"] = name.strip()
+    if direction_key is not None: fields["direction_key"] = direction_key.strip()
+    if target_count is not None: fields["target_count"] = target_count
+    if status_val is not None: fields["status"] = status_val.strip()
+    if start_date is not None: fields["start_date"] = start_date.strip()
+    if mentor is not None: fields["mentor"] = mentor.strip()
+    if notes is not None: fields["notes"] = notes.strip()
+
+    success = update_study_group(group_id, **fields)
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": success})
+
+    return RedirectResponse(
+        url="/admin?notice=Guruh+ma%27lumotlari+yangilandi#groups",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/groups/{group_id}/delete")
+def delete_group_endpoint(group_id: int, request: Request):
+    """Guruhni o'chirish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    success = delete_study_group(group_id)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"success": success})
+
+    return RedirectResponse(
+        url="/admin?notice=Guruh+o%27chirildi#groups",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+@app.post("/admin/groups/{group_id}/start")
+def start_group_endpoint(group_id: int, request: Request):
+    """Kursga start berish (status: boshlandi)"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    actor_name = user.get("display_name", "Admin")
+    success = start_study_group(group_id, started_by=actor_name)
+    return JSONResponse({"success": success, "message": "Guruhga start berildi! Kurs rasman boshlandi 🚀"})
+
+@app.get("/admin/groups/{group_id}/members")
+def get_group_members_endpoint(group_id: int, request: Request):
+    """Guruhdagi barcha talabalar ro'yxatini olish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    group = get_study_group_by_id(group_id)
+    if not group:
+        return JSONResponse({"success": False, "error": "Guruh topilmadi"}, status_code=404)
+
+    members = get_study_group_members(group_id)
+    return JSONResponse({"success": True, "group": group, "members": members})
+
+@app.post("/admin/groups/{group_id}/add-member")
+def add_group_member_endpoint(
+    group_id: int,
+    request: Request,
+    client_id: int = Form(...),
+    notes: str = Form("")
+):
+    """Lidni guruhga qo'shish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    actor_name = user.get("display_name", "Operator")
+    success = add_client_to_study_group(group_id, client_id, added_by=actor_name, notes=notes)
+    group = get_study_group_by_id(group_id)
+    return JSONResponse({"success": success, "group": group})
+
+@app.post("/admin/groups/{group_id}/remove-member")
+def remove_group_member_endpoint(
+    group_id: int,
+    request: Request,
+    client_id: int = Form(...)
+):
+    """Lidni guruhdan chiqarish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    actor_name = user.get("display_name", "Operator")
+    success = remove_client_from_study_group(group_id, client_id, removed_by=actor_name)
+    group = get_study_group_by_id(group_id)
+    return JSONResponse({"success": success, "group": group})
+
+@app.get("/admin/groups/{group_id}/candidate-leads")
+def get_candidate_leads_endpoint(
+    group_id: int,
+    request: Request,
+    search: str = ""
+):
+    """Guruhga qo'shish mumkin bo'lgan lidlarni qidirish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    leads = get_available_leads_for_group(group_id, search=search, limit=50)
+    return JSONResponse({"success": True, "leads": leads})
+
+@app.post("/admin/clients/{client_id}/assign-group")
+def assign_client_group_endpoint(
+    client_id: int,
+    request: Request,
+    group_id: int = Form(0)
+):
+    """Lid kartasidan to'g'ridan-to'g'ri guruhga biriktirish yoki ajratish"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    actor_name = user.get("display_name", "Operator")
+    if group_id and group_id > 0:
+        success = add_client_to_study_group(group_id, client_id, added_by=actor_name)
+        group = get_study_group_by_id(group_id)
+        group_name = group["name"] if group else ""
+    else:
+        cl = get_client_by_id(client_id)
+        cur_gid = cl.get("group_id") if cl else None
+        if cur_gid:
+            remove_client_from_study_group(cur_gid, client_id, removed_by=actor_name)
+        else:
+            now_iso = now_uzb_iso()
+            update_client_by_id(client_id, group_id=None, group_name="", updated_at=now_iso)
+        success = True
+        group_name = ""
+
+    return JSONResponse({"success": success, "group_id": group_id, "group_name": group_name})
 
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):

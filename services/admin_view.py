@@ -86,7 +86,7 @@ def safe_js_str(val) -> str:
     cleaned = str(val).replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\r", " ").replace("\n", " ")
     return " ".join(cleaned.split())
 
-def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None, activity_logs: list = None) -> str:
+def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None, activity_logs: list = None, groups: list = None) -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     is_operator = (user_role == "operator")
     is_supervisor = (user_role == "supervisor")
@@ -101,6 +101,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         operators = []
     if activity_logs is None:
         activity_logs = []
+    if groups is None:
+        groups = []
 
     curr_display_name = current_user.get("display_name", "Admin")
 
@@ -203,6 +205,25 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     campaign_options_html = ""
     for d in AVAILABLE_DIRECTIONS:
         campaign_options_html += f'<option value="{d["name"]}">{d["name"]}</option>\n'
+
+    # 🎓 O'quv guruhlari hisob-kitoblari va variantlari
+    total_groups = len(groups)
+    recruiting_groups = [g for g in groups if g.get("status") == "yigilmoqda"]
+    started_groups = [g for g in groups if g.get("status") == "boshlandi"]
+    completed_groups = [g for g in groups if g.get("status") == "tugatildi"]
+    total_enrolled_students = sum(g.get("student_count", 0) for g in groups)
+    recruiting_badge = f'<span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">{len(recruiting_groups)}</span>' if recruiting_groups else ''
+
+    # Guruhlar select dropdown variantlari (lid modali uchun)
+    groups_options_html = '<option value="">⚪ Guruhga biriktirilmagan</option>\n'
+    for g in groups:
+        st_icon = "⏳" if g.get("status") == "yigilmoqda" else ("🚀" if g.get("status") == "boshlandi" else "🏁")
+        groups_options_html += f'<option value="{g["id"]}">🎓 {g["name"]} ({g.get("student_count", 0)}/{g.get("target_count", 15)} ta) {st_icon}</option>\n'
+
+    # Yangi guruh formasi uchun yo'nalishlar select variantlari
+    new_group_dir_options_html = ""
+    for d in AVAILABLE_DIRECTIONS:
+        new_group_dir_options_html += f'<option value="{d["key"]}">{d.get("icon", "📚")} {d["name"]}</option>\n'
 
     # Xodim uchun yo'nalishlar xabarnomasi banneri
     operator_directions_banner = ""
@@ -617,6 +638,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         ai_paused = 1 if client.get('ai_paused') else 0
         is_suspicious = check_is_suspicious(client)
 
+        client_group_id = client.get('group_id') or ""
+        client_group_name = (client.get('group_name') or "").strip()
+        escaped_group_id = str(client_group_id) if client_group_id else ""
+        group_badge_html = f"""<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan o'quv guruhi: {client_group_name}">🎓 {client_group_name}</span>""" if client_group_name else ""
+
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
 
@@ -695,7 +721,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             """
 
         comment_btn = f"""
-        <button type="button" id="table_row_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs cursor-pointer" title="Bog'lanish va izoh kiritish">
+        <button type="button" id="table_row_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}', '{escaped_group_id}')" class="mt-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition inline-flex items-center gap-1 shadow-xs cursor-pointer" title="Bog'lanish va izoh kiritish">
             💬 {"Izohni o'zgartirish" if manager_comment else "Izoh qo'shish"}
         </button>
         """
@@ -724,7 +750,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <option value="zahira" {'selected' if lead_status=='zahira' else ''}>📦 Zahira</option>
                     <option value="rad" {'selected' if lead_status=='rad' else ''}>🔴 Rad</option>
                 </select>
-                <button type="button" id="table_action_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium cursor-pointer" title="Bog'lanish & Izoh">💬</button>
+                <button type="button" id="table_action_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}', '{escaped_group_id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg transition font-medium cursor-pointer" title="Bog'lanish & Izoh">💬</button>
                 {delete_btn}
             </div>
         </td>
@@ -862,6 +888,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </td>
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div id="table_camp_badge_{client_id}" onclick="openCommentModalWithFocus('{client_id}', 'campaign')" class="cursor-pointer hover:opacity-80 transition inline-block" title="Yo'nalishni o'zgartirish uchun bosing">{campaign_badge}</div>
+                <div id="table_group_badge_{client_id}" class="mt-1 {'' if client_group_name else 'hidden'}">{group_badge_html}</div>
                 <div>{source_badge}</div>
             </td>
             <td class="px-5 py-3.5">
@@ -970,9 +997,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </div>
 
-            <!-- Course & Source badges -->
+            <!-- Course & Source & Group badges -->
             <div class="flex flex-wrap items-center gap-1 mb-2">
                 <div id="kanban_camp_badge_{client_id}" onclick="openCommentModalWithFocus('{client_id}', 'campaign')" class="cursor-pointer hover:opacity-80 transition inline-block" title="Yo'nalishni o'zgartirish uchun bosing">{campaign_badge}</div>
+                <div id="kanban_group_badge_{client_id}" class="{'' if client_group_name else 'hidden'}">{group_badge_html}</div>
                 {source_badge}
             </div>
 
@@ -998,7 +1026,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         class="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati">
                     📸 Chat {'<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>' if ai_paused else ''}
                 </button>
-                <button type="button" id="kanban_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}')"
+                <button type="button" id="kanban_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}', '{escaped_group_id}')"
                         class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Bog'lanish & Izoh">
                     💬 Izoh
                 </button>
@@ -1186,8 +1214,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
                 </button>
+                <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
+                    🎓 2. O'quv Guruhlari {recruiting_badge}
+                </button>
                 <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                    📊 2. Statistika & Tahlil
+                    📊 3. Statistika & Tahlil
                 </button>
             </div>
             <div class="text-xs text-slate-700 font-bold px-3 py-1.5 rounded-xl bg-white border border-slate-200 flex items-center gap-2 shadow-xs">
@@ -1203,14 +1234,17 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </button>
+            <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
+                🎓 2. O'quv Guruhlari {recruiting_badge}
+            </button>
             <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                📊 2. Statistika (Kunlik/Oylik/Umumiy)
+                📊 3. Statistika (Kunlik/Oylik/Umumiy)
             </button>
             <button type="button" onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                🛡️ 3. Xodimlar Auditi & Nazorat {suspicious_nav_badge}
+                🛡️ 4. Xodimlar Auditi & Nazorat {suspicious_nav_badge}
             </button>
             <button type="button" onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                👥 4. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
+                👥 5. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
             </button>
         </div>
     """
@@ -1221,26 +1255,29 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
             </button>
+            <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
+                🎓 2. O'quv Guruhlari {recruiting_badge}
+            </button>
             <button type="button" onclick="switchTab('analytics')" id="tab_btn_analytics" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                📊 2. Statistika & Tahlil
+                📊 3. Statistika & Tahlil
             </button>
             <button type="button" onclick="switchTab('audit')" id="tab_btn_audit" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                🛡️ 3. Xodimlar Auditi {suspicious_nav_badge}
+                🛡️ 4. Xodimlar Auditi {suspicious_nav_badge}
             </button>
             <button type="button" onclick="switchTab('ai')" id="tab_btn_ai" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                🤖 4. Sun'iy Intellekt
+                🤖 5. Sun'iy Intellekt
             </button>
             <button type="button" onclick="switchTab('campaigns')" id="tab_btn_campaigns" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                🎬 5. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
+                🎬 6. Video Qoidalari <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{len(campaigns)}</span>
             </button>
             <button type="button" onclick="switchTab('templates')" id="tab_btn_templates" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                💬 6. Direct Shabloni
+                💬 7. Direct Shabloni
             </button>
             <button type="button" onclick="switchTab('operators')" id="tab_btn_operators" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                👥 7. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
+                👥 8. Operatorlar <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{len(operators)}</span>
             </button>
             <button type="button" onclick="switchTab('security')" id="tab_btn_security" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                🔐 8. Login & Parol
+                🔐 9. Login & Parol
             </button>
         </div>
     """
@@ -1862,6 +1899,212 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <td class="px-5 py-3 text-xs text-slate-700 font-medium">{l_det}</td>
             </tr>
             """
+
+    # ---------------- 🎓 O'QUV GURUHLARI (OQIMLAR) TABI ----------------
+    group_cards_html = ""
+    if not groups:
+        group_cards_html = """
+        <div class="col-span-full bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 text-center shadow-xs">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-purple-100 to-indigo-100 text-purple-700 flex items-center justify-center text-3xl shadow-xs">
+                🎓
+            </div>
+            <h3 class="text-base font-extrabold text-slate-900 mb-1">Hozircha o'quv guruhlari yaratilmagan</h3>
+            <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
+                Yangi o'quv guruhini yarating, CRM ga tushgan qiziquvchi lidlarni shu guruhga to'plang va talabalar soni yetarli bo'lgach kursga start bering!
+            </p>
+            <button type="button" onclick="openNewGroupModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-purple-500/20 transition cursor-pointer">
+                <span>➕</span> <span>Birinchi guruhni yaratish</span>
+            </button>
+        </div>
+        """
+    else:
+        for g in groups:
+            g_id = g.get("id")
+            g_name = g.get("name", "Guruh")
+            g_dir_key = g.get("direction_key", "")
+            g_dir_name = g.get("direction_name", "Kurs")
+            g_target = g.get("target_count", 15)
+            g_status = g.get("status", "yigilmoqda")
+            g_start = g.get("start_date", "")
+            g_mentor = g.get("mentor", "")
+            g_notes = g.get("notes", "")
+            g_count = g.get("student_count", 0)
+            g_percent = g.get("percent", 0)
+            g_ready = g.get("is_ready", False)
+
+            escaped_g_name = safe_js_str(g_name)
+            escaped_g_mentor = safe_js_str(g_mentor)
+            escaped_g_start = safe_js_str(g_start)
+            escaped_g_notes = safe_js_str(g_notes)
+
+            # Direction icon
+            d_info = dir_dict.get(g_dir_key, {})
+            d_icon = d_info.get("icon", "📚")
+
+            # Status badges and styles
+            if g_status == "boshlandi":
+                card_border = "border-emerald-300 ring-1 ring-emerald-200"
+                status_badge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1"><span>🟢</span> <span>Boshlangan</span></span>'
+                progress_color = "bg-gradient-to-r from-emerald-500 to-teal-500"
+                ready_callout = '<div class="mt-2 text-[11px] font-bold text-emerald-700 flex items-center gap-1"><span>🚀</span> <span>Darslar boshlangan (Faol oqim)</span></div>'
+                start_btn_html = ""
+            elif g_status == "tugatildi":
+                card_border = "border-slate-200 opacity-75"
+                status_badge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">🏁 Yakunlangan</span>'
+                progress_color = "bg-slate-400"
+                ready_callout = ""
+                start_btn_html = ""
+            else:
+                # yigilmoqda
+                if g_ready:
+                    card_border = "border-amber-400 shadow-md ring-2 ring-amber-300/60"
+                    status_badge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse flex items-center gap-1"><span>🎉</span> <span>To\'ldi! Start bering</span></span>'
+                    progress_color = "bg-gradient-to-r from-amber-500 to-emerald-500"
+                    ready_callout = '<div class="mt-2 p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800 flex items-center gap-1"><span>✅</span> <span>Guruh to\'ldi! Kursga start berishingiz mumkin</span></div>'
+                else:
+                    card_border = "border-purple-200/90"
+                    status_badge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1"><span>⏳</span> <span>Yig\'ilmoqda</span></span>'
+                    progress_color = "bg-gradient-to-r from-purple-500 to-indigo-600" if g_percent >= 50 else "bg-gradient-to-r from-amber-400 to-orange-500"
+                    ready_callout = f'<div class="mt-2 text-[11px] text-slate-500 font-medium">Kurs boshlanishi uchun yana <b>{max(0, g_target - g_count)} ta</b> talaba kerak</div>'
+
+                start_btn_html = f"""
+                <button type="button" onclick="startGroupCourse({g_id}, '{escaped_g_name}')"
+                        class="py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs whitespace-nowrap"
+                        title="Kursga start berish (Darslarni rasman boshlash)">
+                    <span>🚀 Start</span>
+                </button>
+                """
+
+            admin_controls_html = ""
+            if not is_operator:
+                admin_controls_html = f"""
+                <button type="button" onclick="openEditGroupModal({g_id}, '{escaped_g_name}', '{g_dir_key}', {g_target}, '{escaped_g_start}', '{escaped_g_mentor}', '{escaped_g_notes}', '{g_status}')"
+                        class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer text-xs" title="Tahrirlash">
+                    ✏️
+                </button>
+                <button type="button" onclick="deleteGroupAjax({g_id}, '{escaped_g_name}')"
+                        class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer text-xs" title="O'chirish">
+                    🗑️
+                </button>
+                """
+
+            notes_html = f"""<div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 truncate" title="{g_notes}">📝 {g_notes}</div>""" if g_notes else ""
+
+            group_cards_html += f"""
+            <div class="group-card bg-white rounded-2xl border {card_border} p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                 data-group-id="{g_id}"
+                 data-direction="{g_dir_key}"
+                 data-status="{g_status}"
+                 data-search="{g_name.lower()} {g_dir_name.lower()} {g_mentor.lower()} {g_notes.lower()}">
+                <div>
+                    <!-- Top header: Yo'nalish pill & Status badge -->
+                    <div class="flex items-start justify-between gap-2 mb-3">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                            <span>{d_icon}</span>
+                            <span class="truncate max-w-[150px]">{g_dir_name}</span>
+                        </span>
+                        {status_badge}
+                    </div>
+
+                    <!-- Guruh nomi -->
+                    <h3 class="text-base font-extrabold text-slate-900 mb-1 tracking-tight">{g_name}</h3>
+
+                    <!-- Progress bar & Talabalar soni -->
+                    <div class="mt-3 mb-4 p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <div class="flex items-center justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-slate-600 flex items-center gap-1">
+                                <span>👥</span> <span>Guruh to'lishi:</span>
+                            </span>
+                            <span class="text-slate-900 font-extrabold">{g_count} / {g_target} ta ({g_percent}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                            <div class="{progress_color} h-2.5 rounded-full transition-all duration-500" style="width: {min(100, g_percent)}%"></div>
+                        </div>
+                        {ready_callout}
+                    </div>
+
+                    <!-- Qo'shimcha ma'lumotlar -->
+                    <div class="space-y-1.5 text-xs text-slate-600 mb-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400 font-bold">👨‍🏫 Ustoz:</span>
+                            <span class="font-semibold text-slate-800">{g_mentor if g_mentor else '—'}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400 font-bold">📅 Start:</span>
+                            <span class="font-semibold text-slate-800 font-mono">{g_start if g_start else 'Belgilanmagan'}</span>
+                        </div>
+                        {notes_html}
+                    </div>
+                </div>
+
+                <!-- Footer harakatlar tugmalari -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button type="button" onclick="openGroupMembersModal({g_id})"
+                            class="flex-1 py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                        <span>👥 Talabalar ({g_count})</span>
+                    </button>
+                    {start_btn_html}
+                    {admin_controls_html}
+                </div>
+            </div>
+            """
+
+    groups_filter_dir_options = '<option value="all">📚 Barcha yo\'nalishlar</option>\\n'
+    for d in AVAILABLE_DIRECTIONS:
+        groups_filter_dir_options += f'<option value="{d["key"]}">{d.get("icon", "📚")} {d["name"]}</option>\\n'
+
+    groups_tab_html = f"""
+    <!-- 2-TAB: O'QUV GURUHLARI (OQIMLAR) BOSHQARUVI -->
+    <div id="tab_groups" class="tab-content hidden space-y-6">
+        <!-- Yuqori Asosiy Statistika Kartalari -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">🎓 Jami Guruhlar</div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-slate-900">{total_groups} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">⏳ Yig'ilmoqda (Qabul ochiq)</div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-amber-600">{len(recruiting_groups)} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">🚀 Boshlangan (Faol)</div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600">{len(started_groups)} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">👥 Biriktirilgan Talabalar</div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600">{total_enrolled_students} <span class="text-xs text-slate-400 font-normal">ta</span></div>
+            </div>
+        </div>
+
+        <!-- Filtr va Qidiruv Paneli -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex-1 relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
+                <input type="text" id="group_search" onkeyup="filterGroups()" placeholder="Guruh nomi, ustoz yoki yo'nalish bo'yicha qidirish..."
+                       class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
+            </div>
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <select id="group_filter_status" onchange="filterGroups()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer">
+                    <option value="all">📋 Barcha holatlar</option>
+                    <option value="yigilmoqda">⏳ Yig'ilmoqda (Qabul ochiq)</option>
+                    <option value="boshlandi">🚀 Boshlangan (Faol)</option>
+                    <option value="tugatildi">🏁 Yakunlangan</option>
+                </select>
+                <select id="group_filter_direction" onchange="filterGroups()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer">
+                    {groups_filter_dir_options}
+                </select>
+                <button type="button" onclick="openNewGroupModal()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition cursor-pointer whitespace-nowrap">
+                    <span>➕</span> <span>Yangi Guruh Yaratish</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Guruhlar Kartochkalari Setkasi -->
+        <div id="groupsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {group_cards_html}
+        </div>
+    </div>
+    """
 
     if is_operator:
         audit_tab_html = ""
@@ -2602,6 +2845,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <p class="text-[11px] text-slate-400 mt-1">Agar mijoz adashib boshqa kursga tushgan bo'lsa, to'g'ri yo'nalishga shu yerdan o'tkazishingiz mumkin.</p>
                 </div>
 
+                <!-- O'quv Guruhi (Oqim) biriktirish -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">🎓 O'quv Guruhi (Oqim):</label>
+                    <select name="group_id" id="modalGroupSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none bg-white cursor-pointer shadow-xs">
+                        {groups_options_html}
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">Mijoz ro'yxatga olingan bo'lsa, uni kerakli o'quv guruhiga shu yerdan biriktirishingiz mumkin.</p>
+                </div>
+
                 <!-- Mas'ul mutaxassisni tanlash va O'zimga biriktirish -->
                 {manager_selection_html}
 
@@ -2669,6 +2921,173 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition cursor-pointer">💾 Saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 🎓 YANGI GURUH YARATISH MODALI -->
+    <div id="newGroupModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🎓</span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">Yangi O'quv Guruhi Yaratish</h3>
+                        <p class="text-xs text-slate-500">Talabalar yig'iladigan yangi oqim ochish</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeNewGroupModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition cursor-pointer">&times;</button>
+            </div>
+            <form id="newGroupForm" onsubmit="saveNewGroup(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Guruh Nomi <span class="text-rose-500">*</span>:</label>
+                    <input type="text" name="name" required placeholder="Masalan: Front Office — 12-oqim" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Yo'nalish / Kurs <span class="text-rose-500">*</span>:</label>
+                    <select name="direction_key" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none bg-white">
+                        {new_group_dir_options_html}
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Talabalar rejasi (odam):</label>
+                        <input type="number" name="target_count" value="15" min="1" max="100" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Mo'ljallangan Start:</label>
+                        <input type="text" name="start_date" placeholder="15-noyabr yoki sana" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Mas'ul Ustoz / Mentor:</label>
+                    <input type="text" name="mentor" placeholder="Ustoz ismi (ixtiyoriy)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Dars Vaqti / Eslatma:</label>
+                    <textarea name="notes" rows="2" placeholder="Masalan: Dushanba-Chorshanba-Juma soat 18:00 da" class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeNewGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">Bekor qilish</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition cursor-pointer">💾 Guruhni yaratish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 🎓 GURUHNI TAHRIRLASH MODALI -->
+    <div id="editGroupModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">✏️</span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900" id="editGroupModalTitle">Guruhni Tahrirlash</h3>
+                        <p class="text-xs text-slate-500">Guruh ma'lumotlari va holatini o'zgartirish</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeEditGroupModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition cursor-pointer">&times;</button>
+            </div>
+            <form id="editGroupForm" onsubmit="saveEditGroup(event)" class="space-y-4">
+                <input type="hidden" name="group_id" id="editGroupId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Guruh Nomi <span class="text-rose-500">*</span>:</label>
+                    <input type="text" name="name" id="editGroupName" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Yo'nalish / Kurs:</label>
+                        <select name="direction_key" id="editGroupDirection" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none bg-white">
+                            {new_group_dir_options_html}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Guruh Holati:</label>
+                        <select name="status" id="editGroupStatus" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none bg-white">
+                            <option value="yigilmoqda">⏳ Yig'ilmoqda (Qabul ochiq)</option>
+                            <option value="boshlandi">🚀 Boshlangan (Faol)</option>
+                            <option value="tugatildi">🏁 Yakunlangan</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Talabalar rejasi (odam):</label>
+                        <input type="number" name="target_count" id="editGroupTarget" min="1" max="100" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Start Sanasi:</label>
+                        <input type="text" name="start_date" id="editGroupStartDate" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Mas'ul Ustoz / Mentor:</label>
+                    <input type="text" name="mentor" id="editGroupMentor" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Dars Vaqti / Eslatma:</label>
+                    <textarea name="notes" id="editGroupNotes" rows="2" class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-purple-500 outline-none"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeEditGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">Bekor qilish</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 transition cursor-pointer">💾 O'zgarishlarni saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 🎓 GURUH A'ZOLARI VA LID QO'SHISH MODALI -->
+    <div id="groupMembersModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-3xl w-full h-[88vh] max-h-[720px] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+            <!-- Modal Header -->
+            <div class="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold shadow-xs">
+                        🎓
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-extrabold text-slate-900" id="groupModalHeaderTitle">Guruh Nomi</h3>
+                            <span id="groupModalStatusPill" class="text-[11px] font-bold px-2 py-0.5 rounded-full">Holat</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5" id="groupModalHeaderSubtitle">Yo'nalish va talabalar soni</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="copyGroupPhoneNumbers()" class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer" title="Barcha talabalar raqamini nusxalash">
+                        <span>📋</span> <span class="hidden sm:inline">Raqamlarni nusxalash</span>
+                    </button>
+                    <button type="button" onclick="closeGroupMembersModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition cursor-pointer">&times;</button>
+                </div>
+            </div>
+
+            <!-- Modal Sub-Tabs Navigation -->
+            <div class="px-5 border-b border-slate-200 bg-slate-50 flex items-center gap-4 text-xs font-bold shrink-0">
+                <button type="button" id="groupSubTabBtn_members" onclick="switchGroupModalSubTab('members')" class="py-3 border-b-2 border-purple-600 text-purple-700 transition cursor-pointer">
+                    👥 Biriktirilgan talabalar (<span id="groupModalMembersCount">0</span>)
+                </button>
+                <button type="button" id="groupSubTabBtn_addlead" onclick="switchGroupModalSubTab('addlead')" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition cursor-pointer">
+                    ➕ Guruhga yangi lid qo'shish
+                </button>
+            </div>
+
+            <!-- Sub-Tab 1: A'zolar Ro'yxati -->
+            <div id="groupSubTab_members" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
+                <div id="groupMembersList" class="space-y-2.5">
+                    <!-- Dinamik ravishda JS orqali to'ldiriladi -->
+                </div>
+            </div>
+
+            <!-- Sub-Tab 2: Lid Qo'shish Qidiruvi -->
+            <div id="groupSubTab_addlead" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 hidden bg-slate-50/50">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
+                    <input type="text" id="groupCandidateSearch" onkeyup="searchCandidateLeadsDebounced()" placeholder="Ism, telefon, username yoki kurs bo'yicha qidirish..."
+                           class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-2xs">
+                </div>
+                <div id="groupCandidatesList" class="space-y-2">
+                    <!-- Dinamik ravishda JS orqali to'ldiriladi -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2867,6 +3286,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
         </div>
 
+        {groups_tab_html}
         {analytics_tab_html}
         {audit_tab_html}
         {operators_tab_html}
@@ -3202,7 +3622,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         let currentModalAiPaused = 0;
         let currentModalInstagramId = '';
 
-        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager, aiPaused, instagramId) {{
+        function openCommentModal(clientId, currentComment, clientName, currentStatus, currentPhone, username, campaign, currentManager, aiPaused, instagramId, groupId) {{
             currentModalClientId = clientId;
             currentModalClientName = clientName || '';
             currentModalUsername = username || '';
@@ -3213,6 +3633,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             const form = document.getElementById('modalCommentForm');
             if (!form) return;
             form.action = '/admin/clients/' + clientId + '/comment';
+
+            const groupSelect = document.getElementById('modalGroupSelect');
+            if (groupSelect) {{
+                groupSelect.value = groupId || '';
+            }}
             
             const titleElem = document.getElementById('modalClientTitle');
             if (titleElem) {{
@@ -3528,6 +3953,31 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         }}
                     }}
 
+                    // 4.6 O'quv guruhini yangilash
+                    const newGroupId = data.group_id || '';
+                    const newGroupName = data.group_name || '';
+
+                    const kGroupBadge = document.getElementById('kanban_group_badge_' + clientId);
+                    if (kGroupBadge) {{
+                        if (newGroupName) {{
+                            kGroupBadge.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan guruh">🎓 ' + escapeChatHtml(newGroupName) + '</span>';
+                            kGroupBadge.classList.remove('hidden');
+                        }} else {{
+                            kGroupBadge.innerHTML = '';
+                            kGroupBadge.classList.add('hidden');
+                        }}
+                    }}
+                    const tGroupBadge = document.getElementById('table_group_badge_' + clientId);
+                    if (tGroupBadge) {{
+                        if (newGroupName) {{
+                            tGroupBadge.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan guruh">🎓 ' + escapeChatHtml(newGroupName) + '</span>';
+                            tGroupBadge.classList.remove('hidden');
+                        }} else {{
+                            tGroupBadge.innerHTML = '';
+                            tGroupBadge.classList.add('hidden');
+                        }}
+                    }}
+
                     // 5. Tugmalardagi onclick parametrlarini yangilash
                     const cleanPhone = newPhone || (document.getElementById('modalPhoneInput') ? document.getElementById('modalPhoneInput').value : '') || '';
                     const safeCommentJs = newComment.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'").replace(/\\n/g, ' ');
@@ -3535,7 +3985,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     const safeCampJs = (newCampaign || currentModalCampaign || '').replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
                     const safeMgrJs = newManager.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
 
-                    const newOnclick = "openCommentModal('" + clientId + "', '" + safeCommentJs + "', '" + safeNameJs + "', '" + (newStatus || 'yangi') + "', '" + cleanPhone + "', '" + currentModalUsername + "', '" + safeCampJs + "', '" + safeMgrJs + "', " + currentModalAiPaused + ", '" + currentModalInstagramId + "')";
+                    const newOnclick = "openCommentModal('" + clientId + "', '" + safeCommentJs + "', '" + safeNameJs + "', '" + (newStatus || 'yangi') + "', '" + cleanPhone + "', '" + currentModalUsername + "', '" + safeCampJs + "', '" + safeMgrJs + "', " + currentModalAiPaused + ", '" + currentModalInstagramId + "', '" + newGroupId + "')";
 
                     const kBtn = document.getElementById('kanban_comment_btn_' + clientId);
                     if (kBtn) kBtn.setAttribute('onclick', newOnclick);
@@ -4487,6 +4937,486 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     btn.disabled = false;
                 }}
             }}
+        }}
+
+        // ------------------ 🎓 O'QUV GURUHLARI BOSHQARUVI ------------------
+        let currentActiveGroupId = null;
+        let currentGroupMembersData = [];
+        let candidateSearchTimeout = null;
+
+        function openNewGroupModal() {{
+            const m = document.getElementById('newGroupModal');
+            if (m) m.classList.remove('hidden');
+        }}
+
+        function closeNewGroupModal() {{
+            const m = document.getElementById('newGroupModal');
+            if (m) m.classList.add('hidden');
+        }}
+
+        async function saveNewGroup(e) {{
+            e.preventDefault();
+            const form = document.getElementById('newGroupForm');
+            if (!form) return;
+            const btn = form.querySelector('button[type="submit"]');
+            const origText = btn ? btn.innerHTML : '';
+            if (btn) {{
+                btn.innerHTML = '⏳ Saqlanmoqda...';
+                btn.disabled = true;
+            }}
+            try {{
+                const formData = new FormData(form);
+                const resp = await fetch('/admin/groups/create', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("✅ Guruh muvaffaqiyatli yaratildi!");
+                    closeNewGroupModal();
+                    form.reset();
+                    setTimeout(() => {{
+                        window.location.hash = 'groups';
+                        window.location.reload();
+                    }}, 400);
+                }} else {{
+                    showToast("⚠️ Xatolik: " + (data.error || "Guruh yaratib bo'lmadi"));
+                }}
+            }} catch (err) {{
+                console.error("saveNewGroup error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }} finally {{
+                if (btn) {{
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                }}
+            }}
+        }}
+
+        function openEditGroupModal(id, name, dirKey, target, startDate, mentor, notes, status) {{
+            currentActiveGroupId = id;
+            document.getElementById('editGroupId').value = id;
+            document.getElementById('editGroupName').value = name || '';
+            document.getElementById('editGroupDirection').value = dirKey || '';
+            document.getElementById('editGroupStatus').value = status || 'yigilmoqda';
+            document.getElementById('editGroupTarget').value = target || 15;
+            document.getElementById('editGroupStartDate').value = startDate || '';
+            document.getElementById('editGroupMentor').value = mentor || '';
+            document.getElementById('editGroupNotes').value = notes || '';
+            const m = document.getElementById('editGroupModal');
+            if (m) m.classList.remove('hidden');
+        }}
+
+        function closeEditGroupModal() {{
+            const m = document.getElementById('editGroupModal');
+            if (m) m.classList.add('hidden');
+        }}
+
+        async function saveEditGroup(e) {{
+            e.preventDefault();
+            const form = document.getElementById('editGroupForm');
+            if (!form) return;
+            const groupId = document.getElementById('editGroupId').value;
+            const btn = form.querySelector('button[type="submit"]');
+            const origText = btn ? btn.innerHTML : '';
+            if (btn) {{
+                btn.innerHTML = '⏳ Saqlanmoqda...';
+                btn.disabled = true;
+            }}
+            try {{
+                const formData = new FormData(form);
+                const resp = await fetch('/admin/groups/' + groupId + '/update', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("✅ Guruh yangilandi!");
+                    closeEditGroupModal();
+                    setTimeout(() => {{
+                        window.location.hash = 'groups';
+                        window.location.reload();
+                    }}, 400);
+                }} else {{
+                    showToast("⚠️ Saqlashda xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error("saveEditGroup error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }} finally {{
+                if (btn) {{
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                }}
+            }}
+        }}
+
+        async function deleteGroupAjax(groupId, name) {{
+            if (!confirm("Rostdan ham '" + name + "' guruhini o'chirmoqchimisiz? Guruhdagi talabalar o'chirilmaydi, faqat guruhdan ozod etiladi.")) return;
+            try {{
+                const resp = await fetch('/admin/groups/' + groupId + '/delete', {{
+                    method: 'POST',
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("✅ Guruh o'chirildi");
+                    const card = document.querySelector(`.group-card[data-group-id="${{groupId}}"]`);
+                    if (card) card.remove();
+                    setTimeout(() => {{
+                        window.location.hash = 'groups';
+                        window.location.reload();
+                    }}, 300);
+                }} else {{
+                    showToast("⚠️ O'chirishda xatolik");
+                }}
+            }} catch (err) {{
+                console.error("deleteGroupAjax error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        async function startGroupCourse(groupId, name) {{
+            if (!confirm("'" + name + "' guruhida darslarni boshlaysizmi? Guruh holati 'Boshlangan' holatiga o'tadi.")) return;
+            try {{
+                const resp = await fetch('/admin/groups/' + groupId + '/start', {{
+                    method: 'POST',
+                    headers: {{
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("🚀 Guruhga start berildi! Kurs rasman boshlandi!");
+                    setTimeout(() => {{
+                        window.location.hash = 'groups';
+                        window.location.reload();
+                    }}, 500);
+                }} else {{
+                    showToast("⚠️ Xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error("startGroupCourse error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        async function openGroupMembersModal(groupId) {{
+            currentActiveGroupId = groupId;
+            const modal = document.getElementById('groupMembersModal');
+            if (modal) modal.classList.remove('hidden');
+            switchGroupModalSubTab('members');
+            await loadGroupMembersData(groupId);
+        }}
+
+        function closeGroupMembersModal() {{
+            const modal = document.getElementById('groupMembersModal');
+            if (modal) modal.classList.add('hidden');
+        }}
+
+        function switchGroupModalSubTab(tab) {{
+            const btnMembers = document.getElementById('groupSubTabBtn_members');
+            const btnAdd = document.getElementById('groupSubTabBtn_addlead');
+            const tabMembers = document.getElementById('groupSubTab_members');
+            const tabAdd = document.getElementById('groupSubTab_addlead');
+
+            if (tab === 'members') {{
+                if (btnMembers) {{
+                    btnMembers.className = "py-3 border-b-2 border-purple-600 text-purple-700 transition cursor-pointer";
+                }}
+                if (btnAdd) {{
+                    btnAdd.className = "py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition cursor-pointer";
+                }}
+                if (tabMembers) tabMembers.classList.remove('hidden');
+                if (tabAdd) tabAdd.classList.add('hidden');
+            }} else {{
+                if (btnMembers) {{
+                    btnMembers.className = "py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition cursor-pointer";
+                }}
+                if (btnAdd) {{
+                    btnAdd.className = "py-3 border-b-2 border-purple-600 text-purple-700 transition cursor-pointer";
+                }}
+                if (tabMembers) tabMembers.classList.add('hidden');
+                if (tabAdd) tabAdd.classList.remove('hidden');
+                loadCandidateLeads('');
+            }}
+        }}
+
+        async function loadGroupMembersData(groupId) {{
+            const listBox = document.getElementById('groupMembersList');
+            if (listBox) {{
+                listBox.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs"><div class="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>Yuklanmoqda...</div>';
+            }}
+            try {{
+                const resp = await fetch('/admin/groups/' + groupId + '/members', {{
+                    headers: {{ 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    const grp = data.group;
+                    currentGroupMembersData = data.members || [];
+
+                    document.getElementById('groupModalHeaderTitle').textContent = grp.name;
+                    document.getElementById('groupModalHeaderSubtitle').textContent = grp.direction_name + ' • ' + (grp.mentor ? 'Ustoz: ' + grp.mentor + ' • ' : '') + currentGroupMembersData.length + ' / ' + grp.target_count + ' ta talaba';
+
+                    const pill = document.getElementById('groupModalStatusPill');
+                    if (pill) {{
+                        if (grp.status === 'boshlandi') {{
+                            pill.textContent = '🟢 Boshlangan';
+                            pill.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200';
+                        }} else if (grp.status === 'tugatildi') {{
+                            pill.textContent = '🏁 Yakunlangan';
+                            pill.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200';
+                        }} else {{
+                            pill.textContent = grp.is_ready ? '🎉 Guruh to\\'ldi!' : '⏳ Yig\\'ilmoqda';
+                            pill.className = grp.is_ready ? 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300' : 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200';
+                        }}
+                    }}
+
+                    document.getElementById('groupModalMembersCount').textContent = currentGroupMembersData.length;
+                    renderGroupMembersList(currentGroupMembersData);
+                }}
+            }} catch (err) {{
+                console.error("loadGroupMembersData error:", err);
+                if (listBox) listBox.innerHTML = '<div class="py-6 text-center text-rose-500 text-xs">Ma\\'lumotlarni yuklab bo\\'lmadi</div>';
+            }}
+        }}
+
+        function renderGroupMembersList(members) {{
+            const listBox = document.getElementById('groupMembersList');
+            if (!listBox) return;
+            if (!members || members.length === 0) {{
+                listBox.innerHTML = `
+                <div class="py-12 text-center text-slate-400 text-xs">
+                    <div class="text-3xl mb-2">👥</div>
+                    <div class="font-bold text-slate-600 mb-1">Guruhda hozircha talabalar yo'q</div>
+                    <p class="mb-3">Yuqoridagi "➕ Guruhga yangi lid qo'shish" bo'limi orqali talabalarni biriktiring</p>
+                    <button type="button" onclick="switchGroupModalSubTab('addlead')" class="px-3.5 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition cursor-pointer">➕ Lid qo'shish</button>
+                </div>
+                `;
+                return;
+            }}
+
+            let html = '';
+            members.forEach((m, idx) => {{
+                const cleanPhone = m.phone_number || '';
+                const digits = cleanPhone.replace(/\\D/g, '');
+                const telBtn = digits.length >= 9 ? `<a href="tel:${{cleanPhone}}" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition">📞 Tel</a>` : '';
+                const tgBtn = digits.length >= 9 ? `<a href="https://t.me/+${{digits}}" target="_blank" class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-bold transition">✈️ Telegram</a>` : '';
+                const igBtn = m.username ? `<a href="https://instagram.com/${{m.username}}" target="_blank" class="text-xs font-bold text-pink-600 hover:underline">@${{m.username}}</a>` : '';
+
+                html += `
+                <div class="p-3 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs hover:border-purple-200 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
+                            ${{idx + 1}}
+                        </div>
+                        <div class="min-w-0">
+                            <div class="font-bold text-slate-900 text-xs sm:text-sm truncate">${{m.full_name || 'Noma\\'lum mijoz'}}</div>
+                            <div class="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-mono">
+                                <span>${{cleanPhone || 'Raqamsiz'}}</span>
+                                ${{igBtn ? '<span>•</span> ' + igBtn : ''}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                        <div class="flex items-center gap-1.5">
+                            ${{telBtn}}
+                            ${{tgBtn}}
+                        </div>
+                        <button type="button" onclick="removeGroupMemberAjax(${{currentActiveGroupId}}, ${{m.client_id}}, '${{m.full_name ? m.full_name.replace(/'/g, "\\\\'") : ''}}')"
+                                class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold transition cursor-pointer" title="Guruhdan chiqarish">
+                            🗑️ Chiqarish
+                        </button>
+                    </div>
+                </div>
+                `;
+            }});
+            listBox.innerHTML = html;
+        }}
+
+        function searchCandidateLeadsDebounced() {{
+            clearTimeout(candidateSearchTimeout);
+            candidateSearchTimeout = setTimeout(() => {{
+                const q = document.getElementById('groupCandidateSearch').value;
+                loadCandidateLeads(q);
+            }}, 250);
+        }}
+
+        async function loadCandidateLeads(searchQuery) {{
+            const box = document.getElementById('groupCandidatesList');
+            if (box) {{
+                box.innerHTML = '<div class="py-6 text-center text-slate-400 text-xs"><div class="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>Lidlar qidirilmoqda...</div>';
+            }}
+            try {{
+                const resp = await fetch('/admin/groups/' + currentActiveGroupId + '/candidate-leads?search=' + encodeURIComponent(searchQuery || ''), {{
+                    headers: {{ 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    renderCandidateLeadsList(data.leads || []);
+                }}
+            }} catch (err) {{
+                console.error("loadCandidateLeads error:", err);
+                if (box) box.innerHTML = '<div class="py-6 text-center text-rose-500 text-xs">Qidirishda xatolik</div>';
+            }}
+        }}
+
+        function renderCandidateLeadsList(leads) {{
+            const box = document.getElementById('groupCandidatesList');
+            if (!box) return;
+            if (!leads || leads.length === 0) {{
+                box.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs font-medium">Mos keladigan lidlar topilmadi</div>';
+                return;
+            }}
+
+            let html = '';
+            leads.forEach(cl => {{
+                const cleanPhone = cl.phone_number || '';
+                const st = cl.lead_status || 'yangi';
+                let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">⚪ Yangi</span>';
+                if (st === 'boglandi' || st === 'muvaffaqiyatli') {{
+                    stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">🟢 Muvaffaqiyatli</span>';
+                }} else if (st === 'zahira') {{
+                    stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">📦 Zahira</span>';
+                }} else if (st === 'oylanyapti') {{
+                    stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">💭 O\\'ylayapti</span>';
+                }}
+
+                const curGrp = cl.group_name ? `<span class="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">Hozir: ${{cl.group_name}}</span>` : '';
+
+                html += `
+                <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs hover:border-purple-300 transition">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-900 text-xs sm:text-sm truncate">${{cl.full_name || 'Noma\\'lum mijoz'}}</span>
+                            ${{stBadge}}
+                            ${{curGrp}}
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                            <span class="font-mono">${{cleanPhone || 'Raqamsiz'}}</span>
+                            <span>•</span>
+                            <span class="truncate">${{cl.campaign || 'Umumiy'}}</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addGroupMemberAjax(${{currentActiveGroupId}}, ${{cl.id}})"
+                            class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer shrink-0">
+                        <span>➕</span> <span>Guruhga qo'shish</span>
+                    </button>
+                </div>
+                `;
+            }});
+            box.innerHTML = html;
+        }}
+
+        async function addGroupMemberAjax(groupId, clientId) {{
+            try {{
+                const formData = new FormData();
+                formData.append('client_id', clientId);
+                const resp = await fetch('/admin/groups/' + groupId + '/add-member', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{ 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("✅ Talaba guruhga qo'shildi!");
+                    await loadGroupMembersData(groupId);
+                    switchGroupModalSubTab('members');
+                }} else {{
+                    showToast("⚠️ Qo'shishda xatolik");
+                }}
+            }} catch (err) {{
+                console.error("addGroupMemberAjax error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        async function removeGroupMemberAjax(groupId, clientId, name) {{
+            if (!confirm((name ? "'" + name + "' ni" : "Ushbu talabani") + " guruhdan chiqarmoqchimisiz?")) return;
+            try {{
+                const formData = new FormData();
+                formData.append('client_id', clientId);
+                const resp = await fetch('/admin/groups/' + groupId + '/remove-member', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{ 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }}
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    showToast("✅ Talaba guruhdan chiqarildi");
+                    await loadGroupMembersData(groupId);
+                }} else {{
+                    showToast("⚠️ Xatolik yuz berdi");
+                }}
+            }} catch (err) {{
+                console.error("removeGroupMemberAjax error:", err);
+                showToast("⚠️ Server bilan bog'lanishda xatolik");
+            }}
+        }}
+
+        function copyGroupPhoneNumbers() {{
+            if (!currentGroupMembersData || currentGroupMembersData.length === 0) {{
+                showToast("⚠️ Guruhda talabalar yo'q");
+                return;
+            }}
+            const phones = [];
+            currentGroupMembersData.forEach(m => {{
+                const p = (m.phone_number || '').trim();
+                if (p && p !== '—') {{
+                    phones.push(p);
+                }}
+            }});
+            if (phones.length === 0) {{
+                showToast("⚠️ Birorta ham telefon raqam topilmadi");
+                return;
+            }}
+            const textToCopy = phones.join(', ');
+            navigator.clipboard.writeText(textToCopy).then(() => {{
+                showToast("📋 " + phones.length + " ta telefon raqam nusxalandi!");
+            }}).catch(() => {{
+                const ta = document.createElement('textarea');
+                ta.value = textToCopy;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast("📋 " + phones.length + " ta telefon raqam nusxalandi!");
+            }});
+        }}
+
+        function filterGroups() {{
+            const searchVal = (document.getElementById('group_search')?.value || '').toLowerCase().trim();
+            const statusVal = document.getElementById('group_filter_status')?.value || 'all';
+            const dirVal = document.getElementById('group_filter_direction')?.value || 'all';
+
+            document.querySelectorAll('.group-card').forEach(card => {{
+                const cSearch = card.getAttribute('data-search') || '';
+                const cStatus = card.getAttribute('data-status') || '';
+                const cDir = card.getAttribute('data-direction') || '';
+
+                const matchesSearch = !searchVal || cSearch.includes(searchVal);
+                const matchesStatus = (statusVal === 'all') || (cStatus === statusVal);
+                const matchesDir = (dirVal === 'all') || (cDir === dirVal);
+
+                if (matchesSearch && matchesStatus && matchesDir) {{
+                    card.style.display = '';
+                }} else {{
+                    card.style.display = 'none';
+                }}
+            }});
         }}
 
         {admin_scripts_js}
