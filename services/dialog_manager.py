@@ -10,7 +10,9 @@ from database import (
     get_setting,
     match_campaign,
     append_client_chat_history,
-    get_client_chat_history
+    get_client_chat_history,
+    log_activity,
+    now_uzb_iso
 )
 from services.instagram import send_message, send_link_button, get_user_profile
 from services.telegram import notify_admin_new_lead
@@ -380,14 +382,37 @@ def process_incoming_message(sender_id: str, user_text: str):
 
     # AGAR USHBU MIJOZ UCHUN MUTAXASSIS AI NI TO'XTATGAN BO'LSA (INSON / OPERATOR REJIMI):
     # Sun'iy intellekt va avtomatik bot aralashmaydi va hech qanday avtomatik javob qaytarmaydi!
-    if client.get("ai_paused") in [1, "1", True]:
-        logger.info(f"Mijoz [{sender_id}] uchun AI to'xtatilgan (Inson / Operator rejimi). AI javob bermaydi.")
+    is_operator_managed = bool(client.get("ai_paused") in [1, "1", True])
+    if not is_operator_managed:
+        is_operator_managed = any(m.get("role") in ["manager", "operator"] for m in chat_history_now)
+
+    if is_operator_managed:
+        logger.info(f"Mijoz [{sender_id}] uchun AI to'xtatilgan (Inson / Operator rejimi). AI javob bermaydi. Yangi javob saqlandi.")
         
         # Agar telefon raqam yozgan bo'lsa, bazada saqlab qo'yamiz
         detected_p = extract_phone_number(text_clean)
+        upd_kwargs = {
+            "unread_reply": 1,
+            "unread_reply_text": text_clean,
+            "unread_reply_at": now_uzb_iso()
+        }
         if detected_p:
-            update_client(sender_id, phone_number=detected_p)
+            upd_kwargs["phone_number"] = detected_p
             client["phone_number"] = detected_p
+
+        update_client(sender_id, **upd_kwargs)
+        client["unread_reply"] = 1
+        client["unread_reply_text"] = text_clean
+        client["unread_reply_at"] = now_uzb_iso()
+
+        cid = client.get("id")
+        if cid:
+            log_activity(cid, "Mijoz", "direct_javob", f"Directda javob yozdi: «{text_clean[:60]}»")
+            try:
+                from services.telegram import update_telegram_lead_message
+                update_telegram_lead_message(cid)
+            except Exception:
+                pass
 
         from services.telegram import notify_operator_direct_reply
         notify_operator_direct_reply(client, text_clean)
@@ -1274,8 +1299,19 @@ def process_incoming_audio_message(sender_id: str, audio_url: str):
         # AGAR MUTAXASSIS BILAN MULOQOTDA BO'LSA (AI TO'XTATILGAN BO'LSA):
         if client.get("ai_paused") in [1, "1", True]:
             logger.info(f"Mijoz [{sender_id}] ovozli xabar yubordi, lekin AI to'xtatilgan. Faqat transkripsiya saqlanadi.")
+            updates["unread_reply"] = 1
+            updates["unread_reply_text"] = display_msg
+            updates["unread_reply_at"] = now_uzb_iso()
             if updates:
                 update_client(sender_id, **updates)
+            cid = client.get("id")
+            if cid:
+                log_activity(cid, "Mijoz", "direct_javob", f"Directda ovozli xabar yubordi: «{display_msg[:60]}»")
+                try:
+                    from services.telegram import update_telegram_lead_message
+                    update_telegram_lead_message(cid)
+                except Exception:
+                    pass
             from services.telegram import notify_operator_direct_reply
             notify_operator_direct_reply(client, transcription or "[Ovozli xabar]", is_voice=True)
             return

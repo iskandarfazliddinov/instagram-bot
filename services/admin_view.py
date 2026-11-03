@@ -838,6 +838,106 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         })
     clients_json_data = json.dumps(clients_for_export, ensure_ascii=False).replace("</script>", "<\\/script>")
 
+    # ---------------- 5.8 MIJOZLARDAN YANGI JAVOBLAR (REPLIED LEADS) HISOBI ----------------
+    replied_clients = [c for c in clients if c.get("unread_reply") in (1, "1", True)]
+    total_unread_replies = len(replied_clients)
+    replied_nav_badge = f'<span class="bg-pink-600 text-white text-xs px-2 py-0.5 rounded-full font-black animate-pulse" title="{total_unread_replies} ta mijozdan yangi javob bor">💬 {total_unread_replies}</span>' if total_unread_replies > 0 else ""
+
+    replied_cards_html = ""
+    for rc in replied_clients:
+        rc_id = rc.get("id")
+        rc_name = rc.get("full_name") or "Mijoz"
+        rc_user = rc.get("username") or ""
+        rc_ig_id = rc.get("instagram_id") or ""
+        rc_camp = rc.get("campaign") or "Umumiy"
+        rc_ai_p = 1 if rc.get("ai_paused") in (1, "1", True) else 0
+        rc_mgr = rc.get("manager_name") or "Biriktirilmagan"
+        rc_phone = rc.get("phone_number") or ""
+        rc_reply = (rc.get("unread_reply_text") or rc.get("last_message") or "Yangi xabar").strip()
+        rc_time = rc.get("unread_reply_at") or rc.get("updated_at") or ""
+
+        time_badge = ""
+        if rc_time:
+            try:
+                t_part = rc_time[11:16]
+                d_part = rc_time[8:10] + "." + rc_time[5:7]
+                time_badge = f"{d_part} {t_part}"
+            except Exception:
+                time_badge = str(rc_time)[:16]
+
+        safe_rc_name = safe_js_str(rc_name)
+        safe_rc_camp = safe_js_str(rc_camp)
+
+        replied_cards_html += f"""
+        <div id="unread_reply_card_{rc_id}" class="bg-white rounded-2xl p-4 border border-pink-200 shadow-sm hover:shadow-md transition flex flex-col justify-between relative group">
+            <div>
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-600 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                            {rc_name[0].upper() if rc_name else 'M'}
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="font-extrabold text-xs text-slate-900 truncate" title="{rc_name}">{rc_name}</h4>
+                            <span class="text-[11px] font-bold text-pink-600 font-mono block truncate">{'@' + rc_user if rc_user else (rc_phone if rc_phone else 'Instagram Direct')}</span>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-100 text-pink-800 whitespace-nowrap shrink-0">
+                        🕒 {time_badge or 'Yangi'}
+                    </span>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-pink-50/70 border border-pink-200/80 text-xs text-slate-800 mb-2.5">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-pink-700 mb-1 flex items-center gap-1">
+                        <span>💬</span> <span>Mijozning so'nggi javobi:</span>
+                    </div>
+                    <p class="font-medium italic line-clamp-3 leading-relaxed">«{rc_reply}»</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-600 mb-3">
+                    <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100 truncate max-w-[150px]">🎓 {rc_camp}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">👤 {rc_mgr}</span>
+                </div>
+            </div>
+
+            <div class="pt-2.5 border-t border-slate-100 flex items-center gap-2">
+                <button type="button" onclick="openInstagramChatModal('{rc_id}', '{safe_rc_name}', '{rc_user}', '{safe_rc_camp}', {rc_ai_p}, '{rc_ig_id}')" class="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-pink-500/20 cursor-pointer">
+                    <span>📸 Chat & Javob yozish</span>
+                </button>
+                <button type="button" onclick="markReplyReadAjax('{rc_id}')" class="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer" title="O'qildi deb belgilash">
+                    ✓
+                </button>
+            </div>
+        </div>
+        """
+
+    replied_section_html = ""
+    if total_unread_replies > 0:
+        replied_section_html = f"""
+        <!-- 💬 MIJOZLARDAN YANGI JAVOBLAR (MAXSUS BO'LIM) -->
+        <div id="unread_replies_banner" class="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-pink-50 via-purple-50 to-indigo-50 border-2 border-pink-300 shadow-md relative overflow-hidden transition-all duration-300">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-pink-200/80 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-600 text-white flex items-center justify-center text-xl shadow-md shadow-pink-500/20 animate-bounce">
+                        💬
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-extrabold text-slate-900 text-base sm:text-lg">Mijozlardan Yangi Javoblar</h3>
+                            <span id="unread_replies_count_badge" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-pink-600 text-white shadow-xs animate-pulse">{total_unread_replies} ta yangi javob</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-0.5">Mutaxassislarimiz xabar yozganidan so'ng Instagram Directda qayta javob yozgan mijozlar (darhol gaplashish tavsiya etiladi)</p>
+                    </div>
+                </div>
+                <button type="button" onclick="quickFilterReplies()" class="self-start sm:self-auto text-xs font-bold px-3.5 py-2 rounded-xl bg-white hover:bg-pink-100 text-pink-700 border border-pink-200 transition shadow-2xs cursor-pointer flex items-center gap-1.5">
+                    <span>🔍 Faqat yangi javoblarni filtrda ko'rish</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5" id="unread_replies_cards_grid">
+                {replied_cards_html}
+            </div>
+        </div>
+        """
+
     clients_html = ""
     colspan_num = 9
     kanban_cards_dict = {
@@ -882,6 +982,17 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         client_group_name = (client.get('group_name') or "").strip()
         escaped_group_id = str(client_group_id) if client_group_id else ""
         group_badge_html = f"""<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Biriktirilgan o'quv guruhi: {client_group_name}">🎓 {client_group_name}</span>""" if client_group_name else ""
+
+        has_unread_reply = bool(client.get("unread_reply") in (1, "1", True))
+        unread_reply_text = (client.get("unread_reply_text") or "").strip()
+        unread_reply_at = to_uzb_time_str(client.get("unread_reply_at"))
+
+        table_reply_badge = f"""
+        <div class="table-reply-badge mt-1 p-1 px-2 rounded-lg bg-pink-100 border border-pink-300 text-pink-900 text-[11px] font-bold flex items-center gap-1 shadow-2xs animate-pulse" title="Mijozdan yangi javob kelgan">
+            <span>💬 Yangi javob!</span>
+            <span class="font-normal italic truncate max-w-[140px]">«{unread_reply_text}»</span>
+        </div>
+        """ if has_unread_reply else ""
 
         digits = re.sub(r"\D", "", phone)
         tg_link = f"https://t.me/+{digits}" if len(digits) >= 9 else ""
@@ -972,12 +1083,19 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <button type="button" onclick="deleteLeadAjax('{client_id}')" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg transition cursor-pointer" title="Lidni o'chirish">🗑️</button>
             """
 
-        chat_pulse = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="AI to&#39;xtatilgan (Inson nazoratida)"></span>' if ai_paused else ''
-        chat_btn_td = f"""
-        <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')" class="text-xs bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 px-2 py-1 rounded-lg transition font-bold inline-flex items-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati & Xabar yozish">
-            📸 Chat {chat_pulse}
-        </button>
-        """
+        if has_unread_reply:
+            chat_btn_td = f"""
+            <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')" class="text-xs bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white border border-pink-500 px-2.5 py-1 rounded-lg transition font-black inline-flex items-center gap-1 shadow-sm shadow-pink-500/30 animate-pulse cursor-pointer" title="Mijozdan yangi javob bor!">
+                💬 Yangi javob!
+            </button>
+            """
+        else:
+            chat_pulse = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="AI to&#39;xtatilgan (Inson nazoratida)"></span>' if ai_paused else ''
+            chat_btn_td = f"""
+            <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')" class="text-xs bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 px-2 py-1 rounded-lg transition font-bold inline-flex items-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati & Xabar yozish">
+                📸 Chat {chat_pulse}
+            </button>
+            """
 
         action_td = f"""
         <td class="px-5 py-3.5 text-right whitespace-nowrap">
@@ -1099,15 +1217,17 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         else:
             source_badge = '<div class="inline-flex items-center gap-1 text-[11px] text-slate-500 mt-1">💬 Direct</div>'
 
+        row_bg_extra = "bg-pink-50/50" if has_unread_reply else ""
         clients_html += f"""
-        <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition"
+        <tr class="client-row border-b border-slate-100 hover:bg-slate-50/80 transition {row_bg_extra}"
             data-client-id="{client_id}"
-            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()}"
+            data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()} {unread_reply_text.lower()}"
             data-status="{lead_status}"
             data-course="{campaign.lower()}"
             data-source="{source.lower()}"
             data-manager="{mgr_search_tags}"
-            data-suspicious="{1 if is_suspicious else 0}">
+            data-suspicious="{1 if is_suspicious else 0}"
+            data-replied="{1 if has_unread_reply else 0}">
             <td class="px-5 py-3.5 whitespace-nowrap">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
@@ -1116,6 +1236,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div>
                         <div class="font-bold text-slate-900 leading-snug">{full_name}</div>
                         {ig_badge}
+                        {table_reply_badge}
                     </div>
                 </div>
             </td>
@@ -1193,19 +1314,49 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </div>
             """
 
+        kanban_reply_banner = ""
+        if has_unread_reply:
+            kanban_reply_banner = f"""
+            <div class="kanban-reply-banner mb-2 p-2 rounded-xl bg-gradient-to-r from-pink-100 to-rose-100 border border-pink-300 text-pink-950 text-xs shadow-2xs">
+                <div class="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-pink-700 mb-0.5">
+                    <span class="flex items-center gap-1">💬 <span>Yangi javob bor!</span></span>
+                    <span class="text-[9px] text-pink-600 font-mono">{unread_reply_at}</span>
+                </div>
+                <div class="text-[11px] font-semibold italic text-slate-800 line-clamp-2">«{unread_reply_text}»</div>
+            </div>
+            """
+
+        card_extra_cls = "ring-2 ring-pink-400 border-pink-300 shadow-md bg-pink-50/20" if has_unread_reply else "border-slate-200/90 hover:border-purple-300 shadow-xs"
+
+        if has_unread_reply:
+            kanban_chat_btn = f"""
+            <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')"
+                    class="py-1 px-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-1 shadow-sm shadow-pink-500/30 animate-pulse cursor-pointer" title="Mijozdan yangi javob bor!">
+                💬 Yangi javob!
+            </button>
+            """
+        else:
+            kanban_chat_btn = f"""
+            <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')"
+                    class="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati">
+                📸 Chat {'<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>' if ai_paused else ''}
+            </button>
+            """
+
         kanban_cards_dict[target_status].append(f"""
-        <div class="kanban-card bg-white rounded-xl p-3 border border-slate-200/90 hover:border-purple-300 hover:shadow-md transition shadow-xs cursor-grab active:cursor-grabbing relative group select-none"
+        <div class="kanban-card bg-white rounded-xl p-3 border {card_extra_cls} hover:shadow-md transition cursor-grab active:cursor-grabbing relative group select-none"
              id="kanban_card_{client_id}"
              draggable="true"
              ondragstart="handleDragStart(event, '{client_id}', '{lead_status}')"
              ondragend="handleDragEnd(event, '{client_id}')"
              data-client-id="{client_id}"
-             data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()}"
+             data-search="{full_name.lower()} {phone.lower()} {username.lower()} {campaign.lower()} {source.lower()} {last_msg.lower()} {ai_summary.lower()} {manager_comment.lower()} {manager_name.lower()} {unread_reply_text.lower()}"
              data-status="{lead_status}"
              data-course="{campaign.lower()}"
              data-source="{source.lower()}"
              data-manager="{mgr_search_tags}"
-             data-suspicious="{1 if is_suspicious else 0}">
+             data-suspicious="{1 if is_suspicious else 0}"
+             data-replied="{1 if has_unread_reply else 0}">
 
             <!-- Top row: Avatar, Name, Ig link, and Date -->
             <div class="flex items-start justify-between gap-1.5 mb-2">
@@ -1224,6 +1375,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 </div>
             </div>
 
+            {kanban_reply_banner}
             {kanban_suspicious_banner}
 
             <!-- Phone & Quick Contact Buttons -->
@@ -1262,10 +1414,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             <!-- Card Actions footer: Direct Chat + Izoh modal button + Quick status move dropdown -->
             <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                <button type="button" onclick="openInstagramChatModal('{client_id}', '{escaped_name}', '{username}', '{escaped_campaign}', {ai_paused}, '{ig_id}')"
-                        class="py-1 px-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Instagram Direct Chati">
-                    📸 Chat {'<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>' if ai_paused else ''}
-                </button>
+                {kanban_chat_btn}
                 <button type="button" id="kanban_comment_btn_{client_id}" onclick="openCommentModal('{client_id}', '{escaped_comment}', '{escaped_name}', '{lead_status}', '{phone}', '{username}', '{escaped_campaign}', '{escaped_manager}', {ai_paused}, '{ig_id}', '{escaped_group_id}')"
                         class="flex-1 py-1 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer" title="Bog'lanish & Izoh">
                     💬 Izoh
@@ -1452,7 +1601,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 mb-6 text-sm font-semibold text-slate-600">
             <div class="flex items-center gap-2">
                 <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                    👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+                    👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span> {replied_nav_badge}
                 </button>
                 <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                     🎓 2. O'quv Guruhlari {recruiting_badge}
@@ -1472,7 +1621,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <!-- CRM Bo'limlar Navigatsiyasi (Supervisor / Rahbar rejimi) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1.5 mb-6 text-sm font-semibold text-slate-600">
             <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span> {replied_nav_badge}
             </button>
             <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🎓 2. O'quv Guruhlari {recruiting_badge}
@@ -1493,7 +1642,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <!-- CRM Bo'limlar Navigatsiyasi (Admin) -->
         <div class="bg-slate-200/80 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 text-sm font-semibold text-slate-600">
             <button type="button" onclick="switchTab('leads')" id="tab_btn_leads" class="tab-btn active px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
-                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span>
+                👥 1. Lidlar Bazasi <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-bold">{total_leads}</span> {replied_nav_badge}
             </button>
             <button type="button" onclick="switchTab('groups')" id="tab_btn_groups" class="tab-btn px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer">
                 🎓 2. O'quv Guruhlari {recruiting_badge}
@@ -3468,6 +3617,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             {operator_directions_banner}
 
+            {replied_section_html}
+
             <!-- Qidiruv va Filtrlash Paneli -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
                 <!-- Ko'rinishni tanlash (Ustunlar vs Jadval) -->
@@ -3498,6 +3649,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                         <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
                             <option value="all">📋 Barcha holatlar</option>
+                            <option value="unread_reply">💬 Yangi javob kelganlar ({total_unread_replies} ta)</option>
                             <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
                             <option value="yangi">⚪ Yangi</option>
                             <option value="oylanyapti">💭 O'ylayapti</option>
@@ -3578,6 +3730,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         let currentChatAiPaused = false;
         let currentChatInstagramId = null;
         let currentChatUsername = "";
+        let chatPollingTimer = null;
 
         function escapeChatHtml(str) {{
             if (!str) return "";
@@ -3629,10 +3782,23 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 input.focus();
             }}
 
+            clearReplyIndicatorsVisually(clientId);
+
+            if (chatPollingTimer) clearInterval(chatPollingTimer);
+            chatPollingTimer = setInterval(() => {{
+                if (currentChatClientId && document.getElementById("instagramChatModal") && !document.getElementById("instagramChatModal").classList.contains("hidden")) {{
+                    loadChatMessages(currentChatClientId, true);
+                }}
+            }}, 3500);
+
             loadChatMessages(clientId);
         }}
 
         function closeChatModal() {{
+            if (chatPollingTimer) {{
+                clearInterval(chatPollingTimer);
+                chatPollingTimer = null;
+            }}
             const modal = document.getElementById("instagramChatModal");
             if (modal) modal.classList.add("hidden");
             currentChatClientId = null;
@@ -3667,34 +3833,40 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }}
         }}
 
-        async function loadChatMessages(clientId) {{
+        async function loadChatMessages(clientId, silent = false) {{
             const box = document.getElementById("chatMessagesBox");
             if (!box) return;
 
-            box.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
-                    <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <span class="text-xs font-medium">Suhbat tarixi yuklanmoqda...</span>
-                </div>
-            `;
+            if (!silent) {{
+                box.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
+                        <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                        <span class="text-xs font-medium">Suhbat tarixi yuklanmoqda...</span>
+                    </div>
+                `;
+            }}
 
             try {{
                 const resp = await fetch("/admin/clients/" + clientId + "/chat");
                 if (!resp.ok) {{
-                    box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Suhbat tarixini yuklab bo\\'lmadi.</div>';
+                    if (!silent) box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Suhbat tarixini yuklab bo\\'lmadi.</div>';
                     return;
                 }}
                 const data = await resp.json();
                 if (!data.success) {{
-                    box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">' + (data.error || "Xatolik yuz berdi") + '</div>';
+                    if (!silent) box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">' + (data.error || "Xatolik yuz berdi") + '</div>';
                     return;
                 }}
 
                 updateChatModalAiBadge(data.ai_paused);
-                renderChatMessages(data.chat_history || []);
+                const history = data.chat_history || [];
+                const currentMsgCount = box.querySelectorAll('.chat-bubble-item').length;
+                if (!silent || history.length !== currentMsgCount) {{
+                    renderChatMessages(history);
+                }}
             }} catch (err) {{
                 console.error("loadChatMessages error:", err);
-                box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Server bilan bog\\'lanishda xatolik.</div>';
+                if (!silent) box.innerHTML = '<div class="text-center py-10 text-rose-500 text-xs">Server bilan bog\\'lanishda xatolik.</div>';
             }}
         }}
 
@@ -3722,7 +3894,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                 if (role === "user" || role === "client") {{
                     html += `
-                        <div class="flex items-start gap-2 max-w-[85%]">
+                        <div class="chat-bubble-item flex items-start gap-2 max-w-[85%]">
                             <div class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                                 👤
                             </div>
@@ -3736,7 +3908,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     `;
                 }} else if (role === "manager" || role === "operator") {{
                     html += `
-                        <div class="flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
+                        <div class="chat-bubble-item flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
                             <div class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                                 👨‍💼
                             </div>
@@ -3750,7 +3922,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     `;
                 }} else {{
                     html += `
-                        <div class="flex items-start gap-2 max-w-[85%]">
+                        <div class="chat-bubble-item flex items-start gap-2 max-w-[85%]">
                             <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                                 🤖
                             </div>
@@ -3767,6 +3939,61 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
             box.innerHTML = html;
             box.scrollTop = box.scrollHeight;
+        }}
+
+        function clearReplyIndicatorsVisually(clientId) {{
+            const card = document.getElementById('unread_reply_card_' + clientId);
+            if (card) {{
+                card.remove();
+                const grid = document.getElementById('unread_replies_cards_grid');
+                if (grid && grid.querySelectorAll('[id^="unread_reply_card_"]').length === 0) {{
+                    const banner = document.getElementById('unread_replies_banner');
+                    if (banner) banner.style.display = 'none';
+                }}
+                const navBadge = document.querySelector('[title*="ta mijozdan yangi javob bor"]');
+                if (navBadge) navBadge.remove();
+            }}
+            const row = document.querySelector(`.client-row[data-client-id="${{clientId}}"]`);
+            if (row) {{
+                row.setAttribute('data-replied', '0');
+                row.classList.remove('bg-pink-50/50');
+                const badge = row.querySelector('.table-reply-badge');
+                if (badge) badge.remove();
+            }}
+            const kanbanCard = document.getElementById('kanban_card_' + clientId);
+            if (kanbanCard) {{
+                kanbanCard.setAttribute('data-replied', '0');
+                kanbanCard.classList.remove('ring-2', 'ring-pink-400', 'border-pink-300', 'shadow-md', 'bg-pink-50/20');
+                const kbBanner = kanbanCard.querySelector('.kanban-reply-banner');
+                if (kbBanner) kbBanner.remove();
+            }}
+        }}
+
+        async function markReplyReadAjax(clientId) {{
+            try {{
+                const resp = await fetch('/admin/clients/' + clientId + '/mark-read', {{
+                    method: 'POST'
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    clearReplyIndicatorsVisually(clientId);
+                    showToast("✓ Mijoz javobi o'qildi deb belgilandi");
+                }}
+            }} catch (err) {{
+                console.error("markReplyReadAjax error:", err);
+            }}
+        }}
+
+        function quickFilterReplies() {{
+            const sel = document.getElementById('lead_filter_status');
+            if (sel) {{
+                sel.value = 'unread_reply';
+                filterLeads();
+                const pnl = document.getElementById('leads_kanban_view') || document.getElementById('leads_table_view');
+                if (pnl) {{
+                    pnl.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                }}
+            }}
         }}
 
         async function sendDirectMessage(e) {{
@@ -3807,7 +4034,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                         const nowTime = new Date().toLocaleTimeString().slice(0, 5);
                         const cleanHtml = escapeChatHtml(text).replace(/\\n/g, "<br>");
                         const newMsgHtml = `
-                            <div class="flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
+                            <div class="chat-bubble-item flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse">
                                 <div class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                                     👨‍💼
                                 </div>
@@ -4738,7 +4965,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
                 const isRowSuspicious = (row.getAttribute('data-suspicious') === '1');
-                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isRowSuspicious : (statusData === statusVal));
+                const isRowReplied = (row.getAttribute('data-replied') === '1');
+                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isRowSuspicious : (statusVal === 'unread_reply' ? isRowReplied : (statusData === statusVal)));
 
                 let matchesCourse = true;
                 if (courseVal !== 'all') {{
@@ -4803,7 +5031,8 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
                 const matchesSearch = !searchVal || searchData.includes(searchVal);
                 const isCardSuspicious = (card.getAttribute('data-suspicious') === '1');
-                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isCardSuspicious : (statusData === statusVal));
+                const isCardReplied = (card.getAttribute('data-replied') === '1');
+                const matchesStatus = (statusVal === 'all') || (statusVal === 'suspicious' ? isCardSuspicious : (statusVal === 'unread_reply' ? isCardReplied : (statusData === statusVal)));
 
                 let matchesCourse = true;
                 if (courseVal !== 'all') {{

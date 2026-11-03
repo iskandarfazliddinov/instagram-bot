@@ -113,7 +113,10 @@ def init_db():
         ("last_followup_at", "TEXT DEFAULT ''"),
         ("ai_paused", "INTEGER DEFAULT 0"),
         ("group_id", "INTEGER DEFAULT NULL"),
-        ("group_name", "TEXT DEFAULT ''")
+        ("group_name", "TEXT DEFAULT ''"),
+        ("unread_reply", "INTEGER DEFAULT 0"),
+        ("unread_reply_text", "TEXT DEFAULT ''"),
+        ("unread_reply_at", "TEXT DEFAULT ''")
     ]:
         try:
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col} {col_type}")
@@ -975,6 +978,34 @@ def update_client_by_id(client_id: int, **kwargs):
     conn.commit()
     conn.close()
     sync_leads_backup()
+
+def mark_client_reply_read(client_id: int) -> bool:
+    """Mijozdan kelgan javobni o'qildi deb belgilash"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE clients SET unread_reply = 0 WHERE id = ?", (client_id,))
+        conn.commit()
+        conn.close()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"mark_client_reply_read xatoligi: {e}")
+        return False
+
+def mark_client_reply_read_by_ig(instagram_id: str) -> bool:
+    """Mijozdan kelgan javobni instagram_id bo'yicha o'qildi deb belgilash"""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE clients SET unread_reply = 0 WHERE instagram_id = ?", (instagram_id,))
+        conn.commit()
+        conn.close()
+        sync_leads_backup()
+        return True
+    except Exception as e:
+        logger.error(f"mark_client_reply_read_by_ig xatoligi: {e}")
+        return False
 
 def get_client_by_tg_message_id(message_id: int) -> dict | None:
     """Telegram xabar ID si bo'yicha lidni topish (Reply orqali izoh yozilganda)"""

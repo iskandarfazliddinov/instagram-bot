@@ -47,7 +47,8 @@ from database import (
     remove_client_from_study_group,
     get_study_group_members,
     start_study_group,
-    get_available_leads_for_group
+    get_available_leads_for_group,
+    mark_client_reply_read
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -1459,6 +1460,12 @@ def get_client_chat(client_id: int, request: Request):
     history = get_client_chat_history(ig_id) if ig_id else []
     ai_paused = bool(client.get("ai_paused"))
 
+    # Chat ochilganda mijoz javobini avtomatik 'o'qildi' deb belgilash
+    try:
+        mark_client_reply_read(client_id)
+    except Exception:
+        pass
+
     return JSONResponse({
         "success": True,
         "client_id": client_id,
@@ -1469,6 +1476,16 @@ def get_client_chat(client_id: int, request: Request):
         "ai_paused": ai_paused,
         "chat_history": history
     })
+
+@app.post("/admin/clients/{client_id}/mark-read")
+def mark_reply_read_endpoint(client_id: int, request: Request):
+    """Mijoz javobini o'qildi deb belgilash"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+    
+    success = mark_client_reply_read(client_id)
+    return JSONResponse({"success": success})
 
 @app.post("/admin/clients/{client_id}/send-message")
 def send_direct_message_from_crm(
@@ -1515,13 +1532,14 @@ def send_direct_message_from_crm(
     # 3. Ushbu mijoz uchun AI ni AVTOMATIK TO'XTATISH (Inson muloqotda, AI aralashmasligi kerak)
     set_client_ai_paused(client_id, paused=True)
 
-    # 4. Mijoz ma'lumotlarini yangilash (last_message, manager_name, ai_paused)
+    # 4. Mijoz ma'lumotlarini yangilash (last_message, manager_name, ai_paused, unread_reply=0)
     update_client_by_id(
         client_id,
         last_message=f"Mutaxassis: {msg_text[:60]}",
         manager_name=manager_name,
         manager_time=now_str,
-        ai_paused=1
+        ai_paused=1,
+        unread_reply=0
     )
     log_activity(client_id, manager_name, "direct_message", f"Instagram Direct xabari: {msg_text[:60]}")
 
