@@ -180,7 +180,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
     current_token_val = settings.get("page_access_token", "").strip() or config_settings.PAGE_ACCESS_TOKEN.strip()
 
-    from database import AVAILABLE_DIRECTIONS
+    from database import AVAILABLE_DIRECTIONS, get_lead_direction_key
     dir_dict = {d["key"]: d for d in AVAILABLE_DIRECTIONS}
     if "hotel" in dir_dict:
         dir_dict["hotel_operations"] = dir_dict["hotel"]
@@ -334,6 +334,236 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     chart_daily_totals = [daily_total_map[k] for k in daily_keys]
     chart_daily_phones = [daily_phone_map[k] for k in daily_keys]
 
+    # ---------------- 2.5 YO'NALISHLAR (KURSLAR) KESIMIDA TAHLIL (BUGUN, OYLIK, UMUMIY) ----------------
+    def build_direction_stats(client_list: list, total_count: int) -> list:
+        dir_map = {}
+        for d in AVAILABLE_DIRECTIONS:
+            dir_map[d["key"]] = {
+                "key": d["key"],
+                "name": d["name"],
+                "short": d.get("short", d["name"]),
+                "total": 0,
+                "phones": 0,
+                "done": 0,
+                "zahira": 0,
+                "thinking": 0,
+                "campaigns": {}
+            }
+
+        for c in client_list:
+            cmp_name = (c.get("campaign") or "Umumiy").strip()
+            if not cmp_name:
+                cmp_name = "Umumiy"
+            d_key = get_lead_direction_key(cmp_name)
+            if d_key not in dir_map:
+                d_key = "umumiy"
+            item = dir_map[d_key]
+            item["total"] += 1
+            item["campaigns"][cmp_name] = item["campaigns"].get(cmp_name, 0) + 1
+            if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]:
+                item["phones"] += 1
+            st = c.get("lead_status")
+            if st == "boglandi":
+                item["done"] += 1
+            elif st in ["zahira", "zaxira"]:
+                item["zahira"] += 1
+            elif st == "oylanyapti":
+                item["thinking"] += 1
+
+        sorted_list = sorted(dir_map.values(), key=lambda x: x["total"], reverse=True)
+        for item in sorted_list:
+            item["percentage"] = round((item["total"] / total_count * 100), 1) if total_count > 0 else 0.0
+            item["phone_rate"] = round((item["phones"] / item["total"] * 100), 1) if item["total"] > 0 else 0.0
+        return sorted_list
+
+    today_dir_stats = build_direction_stats(today_clients, today_total)
+    month_dir_stats = build_direction_stats(month_clients, month_total)
+    all_dir_stats = build_direction_stats(clients, total_leads)
+
+    today_active_dirs = [d for d in today_dir_stats if d["total"] > 0]
+    if today_active_dirs:
+        today_dirs_card_snippet = "".join([
+            f'<div class="flex items-center justify-between text-[11px] py-0.5"><span class="truncate max-w-[170px] text-slate-700 font-medium">{d["name"]}</span><span class="font-bold text-purple-900 shrink-0">{d["total"]} ta ({d["percentage"]}%)</span></div>'
+            for d in today_active_dirs[:3]
+        ])
+    else:
+        today_dirs_card_snippet = '<div class="text-[11px] text-slate-400 italic">Bugun hali lidlar kelmadi</div>'
+
+    month_active_dirs = [d for d in month_dir_stats if d["total"] > 0]
+    if month_active_dirs:
+        month_dirs_card_snippet = "".join([
+            f'<div class="flex items-center justify-between text-[11px] py-0.5"><span class="truncate max-w-[170px] text-slate-700 font-medium">{d["name"]}</span><span class="font-bold text-indigo-900 shrink-0">{d["total"]} ta ({d["percentage"]}%)</span></div>'
+            for d in month_active_dirs[:3]
+        ])
+    else:
+        month_dirs_card_snippet = '<div class="text-[11px] text-slate-400 italic">Bu oyda hali lidlar kelmadi</div>'
+
+    all_active_dirs = [d for d in all_dir_stats if d["total"] > 0]
+    if all_active_dirs:
+        all_dirs_card_snippet = "".join([
+            f'<div class="flex items-center justify-between text-[11px] py-0.5"><span class="truncate max-w-[170px] text-slate-700 font-medium">{d["name"]}</span><span class="font-bold text-emerald-900 shrink-0">{d["total"]} ta ({d["percentage"]}%)</span></div>'
+            for d in all_active_dirs[:3]
+        ])
+    else:
+        all_dirs_card_snippet = '<div class="text-[11px] text-slate-400 italic">Hozircha lidlar yo\'q</div>'
+
+    def render_directions_grid_html(dir_stats_list: list, total_leads_period: int, period_label: str) -> str:
+        if not dir_stats_list or total_leads_period == 0:
+            return f"""
+            <div class="py-10 text-center text-slate-400 text-xs font-medium bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                <span>ℹ️ {period_label} davrida hali lidlar kelmagan.</span>
+            </div>
+            """
+
+        active_items = [d for d in dir_stats_list if d["total"] > 0]
+        inactive_items = [d for d in dir_stats_list if d["total"] == 0]
+
+        if not active_items:
+            return f"""
+            <div class="py-10 text-center text-slate-400 text-xs font-medium bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                <span>ℹ️ {period_label} davrida hali yo'nalishlar bo'yicha lidlar mavjud emas.</span>
+            </div>
+            """
+
+        cards_html = ""
+        for item in active_items:
+            d_name = item["name"]
+            parts = d_name.split(" ", 1)
+            d_icon = parts[0] if len(parts) > 1 else "📚"
+            d_title = parts[1] if len(parts) > 1 else d_name
+
+            camp_pills = ""
+            if len(item["campaigns"]) > 1:
+                p_list = [f"{c_name} ({cnt})" for c_name, cnt in sorted(item["campaigns"].items(), key=lambda x: x[1], reverse=True)[:3]]
+                camp_pills = f"""
+                <div class="mt-2 text-[10px] text-slate-400 truncate" title="{', '.join(p_list)}">
+                    🔍 {', '.join(p_list)}
+                </div>
+                """
+
+            cards_html += f"""
+            <div class="bg-white rounded-2xl border border-slate-200/90 hover:border-purple-300 p-4 sm:p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between group">
+                <div>
+                    <div class="flex items-start justify-between gap-2.5 mb-2.5">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-lg font-bold border border-purple-100/80 shrink-0 group-hover:scale-105 transition">{d_icon}</span>
+                            <div class="min-w-0">
+                                <h4 class="font-extrabold text-sm text-slate-900 truncate" title="{d_name}">{d_title}</h4>
+                                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{item['short']}</span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-900 border border-purple-200 shadow-2xs">
+                                {item['total']} ta
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1 mb-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-500 font-medium">Lidlar ulushi ({total_leads_period} tadan):</span>
+                            <span class="font-extrabold text-purple-700">{item['percentage']}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full transition-all duration-500" style="width: {min(item['percentage'], 100)}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs font-medium">
+                        <div class="p-2 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between" title="Telefon raqami olingan lidlar">
+                            <span class="text-emerald-800 flex items-center gap-1">📞 Telefon:</span>
+                            <span class="font-bold text-emerald-900">{item['phones']} ta</span>
+                        </div>
+                        <div class="p-2 rounded-xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between" title="Muvaffaqiyatli kursga qabul qilingan">
+                            <span class="text-indigo-800 flex items-center gap-1">🟢 Muvaffaq:</span>
+                            <span class="font-bold text-indigo-900">{item['done']} ta</span>
+                        </div>
+                        <div class="p-2 rounded-xl bg-purple-50/70 border border-purple-100 flex items-center justify-between" title="Zahiraga / o'quv guruhiga olingan">
+                            <span class="text-purple-800 flex items-center gap-1">📦 Zahira:</span>
+                            <span class="font-bold text-purple-900">{item['zahira']} ta</span>
+                        </div>
+                        <div class="p-2 rounded-xl bg-amber-50/70 border border-amber-100 flex items-center justify-between" title="O'ylab ko'rayotganlar">
+                            <span class="text-amber-800 flex items-center gap-1">💭 O'ylayapti:</span>
+                            <span class="font-bold text-amber-900">{item['thinking']} ta</span>
+                        </div>
+                    </div>
+                    {camp_pills}
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="filterByDirectionAndSwitch('{item['key']}')" class="w-full py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs">
+                        <span>👥 Ushbu lidlarni ko'rish</span>
+                        <span>→</span>
+                    </button>
+                </div>
+            </div>
+            """
+
+        inactive_html = ""
+        if inactive_items:
+            inact_badges = "".join([f'<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-xs font-medium">{d["name"].split(" ", 1)[0]} {d.get("short", d["name"])} (0)</span>' for d in inactive_items])
+            inactive_html = f"""
+            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-bold text-slate-400">⚪ Ushbu davrda lid kelmagan yo'nalishlar:</span>
+                <div class="flex flex-wrap gap-1.5">{inact_badges}</div>
+            </div>
+            """
+
+        return f"""
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {cards_html}
+        </div>
+        {inactive_html}
+        """
+
+    today_directions_grid_html = render_directions_grid_html(today_dir_stats, today_total, f"Bugun ({now_date_display})")
+    month_directions_grid_html = render_directions_grid_html(month_dir_stats, month_total, f"Shu Oy ({current_month_name})")
+    all_directions_grid_html = render_directions_grid_html(all_dir_stats, total_leads, "Barcha davr")
+
+    directions_analytics_block_html = f"""
+            <!-- 🎯 YO'NALISHLAR (KURSLAR) KESIMIDA LIDLAR TAHLILI -->
+            <div id="today_directions_section" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div>
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-100 mb-1.5">
+                            <span>🎯</span> <span>Kurslar & Ta'lim Yo'nalishlari Tahlili</span>
+                        </div>
+                        <h3 class="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                            <span id="dir_section_title">Bugun Qaysi Yo'nalishlarga Lidlar Keldi?</span>
+                            <span class="text-xs font-black px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200" id="dir_section_badge" data-today-badge="{today_total} ta yangi lid" data-month-badge="{month_total} ta oylik lid" data-all-badge="{total_leads} ta jami lid">{today_total} ta yangi lid</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1 font-medium" id="dir_section_subtitle" data-today-sub="{now_date_display} kuni kelgan barcha lidlarning ta'lim yo'nalishlari kesimidagi real-time taqsimoti" data-month-sub="{current_month_name} oyi bo'yicha lidlarning yo'nalishlar kesimidagi taqsimoti" data-all-sub="Barcha davr bo'yicha jami {total_leads} ta lidning yo'nalishlar kesimidagi umumiy statistikasi">
+                            {now_date_display} kuni kelgan barcha lidlarning ta'lim yo'nalishlari kesimidagi real-time taqsimoti
+                        </p>
+                    </div>
+
+                    <!-- Davr tanlash tugmalari -->
+                    <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 self-start sm:self-auto shadow-2xs">
+                        <button type="button" onclick="switchDirectionPeriod('today')" id="dir_btn_today" class="dir-period-btn px-3.5 py-2 rounded-lg bg-white text-purple-700 shadow-xs font-extrabold transition cursor-pointer">
+                            📅 Bugun ({today_total})
+                        </button>
+                        <button type="button" onclick="switchDirectionPeriod('month')" id="dir_btn_month" class="dir-period-btn px-3.5 py-2 rounded-lg hover:text-slate-900 transition text-slate-600 font-semibold cursor-pointer">
+                            🗓️ Shu Oy ({month_total})
+                        </button>
+                        <button type="button" onclick="switchDirectionPeriod('all')" id="dir_btn_all" class="dir-period-btn px-3.5 py-2 rounded-lg hover:text-slate-900 transition text-slate-600 font-semibold cursor-pointer">
+                            🌐 Barcha Davr ({total_leads})
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Kontent Bloklari (Bugun / Shu oy / Umumiy) -->
+                <div id="dir_content_today" class="dir-content-block">
+                    {today_directions_grid_html}
+                </div>
+                <div id="dir_content_month" class="dir-content-block hidden">
+                    {month_directions_grid_html}
+                </div>
+                <div id="dir_content_all" class="dir-content-block hidden">
+                    {all_directions_grid_html}
+                </div>
+            </div>
+    """
+
     # ---------------- 3. VIDEO VA YO'NALISHLAR (KAMPANIYALAR) TAHLILI ----------------
     campaign_stats = {}
     for c in clients:
@@ -344,11 +574,15 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             campaign_stats[cmp_name] = {
                 "name": cmp_name,
                 "total": 0,
+                "today": 0,
                 "phone": 0,
                 "done": 0,
                 "sources": set()
             }
         campaign_stats[cmp_name]["total"] += 1
+        ca_date = (c.get('created_at') or '')[:10]
+        if ca_date == today_str:
+            campaign_stats[cmp_name]["today"] += 1
         src = c.get('source') or 'Direct'
         campaign_stats[cmp_name]["sources"].add(src)
         if c.get("phone_number") and str(c.get("phone_number")).strip() not in ["", "—", "None"]:
@@ -535,7 +769,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     if not sorted_campaigns:
         campaigns_table_html = """
         <tr>
-            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+            <td colspan="7" class="px-6 py-8 text-center text-slate-400">
                 Hozircha kampaniyalar bo'yicha lidlar mavjud emas.
             </td>
         </tr>
@@ -543,6 +777,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
     for c_stat in sorted_campaigns:
         c_name = c_stat["name"]
         c_total = c_stat["total"]
+        c_today = c_stat.get("today", 0)
         c_phone = c_stat["phone"]
         c_done = c_stat["done"]
         c_sources = ", ".join(sorted(list(c_stat["sources"]))) if c_stat["sources"] else "Direct"
@@ -559,6 +794,11 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             </td>
             <td class="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">{c_sources}</td>
             <td class="px-4 py-3.5 text-center font-bold text-slate-900">{c_total} ta</td>
+            <td class="px-4 py-3.5 text-center">
+                <span class="inline-flex items-center gap-1 text-xs font-black px-2.5 py-0.5 rounded-full {'bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs' if c_today > 0 else 'bg-slate-100 text-slate-400'}">
+                    {c_today} ta
+                </span>
+            </td>
             <td class="px-4 py-3.5 text-center">
                 <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                     📞 {c_phone} ({c_phone_pct}%)
@@ -1352,80 +1592,115 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             <!-- Davrlar bo'yicha Tahlil (Bugun, Oylik, Umumiy) -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Bugungi Tahlil -->
-                <div class="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/50 border border-purple-200/80 shadow-xs">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-extrabold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
-                            <span>📅</span> <span>Bugun ({now_date_display})</span>
-                        </span>
-                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Kunlik</span>
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/50 border border-purple-200/80 shadow-xs flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
+                                <span>📅</span> <span>Bugun ({now_date_display})</span>
+                            </span>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Kunlik</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 mb-2">{today_total} <span class="text-xs text-slate-500 font-normal">ta yangi lid</span></div>
+                        <div class="space-y-1.5 text-xs text-slate-600 border-t border-purple-200/60 pt-2.5">
+                            <div class="flex justify-between">
+                                <span>📞 Olingan telefonlar:</span>
+                                <span class="font-bold text-emerald-700">{today_phones} ta</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>🟢 Muvaffaqiyatli:</span>
+                                <span class="font-bold text-indigo-700">{today_done} ta</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>📈 Kunlik konversiya:</span>
+                                <span class="font-bold text-purple-700">{today_conv}%</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 mb-2">{today_total} <span class="text-xs text-slate-500 font-normal">ta yangi lid</span></div>
-                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-purple-200/60 pt-2.5">
-                        <div class="flex justify-between">
-                            <span>📞 Olingan telefonlar:</span>
-                            <span class="font-bold text-emerald-700">{today_phones} ta</span>
+                    <div class="mt-3 pt-2.5 border-t border-purple-200/60 text-xs">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-purple-800 mb-1.5">
+                            <span>🎯 Bugungi kurslar:</span>
+                            <a href="#today_directions_section" onclick="switchDirectionPeriod('today')" class="text-purple-600 hover:text-purple-800 font-semibold underline text-[10px]">Barchasi ↓</a>
                         </div>
-                        <div class="flex justify-between">
-                            <span>🟢 Muvaffaqiyatli:</span>
-                            <span class="font-bold text-indigo-700">{today_done} ta</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>📈 Kunlik konversiya:</span>
-                            <span class="font-bold text-purple-700">{today_conv}%</span>
+                        <div class="space-y-1">
+                            {today_dirs_card_snippet}
                         </div>
                     </div>
                 </div>
 
                 <!-- Shu Oygi Tahlil -->
-                <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-200/80 shadow-xs">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                            <span>🗓️</span> <span>Shu Oy ({current_month_name})</span>
-                        </span>
-                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Oylik</span>
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                                <span>🗓️</span> <span>Shu Oy ({current_month_name})</span>
+                            </span>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Oylik</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 mb-2">{month_total} <span class="text-xs text-slate-500 font-normal">ta oylik lid</span></div>
+                        <div class="space-y-1.5 text-xs text-slate-600 border-t border-indigo-200/60 pt-2.5">
+                            <div class="flex justify-between">
+                                <span>📞 Olingan telefonlar:</span>
+                                <span class="font-bold text-emerald-700">{month_phones} ta</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>🟢 Muvaffaqiyatli:</span>
+                                <span class="font-bold text-indigo-700">{month_done} ta</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>📈 Oylik konversiya:</span>
+                                <span class="font-bold text-indigo-700">{month_conv}%</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 mb-2">{month_total} <span class="text-xs text-slate-500 font-normal">ta oylik lid</span></div>
-                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-indigo-200/60 pt-2.5">
-                        <div class="flex justify-between">
-                            <span>📞 Olingan telefonlar:</span>
-                            <span class="font-bold text-emerald-700">{month_phones} ta</span>
+                    <div class="mt-3 pt-2.5 border-t border-indigo-200/60 text-xs">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-indigo-800 mb-1.5">
+                            <span>🎯 Oylik kurslar:</span>
+                            <a href="#today_directions_section" onclick="switchDirectionPeriod('month')" class="text-indigo-600 hover:text-indigo-800 font-semibold underline text-[10px]">Barchasi ↓</a>
                         </div>
-                        <div class="flex justify-between">
-                            <span>🟢 Muvaffaqiyatli:</span>
-                            <span class="font-bold text-indigo-700">{month_done} ta</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>📈 Oylik konversiya:</span>
-                            <span class="font-bold text-indigo-700">{month_conv}%</span>
+                        <div class="space-y-1">
+                            {month_dirs_card_snippet}
                         </div>
                     </div>
                 </div>
 
                 <!-- Umumiy Tahlil -->
-                <div class="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-xs">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                            <span>🌐</span> <span>Barcha Davr (Umumiy)</span>
-                        </span>
-                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Umumiy</span>
+                <div class="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                                <span>🌐</span> <span>Barcha Davr (Umumiy)</span>
+                            </span>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Umumiy</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 mb-2">{total_leads} <span class="text-xs text-slate-500 font-normal">ta jami lid</span></div>
+                        <div class="space-y-1.5 text-xs text-slate-600 border-t border-emerald-200/60 pt-2.5">
+                            <div class="flex justify-between">
+                                <span>📞 Telefonli lidlar:</span>
+                                <span class="font-bold text-emerald-700">{leads_with_phone} ta ({phone_rate}%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>🟢 Muvaffaqiyatli:</span>
+                                <span class="font-bold text-indigo-700">{done_leads} ta ({conversion_rate}%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>⚠️ Shubhali holatlar:</span>
+                                <span class="font-bold {'text-rose-600' if total_suspicious > 0 else 'text-slate-500'}">{total_suspicious} ta</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 mb-2">{total_leads} <span class="text-xs text-slate-500 font-normal">ta jami lid</span></div>
-                    <div class="space-y-1.5 text-xs text-slate-600 border-t border-emerald-200/60 pt-2.5">
-                        <div class="flex justify-between">
-                            <span>📞 Telefonli lidlar:</span>
-                            <span class="font-bold text-emerald-700">{leads_with_phone} ta ({phone_rate}%)</span>
+                    <div class="mt-3 pt-2.5 border-t border-emerald-200/60 text-xs">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-emerald-800 mb-1.5">
+                            <span>🎯 Asosiy kurslar:</span>
+                            <a href="#today_directions_section" onclick="switchDirectionPeriod('all')" class="text-emerald-700 hover:text-emerald-900 font-semibold underline text-[10px]">Barchasi ↓</a>
                         </div>
-                        <div class="flex justify-between">
-                            <span>🟢 Muvaffaqiyatli:</span>
-                            <span class="font-bold text-indigo-700">{done_leads} ta ({conversion_rate}%)</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>⚠️ Shubhali holatlar:</span>
-                            <span class="font-bold {'text-rose-600' if total_suspicious > 0 else 'text-slate-500'}">{total_suspicious} ta</span>
+                        <div class="space-y-1">
+                            {all_dirs_card_snippet}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {directions_analytics_block_html}
 
             <!-- Asosiy Ko'rsatkichlar (KPI Kartalari) -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -1649,6 +1924,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-5 py-3">Video / Yo'nalish Nomi</th>
                                 <th class="px-4 py-3">Manba Turi</th>
                                 <th class="px-4 py-3 text-center">Jami Lidlar</th>
+                                <th class="px-4 py-3 text-center">📅 Bugun</th>
                                 <th class="px-4 py-3 text-center">📞 Telefonli Lidlar</th>
                                 <th class="px-4 py-3 text-center">🟢 Muvaffaqiyatli</th>
                                 <th class="px-5 py-3 text-right">Konversiya Darajasi</th>
@@ -4375,6 +4651,72 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
             }}
 
             chartsInitialized = true;
+        }}
+
+        // Yo'nalishlar (Kurslar) statistikasi davrini almashtirish (Bugun / Shu oy / Barcha davr)
+        function switchDirectionPeriod(period) {{
+            const btnToday = document.getElementById('dir_btn_today');
+            const btnMonth = document.getElementById('dir_btn_month');
+            const btnAll = document.getElementById('dir_btn_all');
+
+            const contentToday = document.getElementById('dir_content_today');
+            const contentMonth = document.getElementById('dir_content_month');
+            const contentAll = document.getElementById('dir_content_all');
+
+            const titleElem = document.getElementById('dir_section_title');
+            const badgeElem = document.getElementById('dir_section_badge');
+            const subtitleElem = document.getElementById('dir_section_subtitle');
+
+            if (!btnToday || !contentToday) return;
+
+            const inactiveClass = 'dir-period-btn px-3.5 py-2 rounded-lg hover:text-slate-900 transition text-slate-600 font-semibold cursor-pointer';
+            const activeClass = 'dir-period-btn px-3.5 py-2 rounded-lg bg-white text-purple-700 shadow-xs font-extrabold transition cursor-pointer';
+
+            [btnToday, btnMonth, btnAll].forEach(b => {{
+                if (b) b.className = inactiveClass;
+            }});
+
+            [contentToday, contentMonth, contentAll].forEach(c => {{
+                if (c) c.classList.add('hidden');
+            }});
+
+            if (period === 'month') {{
+                if (btnMonth) btnMonth.className = activeClass;
+                if (contentMonth) contentMonth.classList.remove('hidden');
+                if (titleElem) titleElem.textContent = "Shu Oy Qaysi Yo'nalishlarga Lidlar Keldi?";
+                if (badgeElem) badgeElem.textContent = badgeElem.getAttribute('data-month-badge') || '';
+                if (subtitleElem) subtitleElem.textContent = subtitleElem.getAttribute('data-month-sub') || '';
+            }} else if (period === 'all') {{
+                if (btnAll) btnAll.className = activeClass;
+                if (contentAll) contentAll.classList.remove('hidden');
+                if (titleElem) titleElem.textContent = "Barcha Davrda Qaysi Yo'nalishlarga Lidlar Kelgan?";
+                if (badgeElem) badgeElem.textContent = badgeElem.getAttribute('data-all-badge') || '';
+                if (subtitleElem) subtitleElem.textContent = subtitleElem.getAttribute('data-all-sub') || '';
+            }} else {{
+                if (btnToday) btnToday.className = activeClass;
+                if (contentToday) contentToday.classList.remove('hidden');
+                if (titleElem) titleElem.textContent = "Bugun Qaysi Yo'nalishlarga Lidlar Keldi?";
+                if (badgeElem) badgeElem.textContent = badgeElem.getAttribute('data-today-badge') || '';
+                if (subtitleElem) subtitleElem.textContent = subtitleElem.getAttribute('data-today-sub') || '';
+            }}
+        }}
+
+        // Yo'nalish bo'yicha bosilganda Lidlar bazasiga o'tib, shu yo'nalishni avtomatik filtrlab berish
+        function filterByDirectionAndSwitch(dirKey) {{
+            if (typeof switchTab === 'function') {{
+                switchTab('leads');
+            }}
+            const sel = document.getElementById('lead_filter_course');
+            if (sel) {{
+                sel.value = dirKey;
+                if (typeof filterLeads === 'function') {{
+                    filterLeads();
+                }}
+            }}
+            const leadsBox = document.getElementById('tab_leads');
+            if (leadsBox) {{
+                leadsBox.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}
         }}
 
         // Lidlar jadvalida tezkor qidiruv va filtrlash
