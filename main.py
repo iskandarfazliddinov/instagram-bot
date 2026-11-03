@@ -48,7 +48,8 @@ from database import (
     get_study_group_members,
     start_study_group,
     get_available_leads_for_group,
-    mark_client_reply_read
+    mark_client_reply_read,
+    get_operator_activity_report
 )
 from services.dialog_manager import (
     process_incoming_message,
@@ -59,7 +60,11 @@ from services.dialog_manager import (
     is_reaction_or_empty
 )
 from services.instagram import get_recent_media, resolve_media_id_from_url, send_message
-from services.admin_view import get_admin_dashboard_html, get_login_page_html
+from services.admin_view import (
+    get_admin_dashboard_html,
+    get_login_page_html,
+    render_operator_actions_rows_html
+)
 from services.telegram import (
     handle_telegram_callback,
     handle_telegram_reply_comment,
@@ -1486,6 +1491,34 @@ def mark_reply_read_endpoint(client_id: int, request: Request):
     
     success = mark_client_reply_read(client_id)
     return JSONResponse({"success": success})
+
+@app.get("/admin/audit/operator-activity")
+def get_operator_activity_endpoint(
+    request: Request,
+    period: str = "today",
+    date: str = None,
+    month: str = None,
+    from_date: str = None,
+    to_date: str = None
+):
+    """Xodimlarning bajarilgan ishlari va faolligi (kun, oy, oraliq yoki umumiy)"""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "Avtorizatsiyadan o'tilmagan"}, status_code=401)
+
+    custom_val = date if period == "date" else (month if period == "month" else None)
+    data = get_operator_activity_report(
+        period_type=period,
+        custom_val=custom_val,
+        from_date=from_date,
+        to_date=to_date
+    )
+    if not data.get("success"):
+        return JSONResponse(data)
+
+    rows_html = render_operator_actions_rows_html(data.get("operators", []), period_type=period)
+    data["rows_html"] = rows_html
+    return JSONResponse(data)
 
 @app.post("/admin/clients/{client_id}/send-message")
 def send_direct_message_from_crm(

@@ -86,6 +86,70 @@ def safe_js_str(val) -> str:
     cleaned = str(val).replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\r", " ").replace("\n", " ")
     return " ".join(cleaned.split())
 
+def render_operator_actions_rows_html(operators_list: list, period_type: str = "today") -> str:
+    """Xodimlarning faollik jadvali qatorlari HTML ni hosil qilish"""
+    if not operators_list:
+        return '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs font-medium">Ushbu tanlangan davrda hech qanday xodim faolligi qayd etilmagan.</td></tr>'
+
+    rows_html = ""
+    for op_stat in operators_list:
+        o_name = op_stat.get("name") or "Xodim"
+        o_clients_count = op_stat.get("clients_count", 0)
+        o_status = op_stat.get("status_count", 0)
+        o_direct = op_stat.get("direct_count", 0)
+        o_comment = op_stat.get("comment_count", 0)
+        o_assign = op_stat.get("assign_count", 0)
+        o_total = op_stat.get("total_actions", 0)
+        o_last = op_stat.get("last_active", "—")
+
+        if o_name == "Admin":
+            op_badge = '<span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold border border-amber-200">👑</span>'
+            op_label = f'<span class="font-bold text-slate-900">{o_name}</span> <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold ml-1">Admin</span>'
+        else:
+            op_badge = '<span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100">👤</span>'
+            op_label = f'<span class="font-bold text-slate-800">{o_name}</span>'
+
+        status_badge = f'<span class="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{o_status} ta</span>' if o_status > 0 else '<span class="text-slate-400">0</span>'
+        direct_badge = f'<span class="font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-100">{o_direct} ta</span>' if o_direct > 0 else '<span class="text-slate-400">0</span>'
+        comment_badge = f'<span class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{o_comment} ta</span>' if o_comment > 0 else '<span class="text-slate-400">0</span>'
+        assign_badge = f'<span class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{o_assign} ta</span>' if o_assign > 0 else '<span class="text-slate-400">0</span>'
+
+        inactive_text = "Bugun amal yo'q" if period_type == "today" else "Tanlangan davrda amal yo'q"
+        if o_total > 0:
+            total_badge = f'<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">⚡ {o_total} ta amal</span>'
+            last_active_str = f'<span class="text-xs font-semibold text-slate-700">{o_last}</span>'
+        else:
+            total_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-slate-400 bg-slate-100">0 (Faol emas)</span>'
+            last_active_str = f'<span class="text-xs text-slate-400 italic">{inactive_text}</span>'
+
+        if o_clients_count > 0:
+            clients_badge = f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-extrabold">{o_clients_count} ta lid</span>'
+        elif o_assign > 0:
+            clients_badge = '<span class="text-slate-400 text-xs italic">— (faqat biriktirish)</span>'
+        else:
+            clients_badge = '<span class="text-slate-400">0</span>'
+
+        rows_html += f"""
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="px-5 py-3.5 whitespace-nowrap">
+                <div class="flex items-center gap-2.5">
+                    {op_badge}
+                    <div>{op_label}</div>
+                </div>
+            </td>
+            <td class="px-4 py-3.5 text-center text-sm">
+                {clients_badge}
+            </td>
+            <td class="px-4 py-3.5 text-center text-xs">{status_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{direct_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{comment_badge}</td>
+            <td class="px-4 py-3.5 text-center text-xs">{assign_badge}</td>
+            <td class="px-4 py-3.5 text-center">{total_badge}</td>
+            <td class="px-5 py-3.5 text-right whitespace-nowrap">{last_active_str}</td>
+        </tr>
+        """
+    return rows_html
+
 def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, recent_media: list = None, notice: str = "", user_role: str = "admin", current_user: dict = None, operators: list = None, activity_logs: list = None, groups: list = None) -> str:
     """Professional va qulay Instagram CRM boshqaruv paneli va Analitika"""
     is_operator = (user_role == "operator")
@@ -2133,145 +2197,21 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         </tr>
         """
 
-    # Activity Logs table rows & Bugungi amallar hisob-kitobi (UTC+5)
-    today_uzb_date_str = now_uzb().strftime("%d.%m.%Y")
-    today_uzb_iso_str = now_uzb_date()
+    # Xodimlarning Real-Time Faolligi (Davrlar bo'yicha hisobot)
+    from database import get_operator_activity_report
+    now_dt = now_uzb()
+    UZB_MONTHS_MAP = {
+        1: "Yanvar", 2: "Fevral", 3: "Mart", 4: "Aprel",
+        5: "May", 6: "Iyun", 7: "Iyul", 8: "Avgust",
+        9: "Sentyabr", 10: "Oktyabr", 11: "Noyabr", 12: "Dekabr"
+    }
+    this_month_name = UZB_MONTHS_MAP.get(now_dt.month, "")
+    first_day_cur = now_dt.replace(day=1)
+    last_day_prev = first_day_cur - timedelta(days=1)
+    last_month_name = UZB_MONTHS_MAP.get(last_day_prev.month, "")
 
-    operator_today_stats = {}
-
-    # Admin va barcha ro'yxatdan o'tgan operatorlarni bazaviy ro'yxatga olamiz
-    initial_ops = ["Admin"]
-    for op in (operators or []):
-        op_dname = (op.get("display_name") or op.get("username") or "").strip()
-        if op_dname and op_dname not in initial_ops:
-            initial_ops.append(op_dname)
-
-    for op_name in initial_ops:
-        operator_today_stats[op_name] = {
-            "name": op_name,
-            "clients": set(),
-            "status_count": 0,
-            "direct_count": 0,
-            "comment_count": 0,
-            "assign_count": 0,
-            "other_count": 0,
-            "total_actions": 0,
-            "last_active": "—"
-        }
-
-    # activity_logs dan bugungi amallarni yig'amiz
-    for log in (activity_logs or []):
-        raw_created = str(log.get("created_at") or "").strip()
-        time_uzb = to_uzb_time_str(raw_created)
-
-        # Bugungi sana ekanligini aniqlash (DD.MM.YYYY yoki YYYY-MM-DD bo'yicha)
-        is_today = time_uzb.startswith(today_uzb_date_str) or raw_created.startswith(today_uzb_iso_str)
-        if not is_today:
-            continue
-
-        op = (log.get("operator_name") or "Tizim").strip()
-        if op not in operator_today_stats:
-            operator_today_stats[op] = {
-                "name": op,
-                "clients": set(),
-                "status_count": 0,
-                "direct_count": 0,
-                "comment_count": 0,
-                "assign_count": 0,
-                "other_count": 0,
-                "total_actions": 0,
-                "last_active": "—"
-            }
-
-        cid = log.get("client_id")
-        atype = (log.get("action_type") or "").strip().lower()
-        if atype == "status":
-            operator_today_stats[op]["status_count"] += 1
-            if cid:
-                operator_today_stats[op]["clients"].add(cid)
-        elif atype == "direct_message":
-            operator_today_stats[op]["direct_count"] += 1
-            if cid:
-                operator_today_stats[op]["clients"].add(cid)
-        elif atype == "comment":
-            operator_today_stats[op]["comment_count"] += 1
-            if cid:
-                operator_today_stats[op]["clients"].add(cid)
-        elif atype == "assign":
-            operator_today_stats[op]["assign_count"] += 1
-            # Eslatma: 'assign' bu mijoz bilan bevosita gaplashish emas, balki
-            # operatorga biriktirish bo'lgani uchun, faqat biriktirilgan lidlar 'Ishlagan lidlar' ga qo'shilmaydi
-        else:
-            operator_today_stats[op]["other_count"] += 1
-
-        operator_today_stats[op]["total_actions"] += 1
-
-        # Logs ID DESC bo'yicha saralangan, shuning uchun birinchi uchrashgan log - oxirgi amal vaqti
-        if operator_today_stats[op]["last_active"] == "—":
-            operator_today_stats[op]["last_active"] = time_uzb
-
-    sorted_today_ops = sorted(
-        operator_today_stats.values(),
-        key=lambda x: (x["total_actions"], len(x["clients"])),
-        reverse=True
-    )
-
-    today_actions_rows_html = ""
-    for op_stat in sorted_today_ops:
-        o_name = op_stat["name"]
-        o_clients_count = len(op_stat["clients"])
-        o_status = op_stat["status_count"]
-        o_direct = op_stat["direct_count"]
-        o_comment = op_stat["comment_count"]
-        o_assign = op_stat["assign_count"]
-        o_total = op_stat["total_actions"]
-        o_last = op_stat["last_active"]
-
-        if o_name == "Admin":
-            op_badge = '<span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-sm font-bold border border-amber-200">👑</span>'
-            op_label = f'<span class="font-bold text-slate-900">{o_name}</span> <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold ml-1">Admin</span>'
-        else:
-            op_badge = '<span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100">👤</span>'
-            op_label = f'<span class="font-bold text-slate-800">{o_name}</span>'
-
-        status_badge = f'<span class="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{o_status} ta</span>' if o_status > 0 else '<span class="text-slate-400">0</span>'
-        direct_badge = f'<span class="font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-100">{o_direct} ta</span>' if o_direct > 0 else '<span class="text-slate-400">0</span>'
-        comment_badge = f'<span class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{o_comment} ta</span>' if o_comment > 0 else '<span class="text-slate-400">0</span>'
-        assign_badge = f'<span class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{o_assign} ta</span>' if o_assign > 0 else '<span class="text-slate-400">0</span>'
-
-        if o_total > 0:
-            total_badge = f'<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">⚡ {o_total} ta amal</span>'
-            last_active_str = f'<span class="text-xs font-semibold text-slate-700">{o_last}</span>'
-        else:
-            total_badge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-slate-400 bg-slate-100">0 (Faol emas)</span>'
-            last_active_str = '<span class="text-xs text-slate-400 italic">Bugun amal yo\'q</span>'
-
-        if o_clients_count > 0:
-            clients_badge = f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-extrabold">{o_clients_count} ta lid</span>'
-        elif o_assign > 0:
-            clients_badge = '<span class="text-slate-400 text-xs italic">— (faqat biriktirish)</span>'
-        else:
-            clients_badge = '<span class="text-slate-400">0</span>'
-
-        today_actions_rows_html += f"""
-        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
-            <td class="px-5 py-3.5 whitespace-nowrap">
-                <div class="flex items-center gap-2.5">
-                    {op_badge}
-                    <div>{op_label}</div>
-                </div>
-            </td>
-            <td class="px-4 py-3.5 text-center text-sm">
-                {clients_badge}
-            </td>
-            <td class="px-4 py-3.5 text-center text-xs">{status_badge}</td>
-            <td class="px-4 py-3.5 text-center text-xs">{direct_badge}</td>
-            <td class="px-4 py-3.5 text-center text-xs">{comment_badge}</td>
-            <td class="px-4 py-3.5 text-center text-xs">{assign_badge}</td>
-            <td class="px-4 py-3.5 text-center">{total_badge}</td>
-            <td class="px-5 py-3.5 text-right whitespace-nowrap">{last_active_str}</td>
-        </tr>
-        """
+    report_today = get_operator_activity_report("today")
+    today_actions_rows_html = render_operator_actions_rows_html(report_today.get("operators", []), "today")
 
     # Activity Logs table rows & Operator filter
     all_log_ops = sorted(list(set([(log.get("operator_name") or "Tizim").strip() for log in (activity_logs or [])])))
@@ -2574,19 +2514,55 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         <div id="tab_audit" class="tab-content hidden space-y-6">
             {anti_fraud_banner}
 
-            <!-- 1. MUTAXASSISLARNING BUGUNGI REAL-TIME FAOLLIGI (UTC+5) -->
+            <!-- 1. MUTAXASSISLARNING REAL-TIME FAOLLIGI VA BAJARILGAN ISHLARI (UTC+5) -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                            <span>⚡</span> <span>Xodimlarning Bugungi Real-Time Faolligi (Bugun kim nima ish qildi? — UTC+5)</span>
+                            <span>⚡</span> <span id="audit_activity_title">Xodimlarning Real-Time Faolligi (Bajarilgan Ishlar — UTC+5)</span>
                         </h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Bugun qaysi xodim nechta lid bilan ishladi, nechta holat o'zgartirdi va nechta Direct xabar jo'natdi</p>
+                        <p class="text-xs text-slate-500 mt-0.5" id="audit_activity_subtitle">Tanlangan davr bo'yicha qaysi xodim nechta lid bilan ishladi, nechta holat o'zgartirdi va nechta Direct xabar jo'natdi</p>
                     </div>
-                    <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                    <span id="audit_activity_period_badge" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl self-start sm:self-auto shadow-2xs">
                         📅 Bugun: {now_date_display} (Toshkent vaqti)
                     </span>
                 </div>
+
+                <!-- Davrni tanlash filtri (Bugun, Kecha, Shu oy, O'tgan oy, Barcha davr, Istalgan sana yoki oy) -->
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 p-3 bg-slate-50/90 rounded-2xl border border-slate-200/80">
+                    <div class="flex flex-wrap items-center gap-1.5" id="audit_period_btn_group">
+                        <button type="button" onclick="switchAuditPeriod('today', this)" class="audit-period-btn active text-xs font-bold px-3 py-1.5 rounded-xl transition bg-purple-600 text-white shadow-xs cursor-pointer">
+                            ⚡ Bugun
+                        </button>
+                        <button type="button" onclick="switchAuditPeriod('yesterday', this)" class="audit-period-btn text-xs font-semibold px-3 py-1.5 rounded-xl transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer">
+                            ⏳ Kecha
+                        </button>
+                        <button type="button" onclick="switchAuditPeriod('this_month', this)" class="audit-period-btn text-xs font-semibold px-3 py-1.5 rounded-xl transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer">
+                            🗓️ Shu oy ({this_month_name})
+                        </button>
+                        <button type="button" onclick="switchAuditPeriod('last_month', this)" class="audit-period-btn text-xs font-semibold px-3 py-1.5 rounded-xl transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer">
+                            🗓️ O'tgan oy ({last_month_name})
+                        </button>
+                        <button type="button" onclick="switchAuditPeriod('all', this)" class="audit-period-btn text-xs font-semibold px-3 py-1.5 rounded-xl transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer">
+                            🌐 Barcha davr
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                            <span class="text-xs font-bold text-slate-500">📅 Kun:</span>
+                            <input type="date" id="audit_custom_date" onchange="switchAuditCustomDate(this.value)" class="text-xs text-slate-700 font-semibold outline-none bg-transparent cursor-pointer" title="Istalgan kunni tanlang">
+                        </div>
+                        <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                            <span class="text-xs font-bold text-slate-500">🗓️ Oy:</span>
+                            <input type="month" id="audit_custom_month" onchange="switchAuditCustomMonth(this.value)" class="text-xs text-slate-700 font-semibold outline-none bg-transparent cursor-pointer" title="Istalgan oyni tanlang">
+                        </div>
+                        <button type="button" onclick="refreshAuditActivity()" class="p-1.5 px-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl transition text-xs font-bold shadow-2xs cursor-pointer" title="Ma'lumotlarni qayta yuklash">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-indigo-50/60 text-[11px] font-bold uppercase text-indigo-950 border-b border-indigo-100 tracking-wider">
@@ -2601,7 +2577,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                                 <th class="px-5 py-3 text-right">Oxirgi Faolligi (UTC+5)</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="operator_activity_tbody">
                             {today_actions_rows_html}
                         </tbody>
                     </table>
@@ -6008,7 +5984,100 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
         }}
 
         {admin_scripts_js}
-    </script>
+            // ---------------- XODIMLAR FAOLLIGI (DAVRLAR BO'YICHA) ----------------
+        let currentAuditPeriod = 'today';
+
+        async function fetchAndRenderAuditActivity(periodType, customVal = null) {{
+            const tbody = document.getElementById('operator_activity_tbody');
+            const badge = document.getElementById('audit_activity_period_badge');
+            if (!tbody) return;
+
+            tbody.style.opacity = '0.4';
+
+            let url = '/admin/audit/operator-activity?period=' + encodeURIComponent(periodType);
+            if (periodType === 'date' && customVal) {{
+                url += '&date=' + encodeURIComponent(customVal);
+            }} else if (periodType === 'month' && customVal) {{
+                url += '&month=' + encodeURIComponent(customVal);
+            }}
+
+            try {{
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.success) {{
+                    tbody.innerHTML = data.rows_html;
+                    if (badge && data.period_label) {{
+                        badge.textContent = data.period_label;
+                    }}
+                }} else {{
+                    showToast('⚠️ Xatolik yuz berdi');
+                }}
+            }} catch (err) {{
+                console.error('fetchAndRenderAuditActivity error:', err);
+            }} finally {{
+                tbody.style.opacity = '1';
+            }}
+        }}
+
+        function switchAuditPeriod(period, btnEl) {{
+            currentAuditPeriod = period;
+            document.querySelectorAll('.audit-period-btn').forEach(btn => {{
+                btn.classList.remove('active', 'bg-purple-600', 'text-white', 'shadow-xs');
+                btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+            }});
+            if (btnEl) {{
+                btnEl.classList.remove('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+                btnEl.classList.add('active', 'bg-purple-600', 'text-white', 'shadow-xs');
+            }}
+            const dateInp = document.getElementById('audit_custom_date');
+            if (dateInp) dateInp.value = '';
+            const monthInp = document.getElementById('audit_custom_month');
+            if (monthInp) monthInp.value = '';
+
+            fetchAndRenderAuditActivity(period);
+        }}
+
+        function switchAuditCustomDate(dateVal) {{
+            if (!dateVal) return;
+            currentAuditPeriod = 'date';
+            document.querySelectorAll('.audit-period-btn').forEach(btn => {{
+                btn.classList.remove('active', 'bg-purple-600', 'text-white', 'shadow-xs');
+                btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+            }});
+            const monthInp = document.getElementById('audit_custom_month');
+            if (monthInp) monthInp.value = '';
+
+            fetchAndRenderAuditActivity('date', dateVal);
+        }}
+
+        function switchAuditCustomMonth(monthVal) {{
+            if (!monthVal) return;
+            currentAuditPeriod = 'month';
+            document.querySelectorAll('.audit-period-btn').forEach(btn => {{
+                btn.classList.remove('active', 'bg-purple-600', 'text-white', 'shadow-xs');
+                btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+            }});
+            const dateInp = document.getElementById('audit_custom_date');
+            if (dateInp) dateInp.value = '';
+
+            fetchAndRenderAuditActivity('month', monthVal);
+        }}
+
+        function refreshAuditActivity() {{
+            if (currentAuditPeriod === 'date') {{
+                const val = document.getElementById('audit_custom_date') ? document.getElementById('audit_custom_date').value : null;
+                if (val) switchAuditCustomDate(val);
+                else switchAuditPeriod('today');
+            }} else if (currentAuditPeriod === 'month') {{
+                const val = document.getElementById('audit_custom_month') ? document.getElementById('audit_custom_month').value : null;
+                if (val) switchAuditCustomMonth(val);
+                else switchAuditPeriod('this_month');
+            }} else {{
+                fetchAndRenderAuditActivity(currentAuditPeriod);
+            }}
+        }}
+
+</script>
 </body>
 </html>
 """

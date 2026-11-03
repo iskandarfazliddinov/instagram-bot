@@ -1498,6 +1498,204 @@ def get_recent_activity_logs(limit: int = 50) -> list:
     except Exception:
         return []
 
+def get_operator_activity_report(period_type: str = "today", custom_val: str = None, from_date: str = None, to_date: str = None) -> dict:
+    """Xodimlarning amallarini tanlangan davr (kun, oy, oraliq yoki umumiy) bo'yicha hisoblash"""
+    try:
+        now = now_uzb()
+        today_str = now.strftime("%Y-%m-%d")
+
+        UZB_MONTHS = {
+            1: "Yanvar", 2: "Fevral", 3: "Mart", 4: "Aprel",
+            5: "May", 6: "Iyun", 7: "Iyul", 8: "Avgust",
+            9: "Sentyabr", 10: "Oktyabr", 11: "Noyabr", 12: "Dekabr"
+        }
+
+        where_sql = ""
+        params = []
+        period_label = ""
+
+        if period_type == "today":
+            where_sql = "WHERE substr(created_at, 1, 10) = ?"
+            params.append(today_str)
+            period_label = f"📅 Bugun: {now.strftime('%d.%m.%Y')} (Toshkent vaqti)"
+        elif period_type == "yesterday":
+            yest_dt = now - timedelta(days=1)
+            yest_str = yest_dt.strftime("%Y-%m-%d")
+            where_sql = "WHERE substr(created_at, 1, 10) = ?"
+            params.append(yest_str)
+            period_label = f"⏳ Kecha: {yest_dt.strftime('%d.%m.%Y')} (Toshkent vaqti)"
+        elif period_type == "this_month":
+            month_str = now.strftime("%Y-%m")
+            where_sql = "WHERE substr(created_at, 1, 7) = ?"
+            params.append(month_str)
+            m_name = UZB_MONTHS.get(now.month, "")
+            period_label = f"🗓️ Shu oy: {m_name} {now.year} (Toshkent vaqti)"
+        elif period_type == "last_month":
+            first_day_this_month = now.replace(day=1)
+            last_day_prev_month = first_day_this_month - timedelta(days=1)
+            prev_month_str = last_day_prev_month.strftime("%Y-%m")
+            where_sql = "WHERE substr(created_at, 1, 7) = ?"
+            params.append(prev_month_str)
+            m_name = UZB_MONTHS.get(last_day_prev_month.month, "")
+            period_label = f"🗓️ O'tgan oy: {m_name} {last_day_prev_month.year} (Toshkent vaqti)"
+        elif period_type == "date" and custom_val:
+            where_sql = "WHERE substr(created_at, 1, 10) = ?"
+            params.append(custom_val)
+            try:
+                d_obj = datetime.strptime(custom_val, "%Y-%m-%d")
+                period_label = f"📅 Sana: {d_obj.strftime('%d.%m.%Y')} (Toshkent vaqti)"
+            except Exception:
+                period_label = f"📅 Sana: {custom_val}"
+        elif period_type == "month" and custom_val:
+            where_sql = "WHERE substr(created_at, 1, 7) = ?"
+            params.append(custom_val)
+            try:
+                m_obj = datetime.strptime(custom_val, "%Y-%m")
+                m_name = UZB_MONTHS.get(m_obj.month, "")
+                period_label = f"🗓️ Oy: {m_name} {m_obj.year} (Toshkent vaqti)"
+            except Exception:
+                period_label = f"🗓️ Oy: {custom_val}"
+        elif period_type == "range" and from_date and to_date:
+            where_sql = "WHERE substr(created_at, 1, 10) BETWEEN ? AND ?"
+            params.extend([from_date, to_date])
+            period_label = f"📅 Oraliq: {from_date} — {to_date}"
+        elif period_type == "all":
+            where_sql = ""
+            params = []
+            period_label = "🌐 Barcha davr (Umumiy hisobot)"
+        else:
+            where_sql = "WHERE substr(created_at, 1, 10) = ?"
+            params.append(today_str)
+            period_label = f"📅 Bugun: {now.strftime('%d.%m.%Y')} (Toshkent vaqti)"
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT username, display_name FROM operators WHERE is_active = 1 ORDER BY id ASC")
+        ops_rows = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute(f"""
+            SELECT id, client_id, operator_name, action_type, details, created_at
+            FROM activity_logs
+            {where_sql}
+            ORDER BY id DESC
+        """, params)
+        logs = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+
+        # Operatorlar ro'yxati va nom xaritasi
+        initial_ops = ["Admin"]
+        op_name_map = {"admin": "Admin"}
+        for op in ops_rows:
+            d_name = (op.get("display_name") or op.get("username") or "").strip()
+            u_name = (op.get("username") or "").strip()
+            if d_name and d_name not in initial_ops:
+                initial_ops.append(d_name)
+            if d_name:
+                op_name_map[d_name.lower()] = d_name
+            if u_name:
+                op_name_map[u_name.lower()] = d_name or u_name
+                op_name_map["@" + u_name.lower()] = d_name or u_name
+
+        operator_stats = {}
+        for op_name in initial_ops:
+            operator_stats[op_name] = {
+                "name": op_name,
+                "clients": set(),
+                "status_count": 0,
+                "direct_count": 0,
+                "comment_count": 0,
+                "assign_count": 0,
+                "other_count": 0,
+                "total_actions": 0,
+                "last_active": "—"
+            }
+
+        for log in logs:
+            raw_op = (log.get("operator_name") or "Tizim").strip()
+            raw_op_low = raw_op.lower()
+
+            # Mijoz, bot yoki tizimni mutaxassislar ro'yxatidan chiqarib tashlaymiz
+            if raw_op_low in ["mijoz", "bot", "tizim", "ai", "system", "client", ""]:
+                continue
+
+            canonical_op = op_name_map.get(raw_op_low, raw_op)
+            if canonical_op not in operator_stats:
+                operator_stats[canonical_op] = {
+                    "name": canonical_op,
+                    "clients": set(),
+                    "status_count": 0,
+                    "direct_count": 0,
+                    "comment_count": 0,
+                    "assign_count": 0,
+                    "other_count": 0,
+                    "total_actions": 0,
+                    "last_active": "—"
+                }
+
+            cid = log.get("client_id")
+            atype = (log.get("action_type") or "").strip().lower()
+
+            if atype == "status":
+                operator_stats[canonical_op]["status_count"] += 1
+                if cid:
+                    operator_stats[canonical_op]["clients"].add(cid)
+            elif atype == "direct_message":
+                operator_stats[canonical_op]["direct_count"] += 1
+                if cid:
+                    operator_stats[canonical_op]["clients"].add(cid)
+            elif atype == "comment":
+                operator_stats[canonical_op]["comment_count"] += 1
+                if cid:
+                    operator_stats[canonical_op]["clients"].add(cid)
+            elif atype == "assign":
+                operator_stats[canonical_op]["assign_count"] += 1
+            else:
+                operator_stats[canonical_op]["other_count"] += 1
+
+            operator_stats[canonical_op]["total_actions"] += 1
+
+            if operator_stats[canonical_op]["last_active"] == "—":
+                raw_dt = log.get("created_at")
+                operator_stats[canonical_op]["last_active"] = to_uzb_time_str(raw_dt)
+
+        sorted_ops = sorted(
+            operator_stats.values(),
+            key=lambda x: (x["total_actions"], len(x["clients"])),
+            reverse=True
+        )
+
+        result_ops = []
+        for s in sorted_ops:
+            result_ops.append({
+                "name": s["name"],
+                "clients_count": len(s["clients"]),
+                "status_count": s["status_count"],
+                "direct_count": s["direct_count"],
+                "comment_count": s["comment_count"],
+                "assign_count": s["assign_count"],
+                "total_actions": s["total_actions"],
+                "last_active": s["last_active"]
+            })
+
+        return {
+            "success": True,
+            "period_type": period_type,
+            "period_label": period_label,
+            "total_actions": sum(r["total_actions"] for r in result_ops),
+            "operators": result_ops
+        }
+    except Exception as e:
+        logger.error(f"get_operator_activity_report xatoligi: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "period_type": period_type,
+            "period_label": "Xatolik",
+            "total_actions": 0,
+            "operators": []
+        }
+
 # ==========================================
 # 🎓 O'QUV GURUHLARI (OQIMLAR) BOSHQARUVI
 # ==========================================
