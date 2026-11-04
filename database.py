@@ -1603,9 +1603,14 @@ def get_operator_activity_report(period_type: str = "today", custom_val: str = N
                 "name": op_name,
                 "clients": set(),
                 "status_count": 0,
+                "status_boglandi": 0,
+                "status_oylanyapti": 0,
+                "status_zahira": 0,
+                "status_rad": 0,
+                "status_yangi": 0,
                 "direct_count": 0,
                 "comment_count": 0,
-                "assign_count": 0,
+                "group_add_count": 0,
                 "other_count": 0,
                 "total_actions": 0,
                 "last_active": "—"
@@ -1625,9 +1630,14 @@ def get_operator_activity_report(period_type: str = "today", custom_val: str = N
                     "name": canonical_op,
                     "clients": set(),
                     "status_count": 0,
+                    "status_boglandi": 0,
+                    "status_oylanyapti": 0,
+                    "status_zahira": 0,
+                    "status_rad": 0,
+                    "status_yangi": 0,
                     "direct_count": 0,
                     "comment_count": 0,
-                    "assign_count": 0,
+                    "group_add_count": 0,
                     "other_count": 0,
                     "total_actions": 0,
                     "last_active": "—"
@@ -1635,25 +1645,60 @@ def get_operator_activity_report(period_type: str = "today", custom_val: str = N
 
             cid = log.get("client_id")
             atype = (log.get("action_type") or "").strip().lower()
+            details_str = (log.get("details") or "").lower()
 
             if atype == "status":
                 operator_stats[canonical_op]["status_count"] += 1
                 if cid:
                     operator_stats[canonical_op]["clients"].add(cid)
+                if "boglandi" in details_str or "jarayonda" in details_str or "muvaffaqiyatli" in details_str:
+                    operator_stats[canonical_op]["status_boglandi"] += 1
+                elif "oylanyapti" in details_str:
+                    operator_stats[canonical_op]["status_oylanyapti"] += 1
+                elif "zahira" in details_str or "zaxira" in details_str:
+                    operator_stats[canonical_op]["status_zahira"] += 1
+                elif "rad" in details_str:
+                    operator_stats[canonical_op]["status_rad"] += 1
+                elif "yangi" in details_str:
+                    operator_stats[canonical_op]["status_yangi"] += 1
+
             elif atype == "direct_message":
                 operator_stats[canonical_op]["direct_count"] += 1
                 if cid:
                     operator_stats[canonical_op]["clients"].add(cid)
+
             elif atype == "comment":
                 operator_stats[canonical_op]["comment_count"] += 1
                 if cid:
                     operator_stats[canonical_op]["clients"].add(cid)
+                # Agar izoh yozishda holat ham o'zgartirilgan bo'lsa
+                if "holat: boglandi" in details_str or "holat: jarayonda" in details_str:
+                    operator_stats[canonical_op]["status_boglandi"] += 1
+                    operator_stats[canonical_op]["status_count"] += 1
+                elif "holat: oylanyapti" in details_str:
+                    operator_stats[canonical_op]["status_oylanyapti"] += 1
+                    operator_stats[canonical_op]["status_count"] += 1
+                elif "holat: zahira" in details_str or "holat: zaxira" in details_str:
+                    operator_stats[canonical_op]["status_zahira"] += 1
+                    operator_stats[canonical_op]["status_count"] += 1
+                elif "holat: rad" in details_str:
+                    operator_stats[canonical_op]["status_rad"] += 1
+                    operator_stats[canonical_op]["status_count"] += 1
+
+            elif atype in ["guruhga_biriktirildi", "guruhga_qoshildi"] or "guruhiga qo'shildi" in details_str:
+                operator_stats[canonical_op]["group_add_count"] += 1
+                if cid:
+                    operator_stats[canonical_op]["clients"].add(cid)
+
             elif atype == "assign":
-                operator_stats[canonical_op]["assign_count"] += 1
+                # Foydalanuvchi talabiga ko'ra biriktirish jadvaldan olib tashlandi
+                pass
             else:
                 operator_stats[canonical_op]["other_count"] += 1
 
-            operator_stats[canonical_op]["total_actions"] += 1
+            # Jami haqiqiy amallar
+            if atype != "assign":
+                operator_stats[canonical_op]["total_actions"] += 1
 
             if operator_stats[canonical_op]["last_active"] == "—":
                 raw_dt = log.get("created_at")
@@ -1671,9 +1716,14 @@ def get_operator_activity_report(period_type: str = "today", custom_val: str = N
                 "name": s["name"],
                 "clients_count": len(s["clients"]),
                 "status_count": s["status_count"],
+                "status_boglandi": s["status_boglandi"],
+                "status_oylanyapti": s["status_oylanyapti"],
+                "status_zahira": s["status_zahira"],
+                "status_rad": s["status_rad"],
+                "status_yangi": s["status_yangi"],
                 "direct_count": s["direct_count"],
                 "comment_count": s["comment_count"],
-                "assign_count": s["assign_count"],
+                "group_add_count": s["group_add_count"],
                 "total_actions": s["total_actions"],
                 "last_active": s["last_active"]
             })

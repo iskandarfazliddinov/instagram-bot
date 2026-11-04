@@ -96,9 +96,14 @@ def render_operator_actions_rows_html(operators_list: list, period_type: str = "
         o_name = op_stat.get("name") or "Xodim"
         o_clients_count = op_stat.get("clients_count", 0)
         o_status = op_stat.get("status_count", 0)
+        o_st_bog = op_stat.get("status_boglandi", 0)
+        o_st_oyl = op_stat.get("status_oylanyapti", 0)
+        o_st_zah = op_stat.get("status_zahira", 0)
+        o_st_rad = op_stat.get("status_rad", 0)
+        o_st_yan = op_stat.get("status_yangi", 0)
+        o_group_add = op_stat.get("group_add_count", 0)
         o_direct = op_stat.get("direct_count", 0)
         o_comment = op_stat.get("comment_count", 0)
-        o_assign = op_stat.get("assign_count", 0)
         o_total = op_stat.get("total_actions", 0)
         o_last = op_stat.get("last_active", "—")
 
@@ -109,10 +114,38 @@ def render_operator_actions_rows_html(operators_list: list, period_type: str = "
             op_badge = '<span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-bold border border-indigo-100">👤</span>'
             op_label = f'<span class="font-bold text-slate-800">{o_name}</span>'
 
-        status_badge = f'<span class="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">{o_status} ta</span>' if o_status > 0 else '<span class="text-slate-400">0</span>'
+        # Holat o'zgartirish nishonlari (aniq qaysi holatlarga o'zgartirilgani bilan)
+        if o_status > 0:
+            breakdown_badges = []
+            if o_st_bog > 0:
+                breakdown_badges.append(f'<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs" title="Muvaffaqiyatli / Bog\'lanildi">🟢 {o_st_bog}</span>')
+            if o_st_oyl > 0:
+                breakdown_badges.append(f'<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shadow-2xs" title="O\'ylayapti">💭 {o_st_oyl}</span>')
+            if o_st_zah > 0:
+                breakdown_badges.append(f'<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs" title="Zahira (Keyingi oqim)">📦 {o_st_zah}</span>')
+            if o_st_rad > 0:
+                breakdown_badges.append(f'<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs" title="Rad etildi / Ko\'tarmadi">🔴 {o_st_rad}</span>')
+            if o_st_yan > 0:
+                breakdown_badges.append(f'<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs" title="Yangi">⚪ {o_st_yan}</span>')
+
+            badges_html = " ".join(breakdown_badges) if breakdown_badges else ""
+            status_cell_html = f"""
+            <div class="flex flex-col items-center gap-1 py-0.5">
+                <span class="font-extrabold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200 text-xs shadow-2xs">🔄 {o_status} ta</span>
+                {f'<div class="flex flex-wrap items-center justify-center gap-1 max-w-[200px]">{badges_html}</div>' if badges_html else ''}
+            </div>
+            """
+        else:
+            status_cell_html = '<span class="text-slate-400">0</span>'
+
+        # Guruhga qo'shgan nishoni
+        if o_group_add > 0:
+            group_add_badge = f'<span class="font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs">🎓 {o_group_add} ta</span>'
+        else:
+            group_add_badge = '<span class="text-slate-400">0</span>'
+
         direct_badge = f'<span class="font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-100">{o_direct} ta</span>' if o_direct > 0 else '<span class="text-slate-400">0</span>'
         comment_badge = f'<span class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{o_comment} ta</span>' if o_comment > 0 else '<span class="text-slate-400">0</span>'
-        assign_badge = f'<span class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{o_assign} ta</span>' if o_assign > 0 else '<span class="text-slate-400">0</span>'
 
         inactive_text = "Bugun amal yo'q" if period_type == "today" else "Tanlangan davrda amal yo'q"
         if o_total > 0:
@@ -124,8 +157,6 @@ def render_operator_actions_rows_html(operators_list: list, period_type: str = "
 
         if o_clients_count > 0:
             clients_badge = f'<span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-extrabold">{o_clients_count} ta lid</span>'
-        elif o_assign > 0:
-            clients_badge = '<span class="text-slate-400 text-xs italic">— (faqat biriktirish)</span>'
         else:
             clients_badge = '<span class="text-slate-400">0</span>'
 
@@ -140,10 +171,10 @@ def render_operator_actions_rows_html(operators_list: list, period_type: str = "
             <td class="px-4 py-3.5 text-center text-sm">
                 {clients_badge}
             </td>
-            <td class="px-4 py-3.5 text-center text-xs">{status_badge}</td>
+            <td class="px-4 py-3.5 text-center">{status_cell_html}</td>
+            <td class="px-4 py-3.5 text-center">{group_add_badge}</td>
             <td class="px-4 py-3.5 text-center text-xs">{direct_badge}</td>
             <td class="px-4 py-3.5 text-center text-xs">{comment_badge}</td>
-            <td class="px-4 py-3.5 text-center text-xs">{assign_badge}</td>
             <td class="px-4 py-3.5 text-center">{total_badge}</td>
             <td class="px-5 py-3.5 text-right whitespace-nowrap">{last_active_str}</td>
         </tr>
@@ -2569,10 +2600,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <tr>
                                 <th class="px-5 py-3">Mutaxassis / Xodim</th>
                                 <th class="px-4 py-3 text-center" title="Holati o'zgartirilgan, izoh yozilgan yoki Directda yozishilgan unikal lidlar soni">👥 Ishlagan Lidlar (Muloqot/Holat)</th>
-                                <th class="px-4 py-3 text-center">🔄 Holat O'zgartirgan</th>
+                                <th class="px-4 py-3 text-center" title="Mijozlar holatini qaysi bosqichlarga o'zgartirganligi tafsiloti (Muvaffaqiyatli, O'ylayapti, Zahira, Rad)">🔄 Holat O'zgartirgan (Tafsiloti)</th>
+                                <th class="px-4 py-3 text-center" title="O'quv guruhlariga (oqimlarga) biriktirilgan o'quvchilar soni">🎓 Guruhga Qo'shgan</th>
                                 <th class="px-4 py-3 text-center">💬 Directdan Yozgan</th>
                                 <th class="px-4 py-3 text-center">📝 Izoh Qoldirgan</th>
-                                <th class="px-4 py-3 text-center" title="Operatorlarga mas'ul sifatida biriktirilgan lidlar soni (boshqaruv amali)">🎯 Biriktirgan</th>
                                 <th class="px-4 py-3 text-center">⚡ Jami Amallar</th>
                                 <th class="px-5 py-3 text-right">Oxirgi Faolligi (UTC+5)</th>
                             </tr>

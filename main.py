@@ -1340,6 +1340,8 @@ def update_comment_from_admin(
     camp_text = f"; Yo'nalish: {campaign.strip()}" if (campaign and campaign.strip()) else ""
     grp_text = f"; Guruh: {assigned_group_name}" if assigned_group_name else ""
     log_activity(client_id, actor_name, "comment", f"Izoh: {comm_text}; Holat: {st_text}{camp_text}{grp_text}")
+    if status_val and status_val.strip():
+        log_activity(client_id, actor_name, "status", f"Holat o'zgartirildi: {status_val.strip()}")
     try:
         update_telegram_lead_message(client_id)
     except Exception as e:
