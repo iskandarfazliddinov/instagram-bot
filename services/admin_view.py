@@ -2474,10 +2474,10 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
 
         <!-- Filtr va Qidiruv Paneli -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div class="flex-1 relative">
+            <div class="flex-1 relative min-w-[260px]">
                 <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
-                <input type="text" id="group_search" onkeyup="filterGroups()" placeholder="Guruh nomi, ustoz yoki yo'nalish bo'yicha qidirish..."
-                       class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
+                <input type="text" id="group_search" onkeyup="filterGroups()" oninput="filterGroups()" placeholder="Guruh nomi, ustoz yoki yo'nalish bo'yicha qidirish..."
+                       class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white hover:border-slate-300 transition shadow-2xs">
             </div>
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 <select id="group_filter_status" onchange="filterGroups()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer">
@@ -3647,14 +3647,30 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                     </div>
                 </div>
 
-                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-4">
-                    <div class="flex-1 relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
-                        <input type="text" id="lead_search" onkeyup="filterLeads()" placeholder="Ism, telefon yoki kurs bo'yicha qidirish..."
-                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white transition">
+                <div class="flex flex-col gap-3 mb-4">
+                    <!-- 1-qator: Keng Qidiruv Maydoni, Saralash va Yangilash -->
+                    <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+                        <div class="relative flex-1 min-w-[260px]">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
+                            <input type="text" id="lead_search" onkeyup="filterLeads()" oninput="filterLeads()" placeholder="Ism, telefon, username yoki kurs bo'yicha qidirish..."
+                                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white hover:border-slate-300 transition shadow-2xs">
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            <select id="lead_sort_order" onchange="sortCardsAndRows(this.value)" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer shadow-2xs" title="Lidlar tartibi">
+                                <option value="asc" selected>⬇️ Navbat bo'yicha (Yangisi oxirida)</option>
+                                <option value="desc">⬆️ Yangilar avval (Yangisi tepada)</option>
+                            </select>
+                            <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
+                                <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
+                                    🔄 Yangilash
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+
+                    <!-- 2-qator: Filtrlash parametrlari -->
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <select id="lead_filter_status" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer shadow-2xs">
                             <option value="all">📋 Barcha holatlar</option>
                             <option value="unread_reply">💬 Yangi javob kelganlar ({total_unread_replies} ta)</option>
                             <option value="suspicious">⚠️ Faqat Shubhali Lidlar ({total_suspicious} ta)</option>
@@ -3664,29 +3680,20 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                             <option value="zahira">📦 Zahira (Keyingi oqim)</option>
                             <option value="rad">🔴 Rad / Ko'tarmadi</option>
                         </select>
-                        <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                        <select id="lead_filter_course" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer shadow-2xs">
                             {course_filter_options_html}
                         </select>
-                        <select id="lead_filter_source" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                        <select id="lead_filter_source" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer shadow-2xs">
                             <option value="all">📍 Barcha manbalar</option>
                             <option value="reels">🎬 Reels / Video izohi</option>
                             <option value="direct">💬 Instagram Direct</option>
                         </select>
-                        <select id="lead_filter_manager" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300">
+                        <select id="lead_filter_manager" onchange="filterLeads()" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer shadow-2xs">
                             <option value="all">👥 Barcha xodimlar</option>
                             <option value="my_leads">⭐ Faqat mening lidlarim ({curr_display_name})</option>
                             <option value="unassigned">⚪ Biriktirilmagan lidlar</option>
                             {operators_filter_options_html}
                         </select>
-                        <select id="lead_sort_order" onchange="sortCardsAndRows(this.value)" class="text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 outline-none hover:border-slate-300 cursor-pointer" title="Lidlar tartibi">
-                            <option value="asc" selected>⬇️ Navbat bo'yicha (Yangisi oxirida)</option>
-                            <option value="desc">⬆️ Yangilar avval (Yangisi tepada)</option>
-                        </select>
-                        <form action="/admin/sync-instagram" method="POST" class="inline" onsubmit="this.querySelector('button').innerHTML = '⏳ Sinxronlanmoqda...';">
-                            <button type="submit" title="Instagram Direct yozishmalaridan lidlarni yangilash va tiklash" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer">
-                                🔄 Yangilash
-                            </button>
-                        </form>
                     </div>
                 </div>
 
