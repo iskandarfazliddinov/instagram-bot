@@ -977,28 +977,25 @@ def admin_dashboard(request: Request, notice: str = ""):
 
         filtered_clients = []
         for cl in clients_data:
-            mgr = (cl.get("manager_name") or "").strip()
-            mgr_lower = mgr.lower()
-            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
-            is_assigned_to_me = bool(not is_unassigned and (mgr_lower == my_display or mgr_lower == my_user or my_display in mgr_lower or mgr_lower in my_display))
-            is_assigned_to_other = bool(not is_unassigned and not is_assigned_to_me)
-
-            # 1. Boshqa operatorga biriktirilgan bo'lsa -> bu operatorga ASLO ko'rinmasin!
-            if is_assigned_to_other:
+            # 1. Agar barcha yo'nalishlarga ruxsat berilgan bo'lsa:
+            if not allowed_keys:
+                filtered_clients.append(cl)
                 continue
 
-            # 2. Aynan shu operatorga biriktirilgan bo'lsa -> albatta ko'rinsin
+            # 2. Shu yo'nalishdagi BARCHA lidlar ko'rinsin (kimga biriktirilganidan qat'i nazar: o'zi, boshqa xodim yoki biriktirilmagan!)
+            extra_ctx = f"{cl.get('group_name', '')} {cl.get('ai_summary', '')} {cl.get('last_message', '')}"
+            c_dir = get_lead_direction_key(cl.get("campaign", ""), extra_ctx)
+            if c_dir in allowed_keys:
+                filtered_clients.append(cl)
+                continue
+
+            # 3. Agar yo'nalishi boshqa bo'lsa ham, lekin aynan shu operatorga biriktirilgan bo'lsa -> o'ziga ko'rinsin
+            mgr = (cl.get("manager_name") or "").strip().lower()
+            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
+            is_assigned_to_me = bool(not is_unassigned and (mgr == my_display or mgr == my_user or my_display in mgr or mgr in my_display))
             if is_assigned_to_me:
                 filtered_clients.append(cl)
                 continue
-
-            # 3. Hali hech kimga biriktirilmagan yangi lid bo'lsa -> operator yo'nalishlariga qaraymiz
-            if not allowed_keys:
-                filtered_clients.append(cl)
-            else:
-                c_dir = get_lead_direction_key(cl.get("campaign", ""))
-                if c_dir in allowed_keys:
-                    filtered_clients.append(cl)
 
         clients_data = filtered_clients
 
@@ -2082,23 +2079,22 @@ def export_clients_excel(request: Request):
 
         filtered = []
         for cl in clients:
-            mgr = (cl.get("manager_name") or "").strip()
-            mgr_lower = mgr.lower()
-            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
-            is_assigned_to_me = bool(not is_unassigned and (mgr_lower == my_display or mgr_lower == my_user or my_display in mgr_lower or mgr_lower in my_display))
-            is_assigned_to_other = bool(not is_unassigned and not is_assigned_to_me)
-
-            if is_assigned_to_other:
+            if not allowed_keys:
+                filtered.append(cl)
                 continue
+
+            extra_ctx = f"{cl.get('group_name', '')} {cl.get('ai_summary', '')} {cl.get('last_message', '')}"
+            c_dir = get_lead_direction_key(cl.get("campaign", ""), extra_ctx)
+            if c_dir in allowed_keys:
+                filtered.append(cl)
+                continue
+
+            mgr = (cl.get("manager_name") or "").strip().lower()
+            is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
+            is_assigned_to_me = bool(not is_unassigned and (mgr == my_display or mgr == my_user or my_display in mgr or mgr in my_display))
             if is_assigned_to_me:
                 filtered.append(cl)
                 continue
-            if not allowed_keys:
-                filtered.append(cl)
-            else:
-                c_dir = get_lead_direction_key(cl.get("campaign", ""))
-                if c_dir in allowed_keys:
-                    filtered.append(cl)
         clients = filtered
     
     try:
@@ -2319,12 +2315,42 @@ def export_clients_excel(request: Request):
         )
     except Exception as e:
         logger.error(f"Excel yaratishda xatolik: {e}, CSV ga o'tilmoqda")
-        return export_clients_csv()
+        return export_clients_csv(request)
 
 @app.get("/api/clients/csv")
-def export_clients_csv():
+def export_clients_csv(request: Request = None):
     """Yig'ilgan mijozlar bazasini Excel / CSV formatida (UTF-8 BOM bilan) yuklab olish"""
     clients = get_all_clients()
+    if request:
+        curr_user = get_current_user(request)
+        if curr_user and curr_user.get("role") == "operator" and curr_user.get("username") not in ["admin", "jasurraxmanov", "shirin"]:
+            from database import get_operator_by_id, get_lead_direction_key
+            op_info = get_operator_by_id(curr_user.get("id"))
+            allowed_dir_str = (op_info.get("allowed_directions") or "all").strip() if op_info else "all"
+            allowed_keys = set([k.strip() for k in allowed_dir_str.split(",") if k.strip()]) if allowed_dir_str != "all" and allowed_dir_str else set()
+
+            my_display = (curr_user.get("display_name") or "").strip().lower()
+            my_user = (curr_user.get("username") or "").strip().lower()
+
+            filtered = []
+            for cl in clients:
+                if not allowed_keys:
+                    filtered.append(cl)
+                    continue
+
+                extra_ctx = f"{cl.get('group_name', '')} {cl.get('ai_summary', '')} {cl.get('last_message', '')}"
+                c_dir = get_lead_direction_key(cl.get("campaign", ""), extra_ctx)
+                if c_dir in allowed_keys:
+                    filtered.append(cl)
+                    continue
+
+                mgr = (cl.get("manager_name") or "").strip().lower()
+                is_unassigned = (not mgr or mgr in ["—", "none", "null", "⚪ biriktirilmagan (yangi)", "biriktirilmagan", "yangi"])
+                is_assigned_to_me = bool(not is_unassigned and (mgr == my_display or mgr == my_user or my_display in mgr or mgr in my_display))
+                if is_assigned_to_me:
+                    filtered.append(cl)
+                    continue
+            clients = filtered
     
     output = io.StringIO()
     # Excel uchun UTF-8 BOM qo'shish (harflar va belgilar buzilmasligi uchun)

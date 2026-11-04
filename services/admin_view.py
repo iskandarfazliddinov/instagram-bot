@@ -336,7 +336,7 @@ def get_admin_dashboard_html(settings: dict, campaigns: list, clients: list, rec
                 <span>Sizga biriktirilgan yo'nalishlar:</span>
                 <div class="flex flex-wrap gap-1.5">{pills_html}</div>
             </div>
-            <span class="text-slate-500 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-purple-100">🔒 Faqat sizga tegishli lidlar ko'rsatilmoqda</span>
+            <span class="text-slate-500 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-purple-100">🔒 Biriktirilgan yo'nalishingizdagi barcha lidlar ko'rsatilmoqda</span>
         </div>
         """
 

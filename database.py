@@ -793,7 +793,7 @@ AVAILABLE_DIRECTIONS = [
     {"key": "umumiy", "name": "💬 Boshqa / Umumiy", "short": "Boshqa"},
 ]
 
-def get_lead_direction_key(campaign: str) -> str:
+def get_lead_direction_key(campaign: str, fallback_text: str = "") -> str:
     """Mijoz kampaniyasi / so'roviga qarab yo'nalish kalitini aniqlash"""
     c = (campaign or "").lower().strip()
     if any(k in c for k in ["front", "housekeeping", "xona tozalash", "tourism-edu", "online", "onlayn"]):
@@ -814,6 +814,23 @@ def get_lead_direction_key(campaign: str) -> str:
         return "dastur"
     if any(k in c for k in ["konsultatsiya", "batafsil"]):
         return "konsultatsiya"
+
+    # Agar kampaniya nomi umumiy bo'lsa, qo'shimcha ma'lumotlardan (guruh nomi, AI tahlili, oxirgi so'rov) qaraymiz
+    if fallback_text:
+        ft = fallback_text.lower().strip()
+        if any(k in ft for k in ["front", "housekeeping", "xona tozalash", "tourism-edu", "online", "onlayn"]):
+            return "front_office"
+        if any(k in ft for k in ["hotel", "mehmonxona", "operations"]):
+            return "hotel"
+        if "malaka" in ft:
+            return "gid_malaka"
+        if any(k in ft for k in ["gid", "ekskurs"]):
+            return "gid_qayta"
+        if "turagent" in ft:
+            return "turagent"
+        if "turoperator" in ft:
+            return "turoperator"
+
     return "umumiy"
 
 def get_all_operators() -> list:
