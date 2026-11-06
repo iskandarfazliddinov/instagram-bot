@@ -470,10 +470,26 @@ def reply_public_comment(comment_id: str, text: str) -> dict:
         logger.error(f"Izoh ostiga ommaviy javob yozishda xatolik: {e}")
         return {"error": str(e)}
 
-def get_recent_media(limit: int = 25) -> list:
+_RECENT_MEDIA_CACHE = {
+    "timestamp": 0,
+    "data": []
+}
+
+def get_recent_media(limit: int = 25, force_refresh: bool = False) -> list:
     """
-    Instagram akkauntdagi so'nggi video va postlarni olish
+    Instagram akkauntdagi so'nggi video va postlarni olish (15 daqiqalik tezkor kesh bilan)
     """
+    global _RECENT_MEDIA_CACHE
+    import time
+    now = time.time()
+    # 15 daqiqalik (900 soniya) kesh
+    if not force_refresh and (now - _RECENT_MEDIA_CACHE["timestamp"] < 900) and _RECENT_MEDIA_CACHE["data"]:
+        return _RECENT_MEDIA_CACHE["data"]
+
+    # Agar yaqinda so'ralgan va xato/bo'sh bo'lsa, qayta-qayta sahifani qotirmaslik uchun 5 daqiqa kutish
+    if not force_refresh and (now - _RECENT_MEDIA_CACHE["timestamp"] < 300) and _RECENT_MEDIA_CACHE["timestamp"] > 0:
+        return _RECENT_MEDIA_CACHE.get("data", [])
+
     token = get_access_token()
     if not token or token == "YOUR_PAGE_ACCESS_TOKEN_HERE":
         return []
@@ -485,15 +501,19 @@ def get_recent_media(limit: int = 25) -> list:
         "limit": limit
     }
     try:
-        res = requests.get(url, params=params, timeout=5)
+        res = requests.get(url, params=params, timeout=2.5)
+        _RECENT_MEDIA_CACHE["timestamp"] = now
         if res.status_code == 200:
-            return res.json().get("data", [])
+            data = res.json().get("data", [])
+            _RECENT_MEDIA_CACHE["data"] = data
+            return data
         data = res.json()
         check_meta_response_for_errors(data)
         logger.warning(f"me/media so'rovi xatolik berdi: {res.text}")
     except Exception as e:
         logger.error(f"Instagram media olishda xatolik: {e}")
-    return []
+        _RECENT_MEDIA_CACHE["timestamp"] = now
+    return _RECENT_MEDIA_CACHE.get("data", [])
 
 def resolve_media_id_from_url(url_or_id: str) -> tuple[str, str]:
     """

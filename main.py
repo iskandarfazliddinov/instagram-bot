@@ -960,7 +960,9 @@ def admin_dashboard(request: Request, notice: str = ""):
     settings_data = get_all_settings()
     campaigns_data = get_all_campaigns()
     clients_data = get_all_clients()
-    recent_media = get_recent_media(limit=25)
+    recent_media = []
+    if curr_user.get("role") == "admin":
+        recent_media = get_recent_media(limit=25)
     from database import get_all_operators, get_operator_by_id, get_lead_direction_key
     operators_data = get_all_operators()
     recent_logs = get_recent_activity_logs(500)
